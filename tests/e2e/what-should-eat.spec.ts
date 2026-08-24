@@ -200,3 +200,78 @@ test("현재 위치와 참가자 선택부터 A/B 결과와 이력까지 완주�
   await page.getByRole("button", { name: "찾기", exact: true }).click();
   await expect(page.getByText("테스트 식당 2")).toBeVisible();
 });
+
+test("실제 API에서 가입·로그인·결정·피드백을 저장한다", async ({ page }) => {
+  test.skip(
+    process.env.WORKBENCH_DATABASE_E2E !== "true",
+    "공유 Supabase에 쓰는 배포 검증에서만 실행합니다.",
+  );
+
+  const loginId = `e2e${Date.now().toString(36).slice(-8)}`;
+  const pin = "123456";
+  const place = {
+    id: `e2e-place-${loginId}`,
+    name: "Workbench E2E 식당",
+    category: "음식점 > 한식",
+    distanceMeters: 100,
+    address: "서울특별시",
+    roadAddress: "서울특별시 테스트로 1",
+    placeUrl: "",
+    latitude: 37.5665,
+    longitude: 126.978,
+  };
+
+  await page.goto("/what-should-eat");
+  const signup = await page.request.post("/what-should-eat/api/auth/signup", {
+    data: {
+      loginId,
+      pin,
+      displayName: "E2E 사용자",
+      birthYear: 2000,
+      gender: "male",
+    },
+  });
+  expect(signup.status()).toBe(201);
+  const signupBody = (await signup.json()) as { user: { id: number } };
+
+  const sessionCookie = (await page.context().cookies()).find(
+    (cookie) => cookie.name === "what_should_eat_session",
+  );
+  expect(sessionCookie?.path).toBe("/what-should-eat");
+
+  await page.request.post("/what-should-eat/api/auth/logout");
+  const login = await page.request.post("/what-should-eat/api/auth/login", {
+    data: { loginId, pin },
+  });
+  expect(login.status()).toBe(200);
+
+  const decision = await page.request.post("/what-should-eat/api/decisions", {
+    data: {
+      participantIds: [signupBody.user.id],
+      place,
+      comparisons: [],
+    },
+  });
+  expect(decision.status()).toBe(201);
+  const decisionBody = (await decision.json()) as { decision: { id: number } };
+
+  const feedback = await page.request.post("/what-should-eat/api/feedback", {
+    data: {
+      decisionId: decisionBody.decision.id,
+      response: "liked",
+    },
+  });
+  expect(feedback.status()).toBe(201);
+
+  const decisions = await page.request.get("/what-should-eat/api/decisions");
+  expect(decisions.status()).toBe(200);
+  const decisionsBody = (await decisions.json()) as { decisions: unknown[] };
+  expect(decisionsBody.decisions).toHaveLength(1);
+
+  const search = await page.request.get(
+    "/what-should-eat/api/places/search?q=테스트",
+  );
+  expect(search.status()).toBe(
+    process.env.WORKBENCH_KAKAO_E2E === "true" ? 200 : 502,
+  );
+});
