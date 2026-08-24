@@ -4,13 +4,13 @@
 
 ## 1. 자원 구성
 
-| 영역         | 이름                        | 구성                                       |
-| ------------ | --------------------------- | ------------------------------------------ |
-| GitHub       | `TypeMIN/typemin-workbench` | 저장소 1개, `main`이 프로덕션              |
-| 애플리케이션 | `Workbench`                 | Next.js App Router 앱 1개                  |
-| 배포         | `workbench`                 | Vercel 프로젝트 1개, 기능 브랜치는 Preview |
-| 백엔드       | `Workbench`                 | Supabase 프로젝트 1개, `ap-northeast-2`    |
-| 웹 주소      | Vercel 기본 주소            | 앱별 최상위 서브패스                       |
+| 영역         | 이름                            | 구성                                       |
+| ------------ | ------------------------------- | ------------------------------------------ |
+| GitHub       | `TypeMIN/typemin-workbench`     | 저장소 1개, `main`이 프로덕션              |
+| 애플리케이션 | `Workbench`                     | Next.js App Router 앱 1개                  |
+| 배포         | `workbench`                     | Vercel 프로젝트 1개, 기능 브랜치는 Preview |
+| 백엔드       | `Workbench`                     | Supabase 프로젝트 1개, `ap-northeast-2`    |
+| 웹 주소      | `workbench-type-min.vercel.app` | 앱별 최상위 서브패스                       |
 
 `workbench.example.com`은 커스텀 도메인이 정해지기 전까지 문서에서만 쓰는 placeholder입니다.
 
@@ -21,7 +21,7 @@ flowchart TD
     Next --> Meal["/what-should-eat"]
     Next --> WorldCup["/worldcup-prediction"]
     GitHub --> Vercel["Vercel<br/>workbench"]
-    Vercel --> Host["workbench-*.vercel.app"]
+    Vercel --> Host["workbench-type-min.vercel.app"]
     Host --> Home
     Meal --> MealAPI["/what-should-eat/api/*"]
     MealAPI --> ServerSecret["SUPABASE_SECRET_KEY<br/>server only"]

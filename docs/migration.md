@@ -22,6 +22,8 @@ Vercel Preview와 Production에 다음 이름을 설정합니다. 값은 로그�
 
 Edge Function의 `FOOTBALL_DATA_TOKEN`은 현재 설정하지 않습니다. `FOOTBALL_DATA_SEASON`은 함수 기본값 `2026`을 사용하며 토큰 발급 시 secret에도 명시합니다.
 
+기존 Vercel의 `KAKAO_REST_API_KEY`는 `sensitive` 타입이라 Vercel API에서도 원문을 다시 읽을 수 없습니다. 새 원문을 확보해 Workbench Preview·Production에 설정하기 전까지 Kakao 장소 검색 API 검증은 보류합니다.
+
 ## 출시 검증
 
 1. 기능 브랜치 Preview가 `READY`인지 확인합니다.

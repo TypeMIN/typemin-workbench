@@ -9,7 +9,7 @@
 | 오늘 뭐 먹지?    | `/what-should-eat`     | 마이그레이션 완료                          |
 | 월드컵 예측 내기 | `/worldcup-prediction` | 마이그레이션 완료, 자동 경기 동기화 비활성 |
 
-홈 `/`에서 두 앱으로 이동할 수 있습니다. 실제 배포 주소는 Vercel `workbench` 프로젝트의 기본 `.vercel.app` 주소를 사용합니다.
+홈 `/`에서 두 앱으로 이동할 수 있습니다. 실제 배포 주소는 [`https://workbench-type-min.vercel.app`](https://workbench-type-min.vercel.app)입니다.
 
 문서에 남아 있는 `https://workbench.example.com/<app-name>`은 커스텀 도메인이 정해지기 전까지의 placeholder이며 실제 호스트가 아닙니다.
 
