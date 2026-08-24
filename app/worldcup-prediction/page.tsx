@@ -237,14 +237,17 @@ export default function Home() {
         name?: string;
         reason?: string;
       };
-      if (result.role === "admin") saveSession({ role: "admin", pin });
-      else if (result.role === "participant" && result.slot) {
+      if (result.role === "admin") {
+        saveSession({ role: "admin", pin });
+        setMessage("관리자로 로그인했습니다.");
+      } else if (result.role === "participant" && result.slot) {
         saveSession({
           role: "participant",
           participantIndex: result.slot - 1,
           participantId: result.participantId,
           pin,
         });
+        setMessage(`${result.name || cleanName}님으로 참가했습니다.`);
       } else
         setMessage(
           result.reason === "full"
