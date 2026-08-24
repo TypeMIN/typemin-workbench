@@ -1,0 +1,2 @@
+-- Required Workbench defaults are inserted by the initial migration so cloud
+-- and local databases receive the same deterministic state.
