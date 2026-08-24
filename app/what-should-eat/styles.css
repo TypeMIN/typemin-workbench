@@ -1,0 +1,1405 @@
+.what-should-eat-app {
+  --background: oklch(0.982 0.013 68);
+  --backdrop: oklch(0.936 0.024 72);
+  --foreground: oklch(0.21 0.006 56);
+  --card: oklch(1 0 0);
+  --primary: oklch(0.553 0.195 38.402);
+  --primary-dark: oklch(0.49 0.185 36);
+  --primary-foreground: oklch(1 0 0);
+  --accent: oklch(0.954 0.038 75.164);
+  --accent-foreground: oklch(0.51 0.16 39);
+  --muted: oklch(0.968 0.014 70);
+  --muted-foreground: oklch(0.523 0.014 60);
+  --border: oklch(0.925 0.022 72);
+  --ring: oklch(0.705 0.213 47.604);
+  --destructive: oklch(0.577 0.245 27.325);
+  --shadow: 0 18px 45px oklch(0.59 0.13 52 / 0.12);
+}
+
+.what-should-eat-app * {
+  box-sizing: border-box;
+}
+.what-should-eat-app {
+  min-height: 100%;
+  background: var(--backdrop);
+}
+
+.what-should-eat-app {
+  min-height: 100vh;
+  margin: 0;
+  color: var(--foreground);
+  background: var(--backdrop);
+  font-family:
+    Pretendard,
+    -apple-system,
+    BlinkMacSystemFont,
+    "Segoe UI",
+    sans-serif;
+  -webkit-font-smoothing: antialiased;
+}
+
+.what-should-eat-app button,
+.what-should-eat-app input,
+.what-should-eat-app select {
+  font: inherit;
+}
+.what-should-eat-app button,
+.what-should-eat-app a {
+  -webkit-tap-highlight-color: transparent;
+}
+.what-should-eat-app button {
+  color: inherit;
+}
+.what-should-eat-app *:focus-visible {
+  outline: 2px solid var(--ring);
+  outline-offset: 2px;
+}
+
+.what-should-eat-app .sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+.what-should-eat-app .spin {
+  animation: what-should-eat-spin 0.9s linear infinite;
+}
+@keyframes what-should-eat-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.what-should-eat-app .center-screen,
+.what-should-eat-app .auth-page,
+.what-should-eat-app .app-shell {
+  width: min(100%, 448px);
+  min-height: 100vh;
+  min-height: 100dvh;
+  margin: 0 auto;
+  background: var(--background);
+  box-shadow: 0 0 50px oklch(0.45 0.05 55 / 0.1);
+}
+
+.what-should-eat-app .center-screen {
+  display: grid;
+  place-content: center;
+  justify-items: center;
+  gap: 18px;
+  color: var(--primary);
+}
+
+.what-should-eat-app .brand-mark {
+  display: inline-grid;
+  place-items: center;
+  width: 40px;
+  height: 40px;
+  flex: 0 0 40px;
+  border-radius: 15px;
+  color: var(--primary-foreground);
+  background: var(--primary);
+  box-shadow: 0 8px 20px oklch(0.55 0.19 38 / 0.22);
+}
+
+.what-should-eat-app .brand-lockup {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 15px;
+  font-weight: 800;
+  letter-spacing: -0.035em;
+}
+
+.what-should-eat-app .auth-page {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  padding: 40px 24px;
+}
+
+.what-should-eat-app .auth-intro {
+  padding: 0 0 32px;
+}
+.what-should-eat-app .auth-intro .brand-lockup {
+  justify-content: center;
+  gap: 12px;
+}
+.what-should-eat-app .auth-intro .brand-mark {
+  width: 46px;
+  height: 46px;
+  flex-basis: 46px;
+  border-radius: 16px;
+}
+.what-should-eat-app .auth-intro h1 {
+  margin: 0;
+  font-size: 22px;
+  letter-spacing: -0.045em;
+}
+
+.what-should-eat-app .eyebrow {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin: 0 0 8px;
+  color: var(--primary);
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+}
+
+.what-should-eat-app .auth-panel,
+.what-should-eat-app .auth-card {
+  width: 100%;
+}
+
+.what-should-eat-app .auth-tabs {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 4px;
+  padding: 4px;
+  margin-bottom: 24px;
+  border-radius: 13px;
+  background: var(--muted);
+}
+.what-should-eat-app .auth-tabs button {
+  min-height: 40px;
+  border: 0;
+  border-radius: 10px;
+  color: var(--muted-foreground);
+  background: transparent;
+  cursor: pointer;
+  font-size: 13px;
+  font-weight: 700;
+}
+.what-should-eat-app .auth-tabs button[aria-selected="true"] {
+  color: var(--foreground);
+  background: var(--card);
+  box-shadow: 0 2px 10px oklch(0.4 0.03 55 / 0.08);
+}
+.what-should-eat-app .form-stack {
+  display: grid;
+  gap: 15px;
+}
+.what-should-eat-app .form-stack label,
+.what-should-eat-app .form-row label,
+.what-should-eat-app .field-group {
+  display: grid;
+  gap: 7px;
+}
+.what-should-eat-app .form-stack label > span,
+.what-should-eat-app .field-group > label,
+.what-should-eat-app .gender-field legend {
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.what-should-eat-app .form-stack input,
+.what-should-eat-app .form-stack select,
+.what-should-eat-app .search-box input {
+  width: 100%;
+  min-width: 0;
+  border: 1px solid var(--border);
+  border-radius: 11px;
+  outline: none;
+  color: var(--foreground);
+  background: var(--card);
+}
+
+.what-should-eat-app .form-stack input,
+.what-should-eat-app .form-stack select {
+  height: 46px;
+  padding: 0 13px;
+}
+.what-should-eat-app .form-stack input:focus,
+.what-should-eat-app .form-stack select:focus,
+.what-should-eat-app .search-box:focus-within {
+  border-color: var(--ring);
+  box-shadow: 0 0 0 3px oklch(0.71 0.21 48 / 0.16);
+}
+.what-should-eat-app .form-stack input::placeholder,
+.what-should-eat-app .search-box input::placeholder {
+  color: oklch(0.7 0.01 60);
+}
+.what-should-eat-app .form-row {
+  display: grid;
+  grid-template-columns: 1fr 1.2fr;
+  gap: 10px;
+}
+.what-should-eat-app .input-action {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 7px;
+}
+.what-should-eat-app .input-action button {
+  min-width: 78px;
+  border: 1px solid var(--primary);
+  border-radius: 11px;
+  display: inline-grid;
+  place-items: center;
+  color: var(--primary);
+  background: var(--accent);
+  cursor: pointer;
+  font-size: 11px;
+  font-weight: 800;
+}
+.what-should-eat-app .input-action button:disabled {
+  opacity: 0.58;
+  cursor: wait;
+}
+.what-should-eat-app .field-message {
+  margin: 0;
+  font-size: 11px;
+  font-weight: 700;
+}
+.what-should-eat-app .field-message.success {
+  color: oklch(0.48 0.13 145);
+}
+.what-should-eat-app .field-message.error {
+  color: var(--destructive);
+}
+.what-should-eat-app .gender-field {
+  min-width: 0;
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+.what-should-eat-app .gender-field legend {
+  margin-bottom: 7px;
+}
+.what-should-eat-app .gender-toggle {
+  height: 46px;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 6px;
+}
+.what-should-eat-app .gender-toggle label {
+  position: relative;
+  display: block;
+}
+.what-should-eat-app .gender-toggle input {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  opacity: 0;
+}
+.what-should-eat-app .gender-toggle span {
+  height: 46px;
+  border: 1px solid var(--border);
+  border-radius: 11px;
+  display: grid;
+  place-items: center;
+  color: var(--muted-foreground);
+  background: var(--card);
+  cursor: pointer;
+  font-size: 12px;
+  font-weight: 700;
+}
+.what-should-eat-app .gender-toggle input:checked + span {
+  border-color: var(--primary);
+  color: var(--accent-foreground);
+  background: var(--accent);
+}
+.what-should-eat-app .gender-toggle input:focus-visible + span {
+  outline: 2px solid var(--ring);
+  outline-offset: 2px;
+}
+
+.what-should-eat-app .primary-button,
+.what-should-eat-app .secondary-button {
+  min-height: 48px;
+  border-radius: 16px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 0 19px;
+  text-decoration: none;
+  cursor: pointer;
+  font-size: 13px;
+  font-weight: 800;
+}
+.what-should-eat-app .primary-button {
+  border: 1px solid var(--primary);
+  color: var(--primary-foreground);
+  background: var(--primary);
+  box-shadow: 0 8px 22px oklch(0.55 0.19 38 / 0.18);
+}
+.what-should-eat-app .primary-button:hover {
+  background: var(--primary-dark);
+}
+.what-should-eat-app .primary-button:disabled {
+  opacity: 0.58;
+  cursor: wait;
+}
+.what-should-eat-app .primary-button.fit {
+  width: auto;
+}
+.what-should-eat-app .secondary-button {
+  border: 1px solid var(--border);
+  color: var(--foreground);
+  background: var(--card);
+}
+.what-should-eat-app .message {
+  margin: 11px 0 0;
+  padding: 11px 13px;
+  border-radius: 13px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  font-size: 11px;
+  line-height: 1.5;
+}
+.what-should-eat-app .message.error {
+  color: var(--destructive);
+  background: oklch(0.96 0.03 28);
+}
+.what-should-eat-app .message.neutral {
+  color: var(--accent-foreground);
+  background: var(--accent);
+}
+
+.what-should-eat-app .app-shell {
+  display: flex;
+  flex-direction: column;
+}
+.what-should-eat-app .app-header {
+  position: sticky;
+  top: 0;
+  z-index: 10;
+  border-bottom: 1px solid var(--border);
+  background: oklch(0.982 0.013 68 / 0.92);
+  backdrop-filter: blur(14px);
+}
+.what-should-eat-app .header-inner {
+  height: 62px;
+  padding: 0 10px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 7px;
+}
+.what-should-eat-app .brand-button {
+  padding: 0;
+  border: 0;
+  background: transparent;
+  cursor: pointer;
+}
+.what-should-eat-app .brand-button > span:last-child {
+  display: none;
+}
+.what-should-eat-app .brand-button .brand-mark {
+  width: 34px;
+  height: 34px;
+  flex-basis: 34px;
+  border-radius: 12px;
+}
+.what-should-eat-app .app-header nav {
+  align-self: stretch;
+  display: flex;
+  justify-content: center;
+  gap: 2px;
+}
+.what-should-eat-app .app-header nav button {
+  position: relative;
+  border: 0;
+  padding: 0 7px;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  color: var(--muted-foreground);
+  background: transparent;
+  cursor: pointer;
+  font-size: 11px;
+  font-weight: 700;
+}
+.what-should-eat-app .app-header nav button.active {
+  color: var(--primary);
+}
+.what-should-eat-app .app-header nav button.active::after {
+  content: "";
+  position: absolute;
+  left: 7px;
+  right: 7px;
+  bottom: 0;
+  height: 3px;
+  border-radius: 3px 3px 0 0;
+  background: var(--primary);
+}
+.what-should-eat-app .user-menu {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+}
+.what-should-eat-app .avatar {
+  width: 33px;
+  height: 33px;
+  flex: 0 0 33px;
+  border-radius: 50%;
+  display: inline-grid;
+  place-items: center;
+  color: var(--accent-foreground);
+  background: var(--accent);
+  font-size: 12px;
+  font-weight: 800;
+}
+.what-should-eat-app .avatar.small {
+  width: 34px;
+  height: 34px;
+  flex-basis: 34px;
+}
+.what-should-eat-app .user-menu > .avatar {
+  display: none;
+}
+.what-should-eat-app .user-name {
+  display: grid;
+  max-width: 62px;
+  line-height: 1.15;
+}
+.what-should-eat-app .user-name strong {
+  overflow: hidden;
+  font-size: 10px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.what-should-eat-app .user-name small {
+  margin-top: 2px;
+  overflow: hidden;
+  color: var(--muted-foreground);
+  font-size: 9px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.what-should-eat-app .icon-button {
+  width: 33px;
+  height: 33px;
+  border: 0;
+  border-radius: 9px;
+  display: grid;
+  place-items: center;
+  color: var(--muted-foreground);
+  background: transparent;
+  cursor: pointer;
+}
+.what-should-eat-app .icon-button:hover {
+  color: var(--primary);
+  background: var(--accent);
+}
+
+.what-should-eat-app .app-main {
+  width: 100%;
+  flex: 1;
+  padding: 23px 20px 40px;
+}
+.what-should-eat-app .progress {
+  width: 100%;
+  margin: 0 auto 24px;
+  padding: 0;
+  display: flex;
+  justify-content: space-between;
+  list-style: none;
+}
+.what-should-eat-app .progress li {
+  position: relative;
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  color: oklch(0.68 0.01 60);
+  font-size: 10px;
+  font-weight: 700;
+}
+.what-should-eat-app .progress li:not(:last-child)::after {
+  content: "";
+  position: absolute;
+  top: 12px;
+  left: calc(50% + 17px);
+  width: calc(100% - 34px);
+  height: 2px;
+  border-radius: 2px;
+  background: var(--border);
+}
+.what-should-eat-app .progress li.active {
+  color: var(--primary);
+}
+.what-should-eat-app .progress li.active:not(:last-child)::after {
+  background: var(--primary);
+}
+.what-should-eat-app .progress li > span {
+  width: 26px;
+  height: 26px;
+  z-index: 1;
+  border: 1px solid var(--border);
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  color: var(--muted-foreground);
+  background: var(--background);
+  font-size: 10px;
+}
+.what-should-eat-app .progress li.active > span {
+  border-color: var(--primary);
+  color: var(--primary-foreground);
+  background: var(--primary);
+}
+.what-should-eat-app .workflow-card {
+  width: 100%;
+}
+.what-should-eat-app .section-heading {
+  display: flex;
+  gap: 13px;
+  align-items: flex-start;
+  margin-bottom: 22px;
+}
+.what-should-eat-app .section-icon {
+  width: 43px;
+  height: 43px;
+  flex: 0 0 43px;
+  border-radius: 15px;
+  display: grid;
+  place-items: center;
+  color: var(--accent-foreground);
+  background: var(--accent);
+}
+.what-should-eat-app .section-icon.coral {
+  color: var(--primary);
+  background: var(--accent);
+}
+.what-should-eat-app .section-heading .eyebrow {
+  margin-bottom: 4px;
+  font-size: 9px;
+}
+.what-should-eat-app .section-heading h1 {
+  margin: 0 0 5px;
+  font-size: 21px;
+  letter-spacing: -0.045em;
+}
+.what-should-eat-app .section-heading > div > p:last-child {
+  margin: 0;
+  color: var(--muted-foreground);
+  font-size: 11px;
+  line-height: 1.55;
+}
+.what-should-eat-app .member-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-bottom: 16px;
+}
+.what-should-eat-app .member-chip {
+  width: 100%;
+  padding: 10px 11px;
+  border-radius: 16px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  background: var(--card);
+  box-shadow: 0 0 0 1px var(--border);
+}
+.what-should-eat-app .member-chip > span:nth-child(2),
+.what-should-eat-app .search-result > span:nth-child(2) {
+  flex: 1;
+  display: grid;
+  line-height: 1.2;
+}
+.what-should-eat-app .member-chip strong,
+.what-should-eat-app .search-result strong {
+  font-size: 12px;
+}
+.what-should-eat-app .member-chip small,
+.what-should-eat-app .search-result small {
+  margin-top: 3px;
+  color: var(--muted-foreground);
+  font-size: 9px;
+}
+.what-should-eat-app .member-chip em {
+  padding: 4px 8px;
+  border-radius: 999px;
+  color: var(--accent-foreground);
+  background: var(--accent);
+  font-size: 9px;
+  font-style: normal;
+  font-weight: 800;
+}
+.what-should-eat-app .member-chip button {
+  width: 28px;
+  height: 28px;
+  border: 0;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  color: var(--muted-foreground);
+  background: transparent;
+  cursor: pointer;
+}
+.what-should-eat-app .member-chip button:hover {
+  color: var(--primary);
+  background: var(--accent);
+}
+.what-should-eat-app .search-box {
+  height: 46px;
+  border: 1px solid var(--border);
+  border-radius: 11px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 5px 4px 12px;
+  color: var(--muted-foreground);
+  background: var(--card);
+}
+.what-should-eat-app .search-box.large {
+  height: 49px;
+}
+.what-should-eat-app .search-box input {
+  height: 100%;
+  padding: 0;
+  border: 0;
+  box-shadow: none !important;
+  background: transparent;
+  font-size: 12px;
+}
+.what-should-eat-app .search-box button {
+  min-width: 56px;
+  height: 36px;
+  border: 0;
+  border-radius: 8px;
+  display: grid;
+  place-items: center;
+  color: var(--primary-foreground);
+  background: var(--primary);
+  cursor: pointer;
+  font-size: 11px;
+  font-weight: 800;
+}
+.what-should-eat-app .search-box button:disabled {
+  opacity: 0.55;
+}
+.what-should-eat-app .search-results,
+.what-should-eat-app .region-results {
+  margin-top: 9px;
+  border-radius: 15px;
+  overflow: hidden;
+  background: var(--card);
+  box-shadow: 0 0 0 1px var(--border);
+}
+.what-should-eat-app .search-result {
+  padding: 10px 11px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.what-should-eat-app .search-result + .search-result {
+  border-top: 1px solid var(--border);
+}
+.what-should-eat-app .search-result button {
+  border: 0;
+  border-radius: 999px;
+  padding: 7px 10px;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  color: var(--accent-foreground);
+  background: var(--accent);
+  cursor: pointer;
+  font-size: 10px;
+  font-weight: 800;
+}
+.what-should-eat-app .search-result button:disabled {
+  color: var(--muted-foreground);
+  background: var(--muted);
+}
+.what-should-eat-app .empty-inline {
+  margin: 0;
+  padding: 15px;
+  color: var(--muted-foreground);
+  text-align: center;
+  font-size: 11px;
+}
+.what-should-eat-app .card-footer {
+  margin-top: 22px;
+  padding-top: 18px;
+  border-top: 1px solid var(--border);
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 11px;
+}
+.what-should-eat-app .card-footer p {
+  margin: 0;
+  color: var(--muted-foreground);
+  text-align: center;
+  font-size: 11px;
+}
+.what-should-eat-app .card-footer p strong {
+  margin-right: 3px;
+  color: var(--primary);
+}
+.what-should-eat-app .card-footer .primary-button {
+  width: 100%;
+}
+.what-should-eat-app .back-button {
+  margin: -7px 0 15px;
+  padding: 6px 0;
+  border: 0;
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  color: var(--muted-foreground);
+  background: transparent;
+  cursor: pointer;
+  font-size: 11px;
+  font-weight: 700;
+}
+.what-should-eat-app .location-button {
+  width: 100%;
+  min-height: 73px;
+  padding: 13px 14px;
+  border: 0;
+  border-radius: 16px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  text-align: left;
+  background: var(--card);
+  box-shadow: 0 0 0 1px var(--border);
+  cursor: pointer;
+}
+.what-should-eat-app .location-button > span:first-child {
+  width: 40px;
+  height: 40px;
+  flex: 0 0 40px;
+  border-radius: 14px;
+  display: grid;
+  place-items: center;
+  color: var(--primary);
+  background: var(--accent);
+}
+.what-should-eat-app .location-button > span:nth-child(2) {
+  flex: 1;
+  display: grid;
+  gap: 3px;
+}
+.what-should-eat-app .location-button strong {
+  font-size: 12px;
+}
+.what-should-eat-app .location-button small {
+  color: var(--muted-foreground);
+  font-size: 10px;
+}
+.what-should-eat-app .location-button:disabled {
+  opacity: 0.6;
+  cursor: wait;
+}
+.what-should-eat-app .divider {
+  height: 49px;
+  display: flex;
+  align-items: center;
+  color: oklch(0.68 0.01 60);
+  font-size: 10px;
+}
+.what-should-eat-app .divider::before,
+.what-should-eat-app .divider::after {
+  content: "";
+  flex: 1;
+  height: 1px;
+  background: var(--border);
+}
+.what-should-eat-app .divider span {
+  padding: 0 11px;
+}
+.what-should-eat-app .region-results button {
+  width: 100%;
+  padding: 11px 12px;
+  border: 0;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  text-align: left;
+  background: var(--card);
+  cursor: pointer;
+}
+.what-should-eat-app .region-results button + button {
+  border-top: 1px solid var(--border);
+}
+.what-should-eat-app .region-results button:hover {
+  background: var(--muted);
+}
+.what-should-eat-app .region-results button > svg:first-child {
+  color: var(--primary);
+}
+.what-should-eat-app .region-results button > span {
+  flex: 1;
+  display: grid;
+  gap: 3px;
+}
+.what-should-eat-app .region-results button strong {
+  font-size: 12px;
+}
+.what-should-eat-app .region-results button small {
+  color: var(--muted-foreground);
+  font-size: 9px;
+}
+.what-should-eat-app .privacy-note {
+  margin: 16px 0 0;
+  color: var(--muted-foreground);
+  text-align: center;
+  font-size: 9px;
+}
+.what-should-eat-app .participant-bar {
+  margin: 22px -20px -40px;
+  padding: 12px 20px max(12px, env(safe-area-inset-bottom));
+  border-top: 1px solid var(--border);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--muted-foreground);
+  background: var(--card);
+}
+.what-should-eat-app .participant-bar > svg {
+  flex: 0 0 auto;
+}
+.what-should-eat-app .participant-bar > div {
+  display: flex;
+  gap: 6px;
+  overflow-x: auto;
+}
+.what-should-eat-app .participant-bar > div > span {
+  flex: 0 0 auto;
+  padding: 5px 9px;
+  border-radius: 999px;
+  color: var(--accent-foreground);
+  background: var(--accent);
+  font-size: 10px;
+  font-weight: 700;
+}
+
+.what-should-eat-app .duel-section {
+  width: 100%;
+}
+.what-should-eat-app .duel-heading {
+  text-align: left;
+}
+.what-should-eat-app .duel-heading .eyebrow {
+  margin-bottom: 5px;
+}
+.what-should-eat-app .duel-heading h1 {
+  margin: 0 0 5px;
+  font-size: 22px;
+  letter-spacing: -0.045em;
+}
+.what-should-eat-app .duel-heading > p:last-child {
+  margin: 0;
+  color: var(--muted-foreground);
+  font-size: 11px;
+}
+.what-should-eat-app .round-bar {
+  height: 6px;
+  margin: 16px 0 19px;
+  display: flex;
+  gap: 5px;
+}
+.what-should-eat-app .round-bar span {
+  flex: 1;
+  border-radius: 999px;
+  background: var(--accent);
+  transition: background 0.2s ease;
+}
+.what-should-eat-app .round-bar span.active {
+  background: var(--primary);
+}
+.what-should-eat-app .duel-grid {
+  display: flex;
+  flex-direction: column;
+  gap: 9px;
+}
+.what-should-eat-app .place-card {
+  width: 100%;
+  min-height: 171px;
+  padding: 17px;
+  border: 0;
+  border-radius: 24px;
+  display: flex;
+  flex-direction: column;
+  text-align: left;
+  background: var(--card);
+  box-shadow:
+    var(--shadow),
+    0 0 0 1px var(--border);
+  cursor: pointer;
+  transition:
+    transform 0.16s ease,
+    box-shadow 0.16s ease;
+}
+.what-should-eat-app .place-card:hover {
+  box-shadow:
+    0 20px 42px oklch(0.59 0.13 52 / 0.18),
+    0 0 0 1px oklch(0.79 0.11 52);
+}
+.what-should-eat-app .place-card:active {
+  transform: scale(0.985);
+}
+.what-should-eat-app .place-card:disabled {
+  opacity: 0.65;
+  cursor: wait;
+  transform: none;
+}
+.what-should-eat-app .place-card-heading {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+}
+.what-should-eat-app .category-badge {
+  width: 44px;
+  height: 44px;
+  flex: 0 0 44px;
+  border-radius: 16px;
+  display: inline-grid;
+  place-items: center;
+  color: var(--accent-foreground);
+  background: var(--accent);
+}
+.what-should-eat-app .place-copy {
+  min-width: 0;
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+}
+.what-should-eat-app .place-copy .category {
+  margin-bottom: 4px;
+  color: var(--primary);
+  font-size: 9px;
+  font-weight: 800;
+}
+.what-should-eat-app .place-copy > strong {
+  font-size: 18px;
+  line-height: 1.3;
+  letter-spacing: -0.04em;
+}
+.what-should-eat-app .restaurant-meta {
+  margin-top: 13px;
+  padding-top: 11px;
+  border-top: 1px solid var(--border);
+  display: flex;
+  align-items: center;
+  gap: 13px;
+  color: var(--muted-foreground);
+  font-size: 10px;
+}
+.what-should-eat-app .restaurant-meta > span {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+.what-should-eat-app .place-address {
+  margin-top: 7px;
+  overflow: hidden;
+  color: var(--muted-foreground);
+  font-size: 9px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.what-should-eat-app .choose-label {
+  min-height: 34px;
+  margin-top: 12px;
+  border-radius: 11px;
+  display: grid;
+  place-items: center;
+  color: var(--accent-foreground);
+  background: var(--accent);
+  font-size: 10px;
+  font-weight: 800;
+}
+.what-should-eat-app .place-card:hover .choose-label {
+  color: var(--primary-foreground);
+  background: var(--primary);
+}
+.what-should-eat-app .versus {
+  position: relative;
+  z-index: 1;
+  align-self: center;
+  margin: -5px 0;
+  padding: 3px 10px;
+  color: var(--muted-foreground);
+  background: var(--background);
+  font-size: 9px;
+  font-weight: 700;
+}
+
+.what-should-eat-app .result-card {
+  width: 100%;
+  margin: 8px auto 0;
+  padding: 24px 20px;
+  border-radius: 25px;
+  position: relative;
+  background: var(--card);
+  box-shadow:
+    var(--shadow),
+    0 0 0 1px var(--border);
+  overflow: hidden;
+}
+.what-should-eat-app .result-card::before {
+  content: "";
+  position: absolute;
+  inset: 0 0 auto;
+  height: 5px;
+  background: var(--primary);
+}
+.what-should-eat-app .confetti {
+  position: absolute;
+  top: 20px;
+  right: 22px;
+  color: oklch(0.76 0.15 72);
+  font-size: 22px;
+}
+.what-should-eat-app .result-card .eyebrow {
+  margin-bottom: 11px;
+}
+.what-should-eat-app .result-title {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+}
+.what-should-eat-app .result-title-copy {
+  min-width: 0;
+}
+.what-should-eat-app .result-card h1 {
+  margin: 0;
+  font-size: 24px;
+  line-height: 1.25;
+  letter-spacing: -0.045em;
+}
+.what-should-eat-app .result-category {
+  margin: 4px 0 0;
+  color: var(--muted-foreground);
+  font-size: 10px;
+}
+.what-should-eat-app .participant-names {
+  display: inline-flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 3px 7px;
+}
+.what-should-eat-app .participant-names > span {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 3px;
+}
+.what-should-eat-app .participant-names small {
+  color: oklch(0.66 0.01 60);
+  font-size: 0.82em;
+}
+.what-should-eat-app .result-meta {
+  width: 100%;
+  margin: 18px 0;
+  padding: 13px;
+  border-radius: 13px;
+  display: grid;
+  gap: 8px;
+  color: var(--muted-foreground);
+  background: var(--muted);
+  font-size: 10px;
+}
+.what-should-eat-app .result-meta > span {
+  display: flex;
+  align-items: flex-start;
+  gap: 6px;
+}
+.what-should-eat-app .result-meta > span > svg {
+  flex: 0 0 auto;
+}
+.what-should-eat-app .result-feedback {
+  width: 100%;
+  margin: 0 0 17px;
+  padding: 14px;
+  border-radius: 14px;
+  background: var(--accent);
+}
+.what-should-eat-app .result-feedback > strong {
+  font-size: 12px;
+}
+.what-should-eat-app .result-feedback > p {
+  margin: 4px 0 11px;
+  color: var(--muted-foreground);
+  font-size: 9px;
+}
+.what-should-eat-app .feedback-controls {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.what-should-eat-app .feedback-controls button {
+  min-height: 33px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 6px 9px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  color: var(--muted-foreground);
+  background: var(--card);
+  cursor: pointer;
+  font-size: 9px;
+  font-weight: 800;
+}
+.what-should-eat-app .feedback-controls button:hover {
+  border-color: var(--primary);
+  color: var(--primary);
+}
+.what-should-eat-app .feedback-controls button.active {
+  border-color: var(--primary);
+  color: var(--primary-foreground);
+  background: var(--primary);
+}
+.what-should-eat-app .feedback-controls button:disabled {
+  opacity: 0.58;
+  cursor: wait;
+}
+.what-should-eat-app .feedback-error {
+  margin: 9px 0 0 !important;
+  color: var(--destructive) !important;
+}
+.what-should-eat-app .result-card .secondary-button,
+.what-should-eat-app .result-card .primary-button {
+  width: 100%;
+  margin-top: 8px;
+}
+.what-should-eat-app .saved-note {
+  margin: 14px 0 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  color: var(--muted-foreground);
+  font-size: 9px;
+}
+
+.what-should-eat-app .page-heading {
+  margin: 1px 0 22px;
+}
+.what-should-eat-app .page-heading h1 {
+  margin: 0 0 6px;
+  font-size: 24px;
+  letter-spacing: -0.05em;
+}
+.what-should-eat-app .page-heading > p:last-child {
+  margin: 0;
+  color: var(--muted-foreground);
+  font-size: 11px;
+  line-height: 1.55;
+}
+.what-should-eat-app .manual-rating-card {
+  margin-bottom: 25px;
+  padding: 16px;
+  border-radius: 18px;
+  background: var(--accent);
+}
+.what-should-eat-app .manual-rating-card > div:first-child {
+  margin-bottom: 14px;
+}
+.what-should-eat-app .manual-rating-card h2 {
+  margin: 0 0 5px;
+  font-size: 16px;
+  letter-spacing: -0.035em;
+}
+.what-should-eat-app .manual-rating-card > div:first-child > p:last-child {
+  margin: 0;
+  color: var(--muted-foreground);
+  font-size: 10px;
+  line-height: 1.5;
+}
+.what-should-eat-app .rating-search-results {
+  margin-top: 9px;
+  border-radius: 14px;
+  overflow: hidden;
+  background: var(--card);
+  box-shadow: 0 0 0 1px var(--border);
+}
+.what-should-eat-app .rating-place {
+  padding: 11px;
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 10px;
+}
+.what-should-eat-app .rating-place + .rating-place {
+  border-top: 1px solid var(--border);
+}
+.what-should-eat-app .rating-place > span {
+  min-width: 0;
+  display: grid;
+  gap: 3px;
+}
+.what-should-eat-app .rating-place strong {
+  font-size: 11px;
+}
+.what-should-eat-app .rating-place small {
+  color: var(--muted-foreground);
+  font-size: 9px;
+  line-height: 1.45;
+}
+.what-should-eat-app .rating-place .feedback-controls button {
+  flex: 1;
+}
+.what-should-eat-app .history-section-heading {
+  margin: 0 0 12px;
+}
+.what-should-eat-app .history-section-heading h2 {
+  margin: 0 0 3px;
+  font-size: 16px;
+}
+.what-should-eat-app .history-section-heading p {
+  margin: 0;
+  color: var(--muted-foreground);
+  font-size: 9px;
+}
+.what-should-eat-app .history-list {
+  display: grid;
+  gap: 10px;
+}
+.what-should-eat-app .history-item {
+  padding: 14px;
+  border-radius: 17px;
+  display: grid;
+  grid-template-columns: 44px 1fr;
+  align-items: center;
+  gap: 11px;
+  background: var(--card);
+  box-shadow: 0 0 0 1px var(--border);
+}
+.what-should-eat-app .history-icon {
+  width: 44px;
+  height: 44px;
+}
+.what-should-eat-app .history-icon .category-badge {
+  width: 44px;
+  height: 44px;
+}
+.what-should-eat-app .history-copy p {
+  margin: 0 0 5px;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  color: var(--muted-foreground);
+  font-size: 8px;
+}
+.what-should-eat-app .history-copy h2 {
+  margin: 0 0 4px;
+  font-size: 15px;
+  letter-spacing: -0.03em;
+}
+.what-should-eat-app .history-copy > span {
+  color: var(--primary);
+  font-size: 9px;
+  font-weight: 700;
+}
+.what-should-eat-app .history-members {
+  grid-column: 1 / -1;
+  padding: 9px 10px;
+  border-radius: 10px;
+  display: flex;
+  align-items: flex-start;
+  gap: 6px;
+  color: var(--muted-foreground);
+  background: var(--muted);
+  font-size: 9px;
+}
+.what-should-eat-app .history-members svg {
+  flex: 0 0 auto;
+  color: var(--primary);
+}
+.what-should-eat-app .history-feedback {
+  grid-column: 1 / -1;
+  padding-top: 11px;
+  border-top: 1px solid var(--border);
+}
+.what-should-eat-app .history-feedback .feedback-controls button {
+  flex: 1;
+}
+.what-should-eat-app .empty-state {
+  min-height: 280px;
+  border: 1px dashed var(--border);
+  border-radius: 18px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  color: var(--muted-foreground);
+  background: oklch(1 0 0 / 0.55);
+}
+.what-should-eat-app .empty-state > span {
+  width: 58px;
+  height: 58px;
+  margin-bottom: 13px;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  color: var(--primary);
+  background: var(--accent);
+}
+.what-should-eat-app .empty-state h2 {
+  margin: 0 0 7px;
+  color: var(--foreground);
+  font-size: 15px;
+}
+.what-should-eat-app .empty-state p {
+  margin: 0;
+  font-size: 10px;
+}
+.what-should-eat-app .app-shell > footer {
+  margin-top: auto;
+  padding: 18px;
+  border-top: 1px solid var(--border);
+  color: var(--muted-foreground);
+  text-align: center;
+  font-size: 8px;
+  background: var(--card);
+}
+
+@media (max-width: 360px) {
+  .what-should-eat-app .auth-page {
+    padding-inline: 18px;
+  }
+  .what-should-eat-app .form-row {
+    grid-template-columns: 1fr;
+  }
+  .what-should-eat-app .app-main {
+    padding-inline: 16px;
+  }
+  .what-should-eat-app .participant-bar {
+    margin-left: -16px;
+    margin-right: -16px;
+    padding-inline: 16px;
+  }
+  .what-should-eat-app .app-header nav button {
+    padding-inline: 5px;
+    font-size: 10px;
+  }
+  .what-should-eat-app .user-name {
+    max-width: 48px;
+  }
+  .what-should-eat-app .place-card {
+    padding: 15px;
+  }
+  .what-should-eat-app .feedback-controls button {
+    flex: 1;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .what-should-eat-app *,
+  .what-should-eat-app *::before,
+  .what-should-eat-app *::after {
+    scroll-behavior: auto !important;
+    transition: none !important;
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+  }
+}
