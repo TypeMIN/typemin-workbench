@@ -10,13 +10,13 @@ Workbench는 여러 아이디어를 토이 웹앱으로 빠르게 만들고 실�
 
 ## 2. 자원 구성
 
-| 영역 | 이름 | 토이 단계 구성 |
-| --- | --- | --- |
-| GitHub | `typemin-workbench` | 저장소 1개 |
-| 애플리케이션 | `Workbench` | Next.js 앱 1개 |
-| 배포 | `Workbench` | Vercel 프로젝트 1개 |
-| 백엔드 | `Workbench` | Supabase 프로젝트 1개 |
-| 웹 주소 | 미정 | 도메인 1개와 앱별 서브패스 |
+| 영역         | 이름                | 토이 단계 구성             |
+| ------------ | ------------------- | -------------------------- |
+| GitHub       | `typemin-workbench` | 저장소 1개                 |
+| 애플리케이션 | `Workbench`         | Next.js 앱 1개             |
+| 배포         | `Workbench`         | Vercel 프로젝트 1개        |
+| 백엔드       | `Workbench`         | Supabase 프로젝트 1개      |
+| 웹 주소      | 미정                | 도메인 1개와 앱별 서브패스 |
 
 `workbench.example.com`은 문서에서 사용하는 placeholder이며 실제 도메인이 아닙니다. 실제 도메인이 정해지면 문서의 placeholder를 일괄 교체합니다.
 
@@ -63,14 +63,14 @@ typemin-workbench/
 
 예시 대응 관계는 다음과 같습니다.
 
-| 구분 | 값 |
-| --- | --- |
-| 앱 이름 | Restaurant Log |
-| URL slug | `restaurant-log` |
-| Next.js 경로 | `app/restaurant-log/page.tsx` |
-| 공개 URL | `https://workbench.example.com/restaurant-log` |
-| DB 접두사 | `restaurant_log_` |
-| 테이블 예시 | `public.restaurant_log_entries` |
+| 구분         | 값                                             |
+| ------------ | ---------------------------------------------- |
+| 앱 이름      | Restaurant Log                                 |
+| URL slug     | `restaurant-log`                               |
+| Next.js 경로 | `app/restaurant-log/page.tsx`                  |
+| 공개 URL     | `https://workbench.example.com/restaurant-log` |
+| DB 접두사    | `restaurant_log_`                              |
+| 테이블 예시  | `public.restaurant_log_entries`                |
 
 폴더와 파일의 책임은 다음과 같이 구분합니다.
 
@@ -122,13 +122,13 @@ Supabase의 Data API 기본 노출 정책은 변경될 수 있으므로 구현 �
 
 ## 5. 토이 단계와 서비스화 단계
 
-| 구분 | 토이 단계 | 서비스화 이후 |
-| --- | --- | --- |
-| GitHub | `typemin-workbench`에 통합 | 앱 전용 저장소 |
-| Next.js | Workbench의 하위 라우트 | 앱 전용 애플리케이션 |
-| Vercel | `Workbench` 프로젝트 | 앱 전용 프로젝트 |
-| Supabase | `Workbench` 프로젝트와 공유 Auth | 앱 전용 프로젝트와 Auth |
-| URL | `workbench.example.com/<app-name>` | 앱 전용 도메인 |
+| 구분     | 토이 단계                          | 서비스화 이후           |
+| -------- | ---------------------------------- | ----------------------- |
+| GitHub   | `typemin-workbench`에 통합         | 앱 전용 저장소          |
+| Next.js  | Workbench의 하위 라우트            | 앱 전용 애플리케이션    |
+| Vercel   | `Workbench` 프로젝트               | 앱 전용 프로젝트        |
+| Supabase | `Workbench` 프로젝트와 공유 Auth   | 앱 전용 프로젝트와 Auth |
+| URL      | `workbench.example.com/<app-name>` | 앱 전용 도메인          |
 
 예를 들어 `/unword`가 독립한다고 가정하면 구조는 다음처럼 바뀝니다. `unword`는 독립 절차를 설명하기 위한 예시입니다.
 
