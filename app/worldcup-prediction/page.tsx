@@ -168,7 +168,7 @@ export default function Home() {
         return;
       }
       setState(mergeRemote(data as RemoteState));
-      setMessage("Supabase에 연결했습니다.");
+      if (!session.role) setMessage("Supabase에 연결했습니다.");
     };
     void refresh();
     const channel = client
