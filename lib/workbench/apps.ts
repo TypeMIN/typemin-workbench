@@ -4,7 +4,6 @@ export const WORKBENCH_APPS = [
     description: "함께 고르는 오늘의 한 끼와 장소 추천",
     href: "/what-should-eat",
     status: "사용 가능",
-    statusTone: "active",
     accent: "meal",
   },
   {
@@ -12,7 +11,6 @@ export const WORKBENCH_APPS = [
     description: "완료된 5인 월드컵 예측 결과 아카이브",
     href: "/worldcup-prediction",
     status: "아카이브",
-    statusTone: "complete",
     accent: "worldcup",
   },
 ] as const;

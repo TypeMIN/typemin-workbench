@@ -92,6 +92,7 @@ typemin-workbench/
 - `components/workbench-*`, `lib/workbench`와 `app/account`에는 앱 카탈로그와 모든 앱이 공유하는 계정 기능을 둡니다.
 - 둘 이상의 앱에서 실제로 같은 책임으로 재사용되는 코드만 루트 공통 모듈로 승격합니다.
 - 앱 CSS는 각각 `.what-should-eat-app`, `.worldcup-prediction-app` 아래로 제한합니다.
+- 배경, 카드, 간격과 타이포그래피는 공통 디자인 기준을 따르되 앱마다 고유 포인트 컬러를 사용합니다. Workbench는 보라색, `오늘 뭐 먹지?`는 주황색, `월드컵 예측 내기`는 파란색을 사용하며 새 앱도 카탈로그에 별도 포인트 컬러를 지정합니다.
 - 모든 앱은 공통 계정 상태 UI를 제공합니다. Workbench 홈 귀환 UI의 위치와 형태는 추후 확정하며, 현재 앱 헤더에는 배치하지 않습니다.
 - `workbench_session` 쿠키는 `HttpOnly`, `SameSite=Lax`, Production `Secure`, `Path=/`, 30일 만료를 사용합니다. DB에는 32바이트 원문 토큰이 아니라 SHA-256 해시만 저장합니다.
 

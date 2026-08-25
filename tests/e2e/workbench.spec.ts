@@ -4,12 +4,32 @@ test("홈에서 두 앱으로 이동한다", async ({ page }) => {
   await page.goto("/");
 
   await expect(page.getByRole("heading", { name: "Workbench" })).toBeVisible();
-  await expect(page.getByText("1개 운영 · 1개 완료")).toBeVisible();
+  await expect(
+    page.getByText("작은 웹앱을 만들고 직접 사용하는 공간입니다."),
+  ).toBeVisible();
+  await expect(page.getByRole("heading", { name: "웹앱" })).toBeVisible();
   await expect(
     page
       .getByRole("link", { name: "월드컵 예측 내기 열기" })
       .getByText("아카이브", { exact: true }),
   ).toBeVisible();
+  await expect(page.getByText("TYPEMIN · PERSONAL LAB")).toHaveCount(0);
+
+  await page.setViewportSize({ width: 390, height: 844 });
+  const mealCard = await page
+    .getByRole("link", { name: "오늘 뭐 먹지? 열기" })
+    .boundingBox();
+  const worldcupCard = await page
+    .getByRole("link", { name: "월드컵 예측 내기 열기" })
+    .boundingBox();
+  expect(mealCard).not.toBeNull();
+  expect(worldcupCard).not.toBeNull();
+  expect(worldcupCard!.y).toBeGreaterThan(mealCard!.y);
+  expect(
+    await page.evaluate(
+      () => document.documentElement.scrollWidth <= window.innerWidth,
+    ),
+  ).toBe(true);
 
   await page.getByRole("link", { name: "오늘 뭐 먹지? 열기" }).click();
   await expect(page).toHaveURL(/\/what-should-eat$/);
