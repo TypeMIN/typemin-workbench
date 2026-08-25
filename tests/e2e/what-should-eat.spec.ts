@@ -23,7 +23,7 @@ const candidates = Array.from({ length: 3 }, (_, index) => ({
   distanceMeters: 50 + index * 10,
   address: "서울시 강남구",
   roadAddress: "서울시 강남구 테스트로",
-  placeUrl: "",
+  placeUrl: `http://place.map.kakao.com/${index + 1}`,
   latitude: 37.5,
   longitude: 127,
 }));
@@ -123,8 +123,43 @@ test("비회원이 친구를 추가해 결과까지 보고 탭 상태를 복원�
   await page.getByRole("button", { name: /내 현재 위치 사용하기/ }).click();
   await expect(page.getByText("ROUND 1 / 2")).toBeVisible();
   expect(candidateParticipantIds).toEqual([friend.id]);
-  await page.locator(".place-card").first().click();
-  await page.locator(".place-card").first().click();
+  const detailLinks = page.getByRole("link", {
+    name: /카카오맵에서 영업시간과 상세정보 확인/,
+  });
+  const firstCandidateName = await page
+    .locator(".place-card")
+    .first()
+    .locator(".place-copy > strong")
+    .textContent();
+  const firstCandidate = candidates.find(
+    (candidate) => candidate.name === firstCandidateName,
+  );
+  if (!firstCandidate) throw new Error("첫 번째 후보를 찾지 못했습니다.");
+  const expectedKakaoHref = `https://m.map.kakao.com/scheme/place?id=${firstCandidate.id}`;
+  await expect(detailLinks).toHaveCount(2);
+  await expect(detailLinks.first()).toHaveAttribute("href", expectedKakaoHref);
+  await expect(detailLinks.first()).toHaveAttribute("target", "_blank");
+  await expect(detailLinks.first()).toHaveAttribute(
+    "rel",
+    "noopener noreferrer",
+  );
+  await detailLinks.first().evaluate((link) =>
+    link.addEventListener("click", (event) => event.preventDefault(), {
+      once: true,
+    }),
+  );
+  await detailLinks.first().click();
+  await expect(page.getByText("ROUND 1 / 2")).toBeVisible();
+  await page
+    .locator(".place-card")
+    .first()
+    .getByRole("button", { name: /이곳으로 선택/ })
+    .click();
+  await page
+    .locator(".place-card")
+    .first()
+    .getByRole("button", { name: /이곳으로 선택/ })
+    .click();
 
   await expect(page.getByText("오늘의 선택")).toBeVisible();
   await expect(page.getByText("비회원 선택은 저장되지 않아요.")).toBeVisible();
@@ -132,6 +167,11 @@ test("비회원이 친구를 추가해 결과까지 보고 탭 상태를 복원�
   await expect(page.getByText(/지난 선택에 저장됐어요/)).toHaveCount(0);
   await expect(page.locator(".result-meta")).toContainText("비회원");
   await expect(page.locator(".result-meta")).toContainText("친구");
+  await expect(
+    page.getByRole("link", {
+      name: /카카오맵에서 영업시간과 상세정보 확인/,
+    }),
+  ).toHaveAttribute("href", expectedKakaoHref);
   expect(decisionRequests).toBe(0);
   expect(feedbackRequests).toBe(0);
   await expectNoHorizontalOverflow(page);
@@ -304,9 +344,17 @@ test("현재 위치와 참가자 선택부터 A/B 결과와 이력까지 완주�
   await expect(page.locator(".category-badge")).toHaveCount(2);
   await expect(page.getByText(/도보 1분/).first()).toBeVisible();
   await expectNoHorizontalOverflow(page);
-  await page.locator(".place-card").first().click();
+  await page
+    .locator(".place-card")
+    .first()
+    .getByRole("button", { name: /이곳으로 선택/ })
+    .click();
   await expect(page.getByText("ROUND 2 / 2")).toBeVisible();
-  await page.locator(".place-card").first().click();
+  await page
+    .locator(".place-card")
+    .first()
+    .getByRole("button", { name: /이곳으로 선택/ })
+    .click();
 
   await expect(page.getByText("오늘의 선택")).toBeVisible();
   await expectNoHorizontalOverflow(page);

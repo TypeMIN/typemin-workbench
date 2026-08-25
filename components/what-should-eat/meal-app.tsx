@@ -8,6 +8,7 @@ import {
   Check,
   ChevronRight,
   Clock3,
+  ExternalLink,
   Fish,
   Flame,
   Footprints,
@@ -85,6 +86,39 @@ function CategoryBadge({ category }: { category: string }) {
 
 function walkingMinutes(distanceMeters: number) {
   return Math.max(1, Math.round(distanceMeters / 70));
+}
+
+function kakaoMapPlaceHref(place: PlaceCandidate) {
+  const placeId = place.id.trim();
+  if (placeId) {
+    return `https://m.map.kakao.com/scheme/place?id=${encodeURIComponent(placeId)}`;
+  }
+  return place.placeUrl.replace(/^http:/, "https:");
+}
+
+function KakaoPlaceLink({
+  place,
+  className,
+  label,
+}: {
+  place: PlaceCandidate;
+  className: string;
+  label: string;
+}) {
+  const href = kakaoMapPlaceHref(place);
+  if (!href) return null;
+
+  return (
+    <a
+      className={className}
+      href={href}
+      target="_blank"
+      rel="noopener noreferrer"
+      aria-label={`${place.name} 카카오맵에서 영업시간과 상세정보 확인`}
+    >
+      {label} <ExternalLink size={15} aria-hidden />
+    </a>
+  );
 }
 
 async function requestApi<T>(url: string, options?: RequestInit): Promise<T> {
@@ -839,13 +873,8 @@ function PlaceCard({
 }) {
   const { major, detail } = getCategoryParts(place.category);
   return (
-    <button
-      className="place-card"
-      data-slot="candidate"
-      onClick={onChoose}
-      disabled={disabled}
-    >
-      <span className="place-card-heading">
+    <article className="place-card" data-slot="candidate">
+      <div className="place-card-heading">
         <CategoryBadge category={place.category} />
         <span className="place-copy">
           <small className="category">
@@ -853,20 +882,33 @@ function PlaceCard({
           </small>
           <strong>{place.name}</strong>
         </span>
-      </span>
-      <span className="restaurant-meta">
+      </div>
+      <div className="restaurant-meta">
         <span>
           <MapPin size={14} /> {place.distanceMeters.toLocaleString()}m
         </span>
         <span>
           <Footprints size={14} /> 도보 {walkingMinutes(place.distanceMeters)}분
         </span>
-      </span>
-      <span className="place-address">
-        {place.roadAddress || place.address}
-      </span>
-      <span className="choose-label">이곳으로 선택</span>
-    </button>
+      </div>
+      <p className="place-address">{place.roadAddress || place.address}</p>
+      <div className="place-actions">
+        <KakaoPlaceLink
+          place={place}
+          className="place-map-link"
+          label="카카오맵 상세정보"
+        />
+        <button
+          type="button"
+          className="place-choose-button"
+          onClick={onChoose}
+          disabled={disabled}
+          aria-label={`${place.name} 이곳으로 선택`}
+        >
+          이곳으로 선택 <ChevronRight size={15} aria-hidden />
+        </button>
+      </div>
+    </article>
   );
 }
 
@@ -888,7 +930,7 @@ function DuelStep({
           ROUND {state.round} / {state.totalRounds}
         </p>
         <h1>오늘은 어디가 더 끌리나요?</h1>
-        <p>고른 식당이 다음 후보와 계속 대결해요.</p>
+        <p>상세정보를 확인한 뒤 더 끌리는 곳을 골라보세요.</p>
       </div>
       <div className="round-bar" aria-hidden>
         {Array.from({ length: state.totalRounds }, (_, index) => (
@@ -1058,16 +1100,11 @@ function ResultStep({
           <p>로그인하면 다음 선택부터 이력과 평가를 남길 수 있어요.</p>
         </div>
       )}
-      {place.placeUrl && (
-        <a
-          className="secondary-button"
-          href={place.placeUrl}
-          target="_blank"
-          rel="noreferrer"
-        >
-          카카오맵에서 보기 <ChevronRight size={17} />
-        </a>
-      )}
+      <KakaoPlaceLink
+        place={place}
+        className="secondary-button"
+        label="카카오맵에서 보기"
+      />
       <button className="primary-button fit" onClick={onRestart}>
         새로운 한 끼 정하기 <Sparkles size={17} />
       </button>

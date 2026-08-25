@@ -1065,7 +1065,6 @@
   width: 100%;
   min-height: 171px;
   padding: 17px;
-  border: 0;
   border-radius: 24px;
   display: flex;
   flex-direction: column;
@@ -1074,23 +1073,12 @@
   box-shadow:
     var(--shadow),
     0 0 0 1px var(--border);
-  cursor: pointer;
-  transition:
-    transform 0.16s ease,
-    box-shadow 0.16s ease;
+  transition: box-shadow 0.16s ease;
 }
-.what-should-eat-app .place-card:hover {
+.what-should-eat-app .place-card:focus-within {
   box-shadow:
-    0 20px 42px oklch(0.59 0.13 52 / 0.18),
-    0 0 0 1px oklch(0.79 0.11 52);
-}
-.what-should-eat-app .place-card:active {
-  transform: scale(0.985);
-}
-.what-should-eat-app .place-card:disabled {
-  opacity: 0.65;
-  cursor: wait;
-  transform: none;
+    var(--shadow),
+    0 0 0 2px var(--ring);
 }
 .what-should-eat-app .place-card-heading {
   display: flex;
@@ -1140,27 +1128,77 @@
   gap: 4px;
 }
 .what-should-eat-app .place-address {
-  margin-top: 7px;
+  margin: 7px 0 0;
   overflow: hidden;
   color: var(--muted-foreground);
   font-size: 9px;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
-.what-should-eat-app .choose-label {
-  min-height: 34px;
+.what-should-eat-app .place-actions {
   margin-top: 12px;
-  border-radius: 11px;
   display: grid;
-  place-items: center;
-  color: var(--accent-foreground);
-  background: var(--accent);
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+}
+.what-should-eat-app .place-actions > :only-child {
+  grid-column: 1 / -1;
+}
+.what-should-eat-app .place-map-link,
+.what-should-eat-app .place-choose-button {
+  min-width: 0;
+  min-height: 44px;
+  padding: 7px 10px;
+  border-radius: 12px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  text-align: center;
+  text-decoration: none;
+  cursor: pointer;
+  font: inherit;
   font-size: 10px;
   font-weight: 800;
+  transition:
+    border-color 0.16s ease,
+    color 0.16s ease,
+    background 0.16s ease,
+    transform 0.16s ease;
 }
-.what-should-eat-app .place-card:hover .choose-label {
+.what-should-eat-app .place-map-link {
+  border: 1px solid var(--border);
+  color: var(--foreground);
+  background: var(--card);
+}
+.what-should-eat-app .place-map-link:hover {
+  border-color: var(--primary);
+  color: var(--primary);
+  background: var(--accent);
+}
+.what-should-eat-app .place-choose-button {
+  border: 1px solid var(--accent);
+  color: var(--accent-foreground);
+  background: var(--accent);
+}
+.what-should-eat-app .place-choose-button:hover {
+  border-color: var(--primary);
   color: var(--primary-foreground);
   background: var(--primary);
+}
+.what-should-eat-app .place-map-link:active,
+.what-should-eat-app .place-choose-button:active {
+  transform: scale(0.98);
+}
+.what-should-eat-app .place-map-link:focus-visible,
+.what-should-eat-app .place-choose-button:focus-visible {
+  outline: 2px solid var(--ring);
+  outline-offset: 2px;
+}
+.what-should-eat-app .place-choose-button:disabled {
+  opacity: 0.58;
+  cursor: wait;
+  transform: none;
 }
 .what-should-eat-app .versus {
   position: relative;
@@ -1568,6 +1606,12 @@
   }
   .what-should-eat-app .place-card {
     padding: 15px;
+  }
+  .what-should-eat-app .place-actions {
+    grid-template-columns: 1fr;
+  }
+  .what-should-eat-app .place-actions > :only-child {
+    grid-column: auto;
   }
   .what-should-eat-app .feedback-controls button {
     flex: 1;
