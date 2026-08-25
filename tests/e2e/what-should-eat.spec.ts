@@ -55,6 +55,152 @@ test("로그인 화면이 열리고 가입 항목에는 제외조건이 없다",
   await expect(page.getByRole("button", { name: "중복확인" })).toBeVisible();
   await expect(page.getByLabel("PIN")).toHaveAttribute("maxlength", "6");
   await expect(page.getByText(/못 먹는 음식/)).toHaveCount(0);
+  await expect(
+    page.getByRole("button", { name: /로그인 없이 시작하기/ }),
+  ).toBeVisible();
+});
+
+test("비회원이 친구를 추가해 결과까지 보고 탭 상태를 복원한다", async ({
+  page,
+  context,
+}) => {
+  await page.setViewportSize({ width: 320, height: 568 });
+  await context.grantPermissions(["geolocation"]);
+  await context.setGeolocation({ latitude: 37.5, longitude: 127 });
+
+  let candidateParticipantIds: number[] | null = null;
+  let decisionRequests = 0;
+  let feedbackRequests = 0;
+  await page.route("**/what-should-eat/api/auth/me", (route) =>
+    route.fulfill({
+      status: 401,
+      contentType: "application/json",
+      body: JSON.stringify({ error: "로그인이 필요합니다." }),
+    }),
+  );
+  await page.route("**/what-should-eat/api/users/search?*", (route) =>
+    route.fulfill({
+      contentType: "application/json",
+      body: JSON.stringify({ users: [friend] }),
+    }),
+  );
+  await page.route("**/what-should-eat/api/places/candidates", (route) => {
+    candidateParticipantIds = route.request().postDataJSON().participantIds;
+    return route.fulfill({
+      contentType: "application/json",
+      body: JSON.stringify({ candidates }),
+    });
+  });
+  await page.route("**/what-should-eat/api/decisions", (route) => {
+    decisionRequests += 1;
+    return route.fulfill({
+      status: 500,
+      contentType: "application/json",
+      body: JSON.stringify({ error: "비회원은 호출하면 안 됩니다." }),
+    });
+  });
+  await page.route("**/what-should-eat/api/feedback", (route) => {
+    feedbackRequests += 1;
+    return route.fulfill({
+      status: 500,
+      contentType: "application/json",
+      body: JSON.stringify({ error: "비회원은 호출하면 안 됩니다." }),
+    });
+  });
+
+  await page.goto("/what-should-eat");
+  await page.getByRole("button", { name: /로그인 없이 시작하기/ }).click();
+  await expect(page.getByText("이 선택은 저장되지 않아요")).toBeVisible();
+  await expect(page.getByRole("button", { name: "지난 선택" })).toHaveCount(0);
+  await expectNoHorizontalOverflow(page);
+
+  await page.getByLabel("친구 ID 또는 표시 이름").fill("친구");
+  await page.getByRole("button", { name: "검색", exact: true }).click();
+  await page.getByRole("button", { name: "추가", exact: true }).click();
+  await expect(page.getByText("2명이 함께 골라요")).toBeVisible();
+  await page.getByRole("button", { name: /위치 정하기/ }).click();
+  await page.getByRole("button", { name: /내 현재 위치 사용하기/ }).click();
+  await expect(page.getByText("ROUND 1 / 2")).toBeVisible();
+  expect(candidateParticipantIds).toEqual([friend.id]);
+  await page.locator(".place-card").first().click();
+  await page.locator(".place-card").first().click();
+
+  await expect(page.getByText("오늘의 선택")).toBeVisible();
+  await expect(page.getByText("비회원 선택은 저장되지 않아요.")).toBeVisible();
+  await expect(page.getByRole("button", { name: "좋다" })).toHaveCount(0);
+  await expect(page.getByText(/지난 선택에 저장됐어요/)).toHaveCount(0);
+  await expect(page.locator(".result-meta")).toContainText("비회원");
+  await expect(page.locator(".result-meta")).toContainText("친구");
+  expect(decisionRequests).toBe(0);
+  expect(feedbackRequests).toBe(0);
+  await expectNoHorizontalOverflow(page);
+
+  await expect
+    .poll(() =>
+      page.evaluate(() => sessionStorage.getItem("what_should_eat_guest")),
+    )
+    .toBe("true");
+  await page.reload();
+  await expect(
+    page.getByRole("heading", { name: "오늘 누구와 함께하나요?" }),
+  ).toBeVisible();
+  await page.getByRole("button", { name: "로그인/가입" }).click();
+  await expect(page.getByRole("tab", { name: "로그인" })).toBeVisible();
+  expect(
+    await page.evaluate(() => sessionStorage.getItem("what_should_eat_guest")),
+  ).toBeNull();
+});
+
+test("회원이 프로필 팝업에서 표시 이름을 변경한다", async ({ page }) => {
+  await page.setViewportSize({ width: 320, height: 568 });
+  const updatedUser = { ...user, displayName: "새 진행자" };
+  await page.route("**/what-should-eat/api/auth/me", (route) => {
+    const responseUser =
+      route.request().method() === "PATCH" ? updatedUser : user;
+    return route.fulfill({
+      contentType: "application/json",
+      body: JSON.stringify({ user: responseUser }),
+    });
+  });
+  await page.route("**/what-should-eat/api/decisions", (route) =>
+    route.fulfill({
+      contentType: "application/json",
+      body: JSON.stringify({
+        decisions: [
+          {
+            id: 1,
+            place: candidates[0],
+            participants: [user],
+            decidedAt: "2026-08-20T02:00:00.000Z",
+            myFeedback: null,
+          },
+        ],
+      }),
+    }),
+  );
+  await page.route("**/what-should-eat/api/feedback", (route) =>
+    route.fulfill({
+      contentType: "application/json",
+      body: JSON.stringify({ feedback: [] }),
+    }),
+  );
+
+  await page.goto("/what-should-eat");
+  await page.getByRole("button", { name: "프로필 편집: 진행자" }).click();
+  await expect(page.getByRole("dialog", { name: "프로필 편집" })).toBeVisible();
+  await page
+    .getByRole("dialog", { name: "프로필 편집" })
+    .getByRole("textbox", { name: "표시 이름", exact: true })
+    .fill("새 진행자");
+  await expectNoHorizontalOverflow(page);
+  await page.getByRole("button", { name: "저장" }).click();
+
+  await expect(
+    page.getByRole("button", { name: "프로필 편집: 새 진행자" }),
+  ).toBeVisible();
+  await expect(page.locator(".member-list")).toContainText("새 진행자");
+  await page.getByRole("button", { name: "지난 선택" }).click();
+  await expect(page.locator(".history-members")).toContainText("새 진행자");
 });
 
 test("현재 위치와 참가자 선택부터 A/B 결과와 이력까지 완주한다", async ({
@@ -244,6 +390,15 @@ test("실제 API에서 가입·로그인·결정·피드백을 저장한다", as
     data: { loginId, pin },
   });
   expect(login.status()).toBe(200);
+
+  const profile = await page.request.patch("/what-should-eat/api/auth/me", {
+    data: { displayName: "E2E 새 이름" },
+  });
+  expect(profile.status()).toBe(200);
+  const profileBody = (await profile.json()) as {
+    user: { displayName: string };
+  };
+  expect(profileBody.user.displayName).toBe("E2E 새 이름");
 
   const decision = await page.request.post("/what-should-eat/api/decisions", {
     data: {

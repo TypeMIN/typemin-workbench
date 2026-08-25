@@ -12,8 +12,10 @@ import {
   History,
   LoaderCircle,
   LocateFixed,
+  LogIn,
   LogOut,
   MapPin,
+  Pencil,
   Pizza,
   Salad,
   Sandwich,
@@ -53,6 +55,13 @@ type AuthMode = "login" | "signup";
 type IdCheckStatus = "idle" | "checking" | "available" | "taken";
 type AppView = "decide" | "history";
 type DecisionStep = "participants" | "location" | "duel" | "result";
+type AuthState =
+  | { status: "loading" }
+  | { status: "signedOut" }
+  | { status: "guest" }
+  | { status: "member"; user: AppUser };
+
+const GUEST_SESSION_KEY = "what_should_eat_guest";
 
 const CATEGORY_ICONS: Record<string, LucideIcon> = {
   한식: Soup,
@@ -105,8 +114,10 @@ function LoadingScreen() {
 
 function AuthScreen({
   onAuthenticated,
+  onGuest,
 }: {
   onAuthenticated: (user: AppUser) => void;
+  onGuest: () => void;
 }) {
   const [mode, setMode] = useState<AuthMode>("login");
   const [loginId, setLoginId] = useState("");
@@ -362,6 +373,17 @@ function AuthScreen({
               {busy && <LoaderCircle className="spin" size={18} />}
               {mode === "login" ? "로그인" : "가입하고 시작하기"}
             </button>
+            <div className="guest-entry">
+              <span>계정 없이 먼저 둘러볼 수 있어요.</span>
+              <button
+                type="button"
+                className="secondary-button"
+                onClick={onGuest}
+                disabled={busy}
+              >
+                로그인 없이 시작하기 <ChevronRight size={17} />
+              </button>
+            </div>
           </form>
         </div>
       </section>
@@ -374,12 +396,62 @@ function AppHeader({
   view,
   onView,
   onLogout,
+  onAuthenticate,
+  onUserUpdated,
 }: {
-  user: AppUser;
+  user: AppUser | null;
   view: AppView;
   onView: (view: AppView) => void;
   onLogout: () => void;
+  onAuthenticate: () => void;
+  onUserUpdated: (user: AppUser) => void;
 }) {
+  const [profileOpen, setProfileOpen] = useState(false);
+  const [displayName, setDisplayName] = useState(user?.displayName ?? "");
+  const [profileBusy, setProfileBusy] = useState(false);
+  const [profileError, setProfileError] = useState("");
+
+  useEffect(() => {
+    if (!profileOpen) return;
+    function closeOnEscape(event: KeyboardEvent) {
+      if (event.key === "Escape") setProfileOpen(false);
+    }
+    window.addEventListener("keydown", closeOnEscape);
+    return () => window.removeEventListener("keydown", closeOnEscape);
+  }, [profileOpen]);
+
+  function openProfile() {
+    if (!user) return;
+    setDisplayName(user.displayName);
+    setProfileError("");
+    setProfileOpen(true);
+  }
+
+  async function saveProfile(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    setProfileBusy(true);
+    setProfileError("");
+    try {
+      const { user: updatedUser } = await requestApi<{ user: AppUser }>(
+        "/what-should-eat/api/auth/me",
+        {
+          method: "PATCH",
+          body: JSON.stringify({ displayName }),
+        },
+      );
+      onUserUpdated(updatedUser);
+      setProfileOpen(false);
+    } catch (caught) {
+      setProfileError(
+        caught instanceof Error
+          ? caught.message
+          : "표시 이름을 변경하지 못했습니다.",
+      );
+    } finally {
+      setProfileBusy(false);
+    }
+  }
+
   return (
     <header className="app-header">
       <div className="header-inner">
@@ -399,27 +471,115 @@ function AppHeader({
           >
             <Sparkles size={17} /> 오늘 정하기
           </button>
-          <button
-            className={view === "history" ? "active" : ""}
-            onClick={() => onView("history")}
-          >
-            <History size={17} /> 지난 선택
-          </button>
+          {user && (
+            <button
+              className={view === "history" ? "active" : ""}
+              onClick={() => onView("history")}
+            >
+              <History size={17} /> 지난 선택
+            </button>
+          )}
         </nav>
         <div className="user-menu">
-          <span className="avatar">{user.displayName.slice(0, 1)}</span>
-          <span className="user-name">
-            <strong>{user.displayName}</strong>
-            <small>@{user.loginId}</small>
-          </span>
-          <button
-            className="icon-button"
-            onClick={onLogout}
-            aria-label="로그아웃"
-            title="로그아웃"
-          >
-            <LogOut size={19} />
-          </button>
+          {user ? (
+            <>
+              <button
+                type="button"
+                className="profile-trigger"
+                onClick={openProfile}
+                aria-label={`프로필 편집: ${user.displayName}`}
+                aria-haspopup="dialog"
+                aria-expanded={profileOpen}
+                aria-controls="profile-editor"
+              >
+                <span className="avatar">{user.displayName.slice(0, 1)}</span>
+                <span className="user-name">
+                  <strong>{user.displayName}</strong>
+                  <small>@{user.loginId}</small>
+                </span>
+                <Pencil size={13} aria-hidden />
+              </button>
+              <button
+                className="icon-button"
+                onClick={onLogout}
+                aria-label="로그아웃"
+                title="로그아웃"
+              >
+                <LogOut size={19} />
+              </button>
+              {profileOpen && (
+                <div
+                  id="profile-editor"
+                  className="profile-popover"
+                  role="dialog"
+                  aria-modal="false"
+                  aria-labelledby="profile-editor-title"
+                >
+                  <div className="profile-popover-heading">
+                    <div>
+                      <strong id="profile-editor-title">프로필 편집</strong>
+                      <span>@{user.loginId}</span>
+                    </div>
+                    <button
+                      type="button"
+                      className="icon-button"
+                      onClick={() => setProfileOpen(false)}
+                      aria-label="프로필 편집 닫기"
+                    >
+                      <X size={17} />
+                    </button>
+                  </div>
+                  <form className="profile-form" onSubmit={saveProfile}>
+                    <label htmlFor="profile-display-name">표시 이름</label>
+                    <input
+                      id="profile-display-name"
+                      value={displayName}
+                      onChange={(event) => setDisplayName(event.target.value)}
+                      maxLength={30}
+                      autoComplete="name"
+                      autoFocus
+                      required
+                    />
+                    {profileError && (
+                      <p className="field-message error" role="alert">
+                        {profileError}
+                      </p>
+                    )}
+                    <div className="profile-actions">
+                      <button
+                        type="button"
+                        className="secondary-button"
+                        onClick={() => setProfileOpen(false)}
+                        disabled={profileBusy}
+                      >
+                        취소
+                      </button>
+                      <button className="primary-button" disabled={profileBusy}>
+                        {profileBusy && (
+                          <LoaderCircle className="spin" size={16} />
+                        )}
+                        저장
+                      </button>
+                    </div>
+                  </form>
+                </div>
+              )}
+            </>
+          ) : (
+            <>
+              <span className="guest-label">
+                <span className="avatar">비</span>
+                <strong>비회원</strong>
+              </span>
+              <button
+                type="button"
+                className="header-auth-button"
+                onClick={onAuthenticate}
+              >
+                <LogIn size={15} /> 로그인/가입
+              </button>
+            </>
+          )}
         </div>
       </div>
     </header>
@@ -444,11 +604,19 @@ function Progress({ step }: { step: DecisionStep }) {
 
 function ParticipantNames({
   participants,
+  includeGuest = false,
 }: {
   participants: ParticipantSummary[];
+  includeGuest?: boolean;
 }) {
   return (
     <span className="participant-names">
+      {includeGuest && (
+        <span>
+          비회원
+          <small>나</small>
+        </span>
+      )}
       {participants.map((participant) => (
         <span key={participant.id}>
           {participant.displayName}
@@ -461,14 +629,17 @@ function ParticipantNames({
 
 function ParticipantBar({
   participants,
+  includeGuest = false,
 }: {
   participants: ParticipantSummary[];
+  includeGuest?: boolean;
 }) {
   return (
     <div className="participant-bar">
       <Users size={15} aria-hidden />
       <span className="sr-only">오늘 함께 먹는 사람</span>
       <div>
+        {includeGuest && <span>비회원</span>}
         {participants.map((participant) => (
           <span key={participant.id}>{participant.displayName}</span>
         ))}
@@ -479,11 +650,13 @@ function ParticipantBar({
 
 function ParticipantsStep({
   currentUser,
+  guest,
   participants,
   setParticipants,
   onNext,
 }: {
-  currentUser: AppUser;
+  currentUser: AppUser | null;
+  guest: boolean;
   participants: ParticipantSummary[];
   setParticipants: (users: ParticipantSummary[]) => void;
   onNext: () => void;
@@ -534,6 +707,16 @@ function ParticipantsStep({
         </div>
       </div>
       <div className="member-list" aria-label="오늘의 참가자">
+        {guest && (
+          <div className="member-chip">
+            <span className="avatar small">비</span>
+            <span>
+              <strong>비회원</strong>
+              <small>이 선택은 저장되지 않아요</small>
+            </span>
+            <em>나</em>
+          </div>
+        )}
         {participants.map((participant) => (
           <div className="member-chip" key={participant.id}>
             <span className="avatar small">
@@ -543,7 +726,7 @@ function ParticipantsStep({
               <strong>{participant.displayName}</strong>
               <small>@{participant.loginId}</small>
             </span>
-            {participant.id === currentUser.id ? (
+            {participant.id === currentUser?.id ? (
               <em>나</em>
             ) : (
               <button
@@ -618,7 +801,8 @@ function ParticipantsStep({
       )}
       <div className="card-footer">
         <p>
-          <strong>{participants.length}명</strong>이 함께 골라요
+          <strong>{participants.length + (guest ? 1 : 0)}명</strong>이 함께
+          골라요
         </p>
         <button className="primary-button fit" onClick={onNext}>
           위치 정하기 <ChevronRight size={18} />
@@ -923,12 +1107,16 @@ function ResultStep({
   locationLabel,
   decisionId,
   onRestart,
+  guest,
+  onAuthenticate,
 }: {
   place: PlaceCandidate;
   participants: ParticipantSummary[];
   locationLabel: string;
-  decisionId: number;
+  decisionId: number | null;
   onRestart: () => void;
+  guest: boolean;
+  onAuthenticate: () => void;
 }) {
   const { detail: shortCategory } = getCategoryParts(place.category);
   const [feedback, setFeedback] = useState<PreferenceResponse | null>(null);
@@ -936,6 +1124,7 @@ function ResultStep({
   const [feedbackError, setFeedbackError] = useState("");
 
   async function saveFeedback(response: PreferenceResponse) {
+    if (decisionId === null) return;
     setFeedbackBusy(true);
     setFeedbackError("");
     try {
@@ -974,23 +1163,31 @@ function ResultStep({
           {place.distanceMeters.toLocaleString()}m
         </span>
         <span>
-          <Users size={17} /> <ParticipantNames participants={participants} />
+          <Users size={17} />{" "}
+          <ParticipantNames participants={participants} includeGuest={guest} />
         </span>
       </div>
-      <div className="result-feedback">
-        <strong>직접 다녀온 뒤 어땠나요?</strong>
-        <p>내 평가는 내 추천에만 반영돼요.</p>
-        <FeedbackControls
-          value={feedback}
-          onChange={saveFeedback}
-          busy={feedbackBusy}
-        />
-        {feedbackError && (
-          <p className="feedback-error" role="alert">
-            {feedbackError}
-          </p>
-        )}
-      </div>
+      {decisionId !== null ? (
+        <div className="result-feedback">
+          <strong>직접 다녀온 뒤 어땠나요?</strong>
+          <p>내 평가는 내 추천에만 반영돼요.</p>
+          <FeedbackControls
+            value={feedback}
+            onChange={saveFeedback}
+            busy={feedbackBusy}
+          />
+          {feedbackError && (
+            <p className="feedback-error" role="alert">
+              {feedbackError}
+            </p>
+          )}
+        </div>
+      ) : (
+        <div className="guest-result-note">
+          <strong>비회원 선택은 저장되지 않아요.</strong>
+          <p>로그인하면 다음 선택부터 이력과 평가를 남길 수 있어요.</p>
+        </div>
+      )}
       {place.placeUrl && (
         <a
           className="secondary-button"
@@ -1004,14 +1201,20 @@ function ResultStep({
       <button className="primary-button fit" onClick={onRestart}>
         새로운 한 끼 정하기 <Sparkles size={17} />
       </button>
-      <p className="saved-note">
-        <Check size={14} /> 선택 결과가 지난 선택에 저장됐어요.
-      </p>
+      {guest ? (
+        <button className="guest-login-link" onClick={onAuthenticate}>
+          <LogIn size={15} /> 로그인하고 다음 선택 저장하기
+        </button>
+      ) : (
+        <p className="saved-note">
+          <Check size={14} /> 선택 결과가 지난 선택에 저장됐어요.
+        </p>
+      )}
     </section>
   );
 }
 
-function HistoryView() {
+function HistoryView({ currentUser }: { currentUser: AppUser }) {
   const [decisions, setDecisions] = useState<DecisionHistory[]>([]);
   const [manualFeedback, setManualFeedback] = useState<PlaceFeedback[]>([]);
   const [busy, setBusy] = useState(true);
@@ -1235,7 +1438,17 @@ function HistoryView() {
               </div>
               <div className="history-members">
                 <Users size={17} />
-                <ParticipantNames participants={decision.participants} />
+                <ParticipantNames
+                  participants={decision.participants.map((participant) =>
+                    participant.id === currentUser.id
+                      ? {
+                          id: currentUser.id,
+                          loginId: currentUser.loginId,
+                          displayName: currentUser.displayName,
+                        }
+                      : participant,
+                  )}
+                />
               </div>
               <div className="history-feedback">
                 <FeedbackControls
@@ -1254,11 +1467,19 @@ function HistoryView() {
   );
 }
 
-function DecisionFlow({ user }: { user: AppUser }) {
+function DecisionFlow({
+  user,
+  guest,
+  onAuthenticate,
+}: {
+  user: AppUser | null;
+  guest: boolean;
+  onAuthenticate: () => void;
+}) {
   const [step, setStep] = useState<DecisionStep>("participants");
-  const [participants, setParticipants] = useState<ParticipantSummary[]>([
-    user,
-  ]);
+  const [participants, setParticipants] = useState<ParticipantSummary[]>(
+    user ? [user] : [],
+  );
   const [duel, setDuel] = useState<DuelState | null>(null);
   const [result, setResult] = useState<PlaceCandidate | null>(null);
   const [decisionId, setDecisionId] = useState<number | null>(null);
@@ -1266,6 +1487,15 @@ function DecisionFlow({ user }: { user: AppUser }) {
   const [locationLabel, setLocationLabel] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
+  const displayedParticipants = participants.map((participant) =>
+    user && participant.id === user.id
+      ? {
+          id: user.id,
+          loginId: user.loginId,
+          displayName: user.displayName,
+        }
+      : participant,
+  );
 
   async function loadCandidates(
     latitude: number,
@@ -1322,6 +1552,13 @@ function DecisionFlow({ user }: { user: AppUser }) {
       return setDuel(next.state);
     }
     if (!next.result) return;
+    if (guest) {
+      setComparisons(nextComparisons);
+      setDecisionId(null);
+      setResult(next.result);
+      setStep("result");
+      return;
+    }
     setBusy(true);
     setError("");
     try {
@@ -1351,7 +1588,7 @@ function DecisionFlow({ user }: { user: AppUser }) {
   }
 
   function restart() {
-    setParticipants([user]);
+    setParticipants(user ? [user] : []);
     setDuel(null);
     setResult(null);
     setDecisionId(null);
@@ -1367,7 +1604,8 @@ function DecisionFlow({ user }: { user: AppUser }) {
       {step === "participants" && (
         <ParticipantsStep
           currentUser={user}
-          participants={participants}
+          guest={guest}
+          participants={displayedParticipants}
           setParticipants={setParticipants}
           onNext={() => {
             setError("");
@@ -1387,15 +1625,20 @@ function DecisionFlow({ user }: { user: AppUser }) {
         <DuelStep state={duel} onChoose={choose} busy={busy} error={error} />
       )}
       {(step === "location" || step === "duel") && (
-        <ParticipantBar participants={participants} />
+        <ParticipantBar
+          participants={displayedParticipants}
+          includeGuest={guest}
+        />
       )}
-      {step === "result" && result && decisionId !== null && (
+      {step === "result" && result && (
         <ResultStep
           place={result}
-          participants={participants}
+          participants={displayedParticipants}
           locationLabel={locationLabel}
           decisionId={decisionId}
           onRestart={restart}
+          guest={guest}
+          onAuthenticate={onAuthenticate}
         />
       )}
     </main>
@@ -1403,31 +1646,79 @@ function DecisionFlow({ user }: { user: AppUser }) {
 }
 
 export default function MealApp() {
-  const [loading, setLoading] = useState(true);
-  const [user, setUser] = useState<AppUser | null>(null);
+  const [auth, setAuth] = useState<AuthState>({ status: "loading" });
   const [view, setView] = useState<AppView>("decide");
 
   useEffect(() => {
     requestApi<{ user: AppUser }>("/what-should-eat/api/auth/me")
-      .then((data) => setUser(data.user))
-      .catch(() => setUser(null))
-      .finally(() => setLoading(false));
+      .then((data) => {
+        sessionStorage.removeItem(GUEST_SESSION_KEY);
+        setAuth({ status: "member", user: data.user });
+      })
+      .catch(() =>
+        setAuth(
+          sessionStorage.getItem(GUEST_SESSION_KEY) === "true"
+            ? { status: "guest" }
+            : { status: "signedOut" },
+        ),
+      );
   }, []);
+
+  function authenticated(user: AppUser) {
+    sessionStorage.removeItem(GUEST_SESSION_KEY);
+    setView("decide");
+    setAuth({ status: "member", user });
+  }
+
+  function startGuest() {
+    sessionStorage.setItem(GUEST_SESSION_KEY, "true");
+    setView("decide");
+    setAuth({ status: "guest" });
+  }
+
+  function showAuthentication() {
+    sessionStorage.removeItem(GUEST_SESSION_KEY);
+    setView("decide");
+    setAuth({ status: "signedOut" });
+  }
 
   async function logout() {
     await requestApi("/what-should-eat/api/auth/logout", {
       method: "POST",
     }).catch(() => undefined);
-    setUser(null);
+    sessionStorage.removeItem(GUEST_SESSION_KEY);
+    setAuth({ status: "signedOut" });
     setView("decide");
   }
 
-  if (loading) return <LoadingScreen />;
-  if (!user) return <AuthScreen onAuthenticated={setUser} />;
+  if (auth.status === "loading") return <LoadingScreen />;
+  if (auth.status === "signedOut") {
+    return <AuthScreen onAuthenticated={authenticated} onGuest={startGuest} />;
+  }
+
+  const user = auth.status === "member" ? auth.user : null;
+  const guest = auth.status === "guest";
   return (
     <div className="app-shell">
-      <AppHeader user={user} view={view} onView={setView} onLogout={logout} />
-      {view === "decide" ? <DecisionFlow user={user} /> : <HistoryView />}
+      <AppHeader
+        user={user}
+        view={view}
+        onView={setView}
+        onLogout={logout}
+        onAuthenticate={showAuthentication}
+        onUserUpdated={(updatedUser) =>
+          setAuth({ status: "member", user: updatedUser })
+        }
+      />
+      {view === "decide" || guest ? (
+        <DecisionFlow
+          user={user}
+          guest={guest}
+          onAuthenticate={showAuthentication}
+        />
+      ) : (
+        user && <HistoryView currentUser={user} />
+      )}
       <footer>오늘 뭐 먹지? · 함께 결정하는 가장 가벼운 방법</footer>
     </div>
   );

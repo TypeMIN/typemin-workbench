@@ -345,6 +345,19 @@
   color: var(--foreground);
   background: var(--card);
 }
+.what-should-eat-app .guest-entry {
+  margin-top: 5px;
+  padding-top: 18px;
+  border-top: 1px solid var(--border);
+  display: grid;
+  gap: 9px;
+  color: var(--muted-foreground);
+  text-align: center;
+  font-size: 10px;
+}
+.what-should-eat-app .guest-entry .secondary-button {
+  width: 100%;
+}
 .what-should-eat-app .message {
   margin: 11px 0 0;
   padding: 11px 13px;
@@ -433,6 +446,7 @@
   background: var(--primary);
 }
 .what-should-eat-app .user-menu {
+  position: relative;
   display: flex;
   align-items: center;
   gap: 5px;
@@ -474,6 +488,117 @@
   color: var(--muted-foreground);
   font-size: 9px;
   text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.what-should-eat-app .profile-trigger {
+  min-width: 0;
+  border: 0;
+  border-radius: 11px;
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  padding: 3px 5px;
+  color: var(--foreground);
+  background: transparent;
+  cursor: pointer;
+}
+.what-should-eat-app .profile-trigger:hover,
+.what-should-eat-app .profile-trigger[aria-expanded="true"] {
+  background: var(--accent);
+}
+.what-should-eat-app .profile-trigger > svg {
+  flex: 0 0 auto;
+  color: var(--muted-foreground);
+}
+.what-should-eat-app .profile-popover {
+  position: absolute;
+  top: calc(100% + 10px);
+  right: 0;
+  z-index: 20;
+  width: min(300px, calc(100vw - 20px));
+  padding: 16px;
+  border: 1px solid var(--border);
+  border-radius: 18px;
+  background: var(--card);
+  box-shadow: 0 18px 48px oklch(0.3 0.03 55 / 0.18);
+}
+.what-should-eat-app .profile-popover-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 14px;
+}
+.what-should-eat-app .profile-popover-heading > div {
+  display: grid;
+  gap: 2px;
+}
+.what-should-eat-app .profile-popover-heading strong {
+  font-size: 14px;
+}
+.what-should-eat-app .profile-popover-heading span {
+  color: var(--muted-foreground);
+  font-size: 10px;
+}
+.what-should-eat-app .profile-form {
+  display: grid;
+  gap: 8px;
+}
+.what-should-eat-app .profile-form label {
+  font-size: 11px;
+  font-weight: 800;
+}
+.what-should-eat-app .profile-form input {
+  width: 100%;
+  height: 43px;
+  border: 1px solid var(--border);
+  border-radius: 11px;
+  padding: 0 12px;
+  outline: none;
+  color: var(--foreground);
+  background: var(--card);
+}
+.what-should-eat-app .profile-form input:focus {
+  border-color: var(--ring);
+  box-shadow: 0 0 0 3px oklch(0.71 0.21 48 / 0.16);
+}
+.what-should-eat-app .profile-actions {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 7px;
+  margin-top: 5px;
+}
+.what-should-eat-app .profile-actions .primary-button,
+.what-should-eat-app .profile-actions .secondary-button {
+  min-height: 40px;
+  padding-inline: 12px;
+  border-radius: 11px;
+  font-size: 11px;
+}
+.what-should-eat-app .guest-label {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 10px;
+}
+.what-should-eat-app .guest-label .avatar {
+  width: 29px;
+  height: 29px;
+  flex-basis: 29px;
+}
+.what-should-eat-app .header-auth-button {
+  min-height: 32px;
+  border: 1px solid var(--border);
+  border-radius: 9px;
+  padding: 0 8px;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  color: var(--primary);
+  background: var(--card);
+  cursor: pointer;
+  font-size: 9px;
+  font-weight: 800;
   white-space: nowrap;
 }
 .what-should-eat-app .icon-button {
@@ -1129,6 +1254,23 @@
   color: var(--muted-foreground);
   font-size: 9px;
 }
+.what-should-eat-app .guest-result-note {
+  width: 100%;
+  margin: 0 0 17px;
+  padding: 14px;
+  border-radius: 14px;
+  color: var(--accent-foreground);
+  background: var(--accent);
+}
+.what-should-eat-app .guest-result-note strong {
+  font-size: 12px;
+}
+.what-should-eat-app .guest-result-note p {
+  margin: 4px 0 0;
+  color: var(--muted-foreground);
+  font-size: 9px;
+  line-height: 1.5;
+}
 .what-should-eat-app .feedback-controls {
   display: flex;
   flex-wrap: wrap;
@@ -1179,6 +1321,20 @@
   gap: 4px;
   color: var(--muted-foreground);
   font-size: 9px;
+}
+.what-should-eat-app .guest-login-link {
+  width: 100%;
+  margin-top: 10px;
+  border: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  color: var(--primary);
+  background: transparent;
+  cursor: pointer;
+  font-size: 10px;
+  font-weight: 800;
 }
 
 .what-should-eat-app .page-heading {
@@ -1381,6 +1537,14 @@
   .what-should-eat-app .app-header nav button {
     padding-inline: 5px;
     font-size: 10px;
+  }
+  .what-should-eat-app .profile-trigger > .avatar,
+  .what-should-eat-app .profile-trigger > svg,
+  .what-should-eat-app .guest-label .avatar {
+    display: none;
+  }
+  .what-should-eat-app .header-auth-button {
+    padding-inline: 6px;
   }
   .what-should-eat-app .user-name {
     max-width: 48px;

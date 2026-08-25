@@ -1,10 +1,7 @@
 import { apiError } from "@/lib/what-should-eat/api";
-import { getCurrentUser } from "@/lib/what-should-eat/auth";
 import { searchRegions } from "@/lib/what-should-eat/kakao";
 
 export async function GET(request: Request) {
-  if (!(await getCurrentUser())) return apiError("로그인이 필요합니다.", 401);
-
   const query = (new URL(request.url).searchParams.get("q") ?? "").trim();
   if (query.length < 2 || query.length > 50) {
     return apiError("지역이나 장소를 두 글자 이상 입력해 주세요.");

@@ -13,8 +13,6 @@ type CandidateBody = {
 
 export async function POST(request: Request) {
   const currentUser = await getCurrentUser();
-  if (!currentUser) return apiError("로그인이 필요합니다.", 401);
-
   const body = await readJson<CandidateBody>(request);
   const latitude = Number(body?.latitude);
   const longitude = Number(body?.longitude);
@@ -26,15 +24,26 @@ export async function POST(request: Request) {
   if (!Number.isFinite(longitude) || longitude < -180 || longitude > 180) {
     return apiError("기준 위치의 경도를 확인해 주세요.");
   }
-  if (!participantIds.includes(currentUser.id)) {
+  if (
+    participantIds.some(
+      (participantId) =>
+        !Number.isSafeInteger(participantId) || participantId < 1,
+    )
+  ) {
+    return apiError("참가자 정보를 확인해 주세요.");
+  }
+  if (currentUser && !participantIds.includes(currentUser.id)) {
     return apiError("세션 진행자는 참가자에 포함되어야 합니다.");
   }
 
   const supabase = getSupabaseAdmin();
-  const { data: participants, error: participantError } = await supabase
-    .from("what_should_eat_users")
-    .select("id, birth_year, gender")
-    .in("id", participantIds);
+  const { data: participants, error: participantError } =
+    participantIds.length === 0
+      ? { data: [], error: null }
+      : await supabase
+          .from("what_should_eat_users")
+          .select("id, birth_year, gender")
+          .in("id", participantIds);
   if (participantError || participants?.length !== participantIds.length) {
     return apiError("참가자 정보를 확인해 주세요.");
   }
@@ -45,20 +54,26 @@ export async function POST(request: Request) {
     comparisonResult,
     populationFeedbackResult,
   ] = await Promise.all([
-    supabase
-      .from("what_should_eat_decision_participants")
-      .select("decision_id")
-      .in("user_id", participantIds),
-    supabase
-      .from("what_should_eat_place_feedback")
-      .select("user_id, place_id, category_name, response, updated_at")
-      .in("user_id", participantIds),
-    supabase
-      .from("what_should_eat_comparisons")
-      .select("host_user_id, winner_category_name, loser_category_name")
-      .in("host_user_id", participantIds)
-      .order("created_at", { ascending: false })
-      .limit(500),
+    participantIds.length === 0
+      ? Promise.resolve({ data: [], error: null })
+      : supabase
+          .from("what_should_eat_decision_participants")
+          .select("decision_id")
+          .in("user_id", participantIds),
+    participantIds.length === 0
+      ? Promise.resolve({ data: [], error: null })
+      : supabase
+          .from("what_should_eat_place_feedback")
+          .select("user_id, place_id, category_name, response, updated_at")
+          .in("user_id", participantIds),
+    participantIds.length === 0
+      ? Promise.resolve({ data: [], error: null })
+      : supabase
+          .from("what_should_eat_comparisons")
+          .select("host_user_id, winner_category_name, loser_category_name")
+          .in("host_user_id", participantIds)
+          .order("created_at", { ascending: false })
+          .limit(500),
     supabase
       .from("what_should_eat_place_feedback")
       .select("user_id, place_id, category_name, response, updated_at")

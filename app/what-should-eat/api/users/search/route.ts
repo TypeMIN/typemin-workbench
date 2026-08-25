@@ -15,7 +15,6 @@ function toParticipantSummary(row: SummaryRow): ParticipantSummary {
 
 export async function GET(request: Request) {
   const currentUser = await getCurrentUser();
-  if (!currentUser) return apiError("로그인이 필요합니다.", 401);
 
   const query = (new URL(request.url).searchParams.get("q") ?? "").trim();
   if (query.length < 1 || query.length > 30) {
@@ -24,19 +23,20 @@ export async function GET(request: Request) {
 
   const supabase = getSupabaseAdmin();
   const columns = "id, login_id, display_name";
+  const excludedUserId = currentUser?.id ?? -1;
   const [idMatches, nameMatches] = await Promise.all([
     supabase
       .from("what_should_eat_users")
       .select(columns)
       .ilike("login_id", `${query.toLowerCase()}%`)
-      .neq("id", currentUser.id)
+      .neq("id", excludedUserId)
       .order("login_id")
       .limit(8),
     supabase
       .from("what_should_eat_users")
       .select(columns)
       .ilike("display_name", `%${query}%`)
-      .neq("id", currentUser.id)
+      .neq("id", excludedUserId)
       .order("login_id")
       .limit(8),
   ]);
