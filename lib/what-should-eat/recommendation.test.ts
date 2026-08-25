@@ -321,6 +321,40 @@ describe("목표 추천 알고리즘", () => {
     expect(Math.max(...detailCounts.values())).toBeLessThanOrEqual(2);
   });
 
+  test("탐색 예약 후보가 겹쳐도 여덟 곳을 채울 수 있으면 세부분류 상한을 완화하지 않는다", () => {
+    const sharedCategory = "음식점 > 한식 > 국수 > 칼국수";
+    const newPlaces = [
+      place("new-1", sharedCategory),
+      place("new-2", sharedCategory),
+    ];
+    const rediscovery = place("liked", sharedCategory);
+    const diversePlaces = Array.from({ length: 6 }, (_, index) =>
+      place(
+        `diverse-${index}`,
+        `음식점 > 분류${index} > 중분류${index} > 소분류${index}`,
+      ),
+    );
+    const places = [...newPlaces, rediscovery, ...diversePlaces];
+    const selected = selectRecommendedCandidates(
+      places,
+      context({
+        feedback: [feedback(rediscovery.id, rediscovery.category, "liked")],
+        visitedPlaceIds: new Set([rediscovery.id]),
+        accuracyRanks: new Map(
+          places.map((candidate, index) => [candidate.id, index + 1]),
+        ),
+      }),
+    );
+
+    expect(selected).toHaveLength(8);
+    expect(
+      selected.filter((candidate) => candidate.category === sharedCategory),
+    ).toHaveLength(2);
+    expect(selected.map((candidate) => candidate.id)).not.toContain(
+      rediscovery.id,
+    );
+  });
+
   test("한 대분류뿐이면 상한을 단계적으로 완화해 여덟 곳을 채운다", () => {
     const places = Array.from({ length: 8 }, (_, index) =>
       place(

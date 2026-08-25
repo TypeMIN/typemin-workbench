@@ -529,7 +529,6 @@ export function selectRecommendedCandidates(
         left.place.id.localeCompare(right.place.id),
     );
 
-  const selected: RankedCandidate[] = [];
   const fresh = ranked.filter(
     (candidate) => !context.recentPlaceIds.has(candidate.place.id),
   );
@@ -538,29 +537,26 @@ export function selectRecommendedCandidates(
   );
   const newPlaces = fresh.filter((candidate) => candidate.newPlace);
   const rediscoveries = fresh.filter((candidate) => candidate.rediscovery);
-  const newTarget = Math.min(2, limit);
-  const rediscoveryTarget = Math.min(1, Math.max(0, limit - newTarget));
+  const target = Math.min(limit, ranked.length);
+  const newTarget = Math.min(2, target, newPlaces.length);
+  const rediscoveryTarget = Math.min(
+    1,
+    Math.max(0, target - newTarget),
+    rediscoveries.length,
+  );
+  let selected: RankedCandidate[] = [];
 
   for (const caps of CAP_STAGES) {
-    addReservedCandidates(selected, newPlaces, newTarget, caps);
-    addReservedCandidates(selected, rediscoveries, rediscoveryTarget, caps);
-    if (
-      selected.filter((candidate) => candidate.newPlace).length >= newTarget &&
-      selected.filter((candidate) => candidate.rediscovery).length >=
-        rediscoveryTarget
-    ) {
-      break;
+    const attempt: RankedCandidate[] = [];
+    addReservedCandidates(attempt, newPlaces, newTarget, caps);
+    addReservedCandidates(attempt, rediscoveries, rediscoveryTarget, caps);
+    addCandidates(attempt, fresh, target - attempt.length, caps);
+    if (fresh.length < target) {
+      addCandidates(attempt, recent, target - attempt.length, caps);
     }
+    selected = attempt;
+    if (selected.length >= target) break;
   }
 
-  for (const caps of CAP_STAGES) {
-    addCandidates(selected, fresh, limit - selected.length, caps);
-    if (selected.length >= limit) break;
-  }
-  for (const caps of CAP_STAGES) {
-    addCandidates(selected, recent, limit - selected.length, caps);
-    if (selected.length >= limit) break;
-  }
-
-  return selected.slice(0, limit).map((candidate) => candidate.place);
+  return selected.map((candidate) => candidate.place);
 }
