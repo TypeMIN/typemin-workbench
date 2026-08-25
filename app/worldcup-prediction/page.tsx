@@ -2,7 +2,6 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import { WorkbenchAccountControl } from "@/components/workbench-account-control";
-import { WorkbenchHomeLink } from "@/components/workbench-home-link";
 import { createClient } from "@/lib/supabase/client";
 import {
   calculateScore,
@@ -449,8 +448,7 @@ export default function Home() {
       </button>
 
       <header className="hero shell">
-        <div className="archive-nav">
-          <WorkbenchHomeLink />
+        <div className="archive-account">
           <WorkbenchAccountControl returnTo="/worldcup-prediction" />
         </div>
         <h1>월드컵 예측 내기</h1>

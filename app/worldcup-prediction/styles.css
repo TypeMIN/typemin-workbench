@@ -59,16 +59,15 @@
   padding: 1.4rem 0 0.9rem;
   border-bottom: 1px solid var(--border);
 }
-.worldcup-prediction-app .archive-nav {
+.worldcup-prediction-app .archive-account {
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  gap: 1rem;
+  justify-content: flex-end;
   padding-right: 3rem;
   margin-bottom: 1rem;
 }
-.worldcup-prediction-app .archive-nav .workbench-account-control a,
-.worldcup-prediction-app .archive-nav .workbench-account-control button {
+.worldcup-prediction-app .archive-account .workbench-account-control a,
+.worldcup-prediction-app .archive-account .workbench-account-control button {
   background: var(--surface);
 }
 .worldcup-prediction-app .archive-notice {

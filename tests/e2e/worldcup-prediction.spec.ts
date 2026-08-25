@@ -20,11 +20,11 @@ test("완료된 월드컵 기록을 읽기 전용으로 공개한다", async ({ 
   ).toHaveCount(0);
 });
 
-test("공통 계정 상태와 Workbench 귀환 링크를 제공한다", async ({ page }) => {
+test("공통 계정 상태만 제공한다", async ({ page }) => {
   await page.goto("/worldcup-prediction");
   await expect(
     page.getByRole("link", { name: "Workbench 홈으로 돌아가기" }),
-  ).toHaveAttribute("href", "/");
+  ).toHaveCount(0);
   await expect(
     page.getByRole("navigation", { name: "Workbench 계정" }),
   ).toBeVisible();

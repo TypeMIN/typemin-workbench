@@ -54,7 +54,7 @@ test("공통 계정 링크와 비회원 체험을 제공한다", async ({ page }
   );
   await expect(
     page.getByRole("link", { name: "Workbench 홈으로 돌아가기" }),
-  ).toHaveAttribute("href", "/");
+  ).toHaveCount(0);
   await expect(page.getByText(/못 먹는 음식/)).toHaveCount(0);
   await expect(
     page.getByRole("button", { name: /로그인 없이 시작하기/ }),

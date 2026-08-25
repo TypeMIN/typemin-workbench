@@ -12,11 +12,15 @@ export default async function SignUpPage({
 }) {
   const next = safeNextPath((await searchParams).next);
   return (
-    <section className="workbench-account-page">
-      <p className="workbench-eyebrow">ONE ACCOUNT</p>
-      <h1>Workbench 계정 만들기</h1>
-      <p>ID, 숫자 PIN, 표시 이름만으로 시작합니다.</p>
-      <WorkbenchAuthForm mode="sign-up" next={next} />
+    <section className="workbench-auth-page">
+      <div className="workbench-auth-brand" aria-label="Workbench">
+        <span aria-hidden="true">W</span>
+        <strong>Workbench</strong>
+      </div>
+      <div className="workbench-auth-panel">
+        <h1>가입</h1>
+        <WorkbenchAuthForm mode="sign-up" next={next} />
+      </div>
     </section>
   );
 }

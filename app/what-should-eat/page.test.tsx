@@ -37,23 +37,20 @@ test("로그인하지 않은 사용자는 브랜드와 로그인 폼을 본다",
     "/account/sign-up?next=%2Fwhat-should-eat",
   );
   expect(
-    screen.getByRole("link", { name: "Workbench 홈으로 돌아가기" }),
-  ).toHaveAttribute("href", "/");
+    screen.queryByRole("link", { name: "Workbench 홈으로 돌아가기" }),
+  ).not.toBeInTheDocument();
   expect(
     screen.getByRole("button", { name: /로그인 없이 시작하기/ }),
   ).toBeVisible();
 });
 
-test("공통 계정은 식사 앱으로 돌아올 경로를 유지한다", async () => {
+test("공통 계정 링크는 식사 앱으로 돌아올 경로를 유지한다", async () => {
   vi.stubGlobal(
     "fetch",
     vi.fn().mockResolvedValue(new Response("{}", { status: 401 })),
   );
   render(<WhatShouldEatPage />);
-  expect(
-    await screen.findByText("Workbench의 모든 앱에서 같은 계정을 사용합니다."),
-  ).toBeVisible();
-  expect(screen.getByRole("link", { name: "로그인" })).toHaveAttribute(
+  expect(await screen.findByRole("link", { name: "로그인" })).toHaveAttribute(
     "href",
     expect.stringContaining("next=%2Fwhat-should-eat"),
   );

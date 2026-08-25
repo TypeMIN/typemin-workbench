@@ -48,7 +48,7 @@ export function WorkbenchAuthForm({
 
   const alternate = signingUp ? "sign-in" : "sign-up";
   return (
-    <form className="workbench-account-card" onSubmit={submit}>
+    <form className="workbench-auth-form" onSubmit={submit}>
       <label>
         <span>ID</span>
         <input
@@ -57,6 +57,7 @@ export function WorkbenchAuthForm({
           minLength={3}
           name="loginId"
           pattern="[a-z0-9]{3,20}"
+          placeholder="ID"
           required
         />
       </label>
@@ -69,17 +70,19 @@ export function WorkbenchAuthForm({
           minLength={4}
           name="pin"
           pattern="[0-9]{4,6}"
+          placeholder="숫자 4~6자리"
           required
           type="password"
         />
       </label>
       {signingUp && (
         <label>
-          <span>표시 이름</span>
+          <span>이름</span>
           <input
             autoComplete="name"
             maxLength={30}
             name="displayName"
+            placeholder="이름"
             required
           />
         </label>
@@ -92,8 +95,8 @@ export function WorkbenchAuthForm({
       <button disabled={busy} type="submit">
         {busy ? "처리 중…" : signingUp ? "가입하기" : "로그인"}
       </button>
-      <p>
-        {signingUp ? "이미 계정이 있나요?" : "Workbench가 처음인가요?"}{" "}
+      <p className="workbench-auth-alternate">
+        {signingUp ? "이미 계정이 있나요?" : "계정이 없나요?"}{" "}
         <Link href={`/account/${alternate}?next=${encodeURIComponent(next)}`}>
           {signingUp ? "로그인" : "가입"}
         </Link>

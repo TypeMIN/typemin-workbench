@@ -52,7 +52,6 @@ import type {
   PreferenceResponse,
   RegionResult,
 } from "@/lib/what-should-eat/types";
-import { WorkbenchHomeLink } from "@/components/workbench-home-link";
 
 type AppView = "decide" | "history";
 type DecisionStep = "participants" | "location" | "duel" | "result";
@@ -106,7 +105,6 @@ async function requestApi<T>(url: string, options?: RequestInit): Promise<T> {
 function LoadingScreen() {
   return (
     <main className="center-screen">
-      <WorkbenchHomeLink />
       <span className="brand-mark">
         <Utensils size={28} />
       </span>
@@ -118,7 +116,6 @@ function LoadingScreen() {
 function AuthScreen({ onGuest }: { onGuest: () => void }) {
   return (
     <main className="auth-page">
-      <WorkbenchHomeLink />
       <section className="auth-intro">
         <div className="brand-lockup">
           <span className="brand-mark">
@@ -130,9 +127,6 @@ function AuthScreen({ onGuest }: { onGuest: () => void }) {
 
       <section className="auth-panel">
         <div className="auth-card">
-          <p className="auth-shared-copy">
-            Workbench의 모든 앱에서 같은 계정을 사용합니다.
-          </p>
           <div className="auth-shared-actions">
             <Link
               className="primary-button"
@@ -148,7 +142,6 @@ function AuthScreen({ onGuest }: { onGuest: () => void }) {
             </Link>
           </div>
           <div className="guest-entry">
-            <span>저장하지 않는 체험은 계정 없이 가능합니다.</span>
             <button
               type="button"
               className="secondary-button"
@@ -206,7 +199,6 @@ function MealProfileScreen({
 
   return (
     <main className="auth-page">
-      <WorkbenchHomeLink />
       <section className="auth-intro">
         <div className="brand-lockup">
           <span className="brand-mark">
@@ -332,7 +324,6 @@ function AppHeader({
   return (
     <header className="app-header">
       <div className="header-inner">
-        <WorkbenchHomeLink className="meal-home-link" />
         <button
           className="brand-lockup brand-button"
           onClick={() => onView("decide")}
