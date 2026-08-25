@@ -17,10 +17,7 @@ describe("Workbench home", () => {
     expect(
       screen.getByRole("link", { name: "월드컵 예측 내기 열기" }),
     ).toHaveAttribute("href", "/worldcup-prediction");
-    expect(
-      screen.getByText("작은 웹앱을 만들고 직접 사용하는 공간입니다."),
-    ).toBeVisible();
-    expect(screen.getByRole("heading", { name: "웹앱" })).toBeVisible();
+    expect(screen.getByRole("heading", { name: "프로젝트" })).toBeVisible();
     expect(
       within(
         screen.getByRole("link", { name: "월드컵 예측 내기 열기" }),
@@ -28,6 +25,9 @@ describe("Workbench home", () => {
     ).toBeVisible();
     expect(
       screen.queryByText("TYPEMIN · PERSONAL LAB"),
+    ).not.toBeInTheDocument();
+    expect(
+      screen.queryByText("작은 웹앱을 만들고 직접 사용하는 공간입니다."),
     ).not.toBeInTheDocument();
   });
 });

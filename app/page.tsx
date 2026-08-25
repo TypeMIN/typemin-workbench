@@ -7,25 +7,18 @@ export default function Home() {
   return (
     <main className="workbench-home">
       <div className="workbench-home-shell">
-        <header className="workbench-home-header">
-          <div className="workbench-home-topbar">
-            <div className="workbench-home-brand" aria-label="Workbench">
-              <span aria-hidden="true">W</span>
-              <strong>Workbench</strong>
-            </div>
-            <div className="workbench-home-account">
-              <WorkbenchAccountControl />
-            </div>
-          </div>
-
-          <div className="workbench-home-intro">
-            <h1>Workbench</h1>
-            <p>작은 웹앱을 만들고 직접 사용하는 공간입니다.</p>
+        <header className="workbench-home-topbar">
+          <h1 className="workbench-home-brand" aria-label="Workbench">
+            <span aria-hidden="true">W</span>
+            <strong>Workbench</strong>
+          </h1>
+          <div className="workbench-home-account">
+            <WorkbenchAccountControl />
           </div>
         </header>
 
         <section aria-labelledby="apps-heading" className="workbench-apps">
-          <h2 id="apps-heading">웹앱</h2>
+          <h2 id="apps-heading">프로젝트</h2>
 
           <div className="workbench-grid">
             {WORKBENCH_APPS.map((app) => (
