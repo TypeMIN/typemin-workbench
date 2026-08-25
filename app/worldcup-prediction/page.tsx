@@ -148,6 +148,7 @@ export default function Home() {
   useEffect(() => {
     if (!ready || !remoteEnabled) return;
     const client = createClient();
+    let active = true;
     const refresh = async () => {
       const rpc =
         session.role === "admin"
@@ -163,6 +164,7 @@ export default function Home() {
               }
             : { p_participant_id: null, p_pin: null };
       const { data, error } = await client.rpc(rpc, args);
+      if (!active) return;
       if (error) {
         setMessage("원격 데이터 연결에 실패해 브라우저 저장으로 실행합니다.");
         return;
@@ -180,6 +182,7 @@ export default function Home() {
       )
       .subscribe();
     return () => {
+      active = false;
       void client.removeChannel(channel);
     };
   }, [ready, remoteEnabled, session]);
