@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
 import {
   calculateScore,
@@ -117,6 +117,7 @@ function pickValue(pick: Pick | undefined): string {
 export default function Home() {
   const [state, setState] = useState<WorldCupState>(createInitialState);
   const [session, setSession] = useState<Session>({ role: null });
+  const sessionRef = useRef<Session>({ role: null });
   const [stage, setStage] = useState<Stage>("r32");
   const [name, setName] = useState("");
   const [pin, setPin] = useState("");
@@ -133,7 +134,9 @@ export default function Home() {
   useEffect(() => {
     const timer = window.setTimeout(() => {
       setState(loadLocalState());
-      setSession(loadSession());
+      const storedSession = loadSession();
+      sessionRef.current = storedSession;
+      setSession(storedSession);
       setDark(localStorage.getItem("worldcup-theme") === "dark");
       setReady(true);
     }, 0);
@@ -170,7 +173,7 @@ export default function Home() {
         return;
       }
       setState(mergeRemote(data as RemoteState));
-      if (!session.role) setMessage("Supabase에 연결했습니다.");
+      if (!sessionRef.current.role) setMessage("Supabase에 연결했습니다.");
     };
     void refresh();
     const channel = client
@@ -212,6 +215,7 @@ export default function Home() {
   const roundLocked = isRoundLocked(state, stage);
 
   function saveSession(next: Session) {
+    sessionRef.current = next;
     setSession(next);
     if (next.role) localStorage.setItem(SESSION_KEY, JSON.stringify(next));
     else localStorage.removeItem(SESSION_KEY);
