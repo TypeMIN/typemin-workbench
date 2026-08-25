@@ -1,5 +1,7 @@
 "use client";
 
+import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { useEffect, useState, type FormEvent } from "react";
 import {
   ArrowLeft,
@@ -50,14 +52,14 @@ import type {
   PreferenceResponse,
   RegionResult,
 } from "@/lib/what-should-eat/types";
+import { WorkbenchHomeLink } from "@/components/workbench-home-link";
 
-type AuthMode = "login" | "signup";
-type IdCheckStatus = "idle" | "checking" | "available" | "taken";
 type AppView = "decide" | "history";
 type DecisionStep = "participants" | "location" | "duel" | "result";
 type AuthState =
   | { status: "loading" }
   | { status: "signedOut" }
+  | { status: "needsProfile" }
   | { status: "guest" }
   | { status: "member"; user: AppUser };
 
@@ -104,6 +106,7 @@ async function requestApi<T>(url: string, options?: RequestInit): Promise<T> {
 function LoadingScreen() {
   return (
     <main className="center-screen">
+      <WorkbenchHomeLink />
       <span className="brand-mark">
         <Utensils size={28} />
       </span>
@@ -112,108 +115,10 @@ function LoadingScreen() {
   );
 }
 
-function AuthScreen({
-  onAuthenticated,
-  onGuest,
-}: {
-  onAuthenticated: (user: AppUser) => void;
-  onGuest: () => void;
-}) {
-  const [mode, setMode] = useState<AuthMode>("login");
-  const [loginId, setLoginId] = useState("");
-  const [checkedLoginId, setCheckedLoginId] = useState("");
-  const [idCheckStatus, setIdCheckStatus] = useState<IdCheckStatus>("idle");
-  const [busy, setBusy] = useState(false);
-  const [error, setError] = useState("");
-  const currentYear = new Date().getFullYear();
-  const birthYears = Array.from(
-    { length: currentYear - 1899 },
-    (_, index) => currentYear - index,
-  );
-
-  function changeMode(nextMode: AuthMode) {
-    setMode(nextMode);
-    setError("");
-    setCheckedLoginId("");
-    setIdCheckStatus("idle");
-  }
-
-  async function checkLoginId() {
-    const normalizedId = loginId.trim().toLowerCase();
-    setError("");
-    setCheckedLoginId("");
-
-    if (!/^[a-z0-9]{3,20}$/.test(normalizedId)) {
-      setIdCheckStatus("idle");
-      setError("ID는 영문 소문자와 숫자로 3~20자여야 합니다.");
-      return;
-    }
-
-    setIdCheckStatus("checking");
-    try {
-      const { available } = await requestApi<{ available: boolean }>(
-        `/what-should-eat/api/auth/check-id?loginId=${encodeURIComponent(normalizedId)}`,
-      );
-      setCheckedLoginId(normalizedId);
-      setIdCheckStatus(available ? "available" : "taken");
-    } catch (caught) {
-      setIdCheckStatus("idle");
-      setError(
-        caught instanceof Error
-          ? caught.message
-          : "ID 중복 여부를 확인하지 못했습니다.",
-      );
-    }
-  }
-
-  async function submit(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-    setError("");
-    const form = new FormData(event.currentTarget);
-    const normalizedId = String(form.get("loginId") ?? "")
-      .trim()
-      .toLowerCase();
-
-    if (
-      mode === "signup" &&
-      (idCheckStatus !== "available" || checkedLoginId !== normalizedId)
-    ) {
-      setError("ID 중복확인을 먼저 완료해 주세요.");
-      return;
-    }
-
-    setBusy(true);
-    const body =
-      mode === "login"
-        ? { loginId: form.get("loginId"), pin: form.get("pin") }
-        : {
-            loginId: form.get("loginId"),
-            pin: form.get("pin"),
-            displayName: form.get("displayName"),
-            birthYear: Number(form.get("birthYear")),
-            gender: form.get("gender") as Gender,
-          };
-
-    try {
-      const { user } = await requestApi<{ user: AppUser }>(
-        `/what-should-eat/api/auth/${mode}`,
-        {
-          method: "POST",
-          body: JSON.stringify(body),
-        },
-      );
-      onAuthenticated(user);
-    } catch (caught) {
-      setError(
-        caught instanceof Error ? caught.message : "인증에 실패했습니다.",
-      );
-    } finally {
-      setBusy(false);
-    }
-  }
-
+function AuthScreen({ onGuest }: { onGuest: () => void }) {
   return (
     <main className="auth-page">
+      <WorkbenchHomeLink />
       <section className="auth-intro">
         <div className="brand-lockup">
           <span className="brand-mark">
@@ -225,168 +130,140 @@ function AuthScreen({
 
       <section className="auth-panel">
         <div className="auth-card">
-          <div
-            className="auth-tabs"
-            role="tablist"
-            aria-label="로그인 또는 가입"
-          >
-            <button
-              type="button"
-              role="tab"
-              aria-selected={mode === "login"}
-              onClick={() => changeMode("login")}
+          <p className="auth-shared-copy">
+            Workbench의 모든 앱에서 같은 계정을 사용합니다.
+          </p>
+          <div className="auth-shared-actions">
+            <Link
+              className="primary-button"
+              href="/account/sign-in?next=%2Fwhat-should-eat"
             >
               로그인
-            </button>
+            </Link>
+            <Link
+              className="secondary-button"
+              href="/account/sign-up?next=%2Fwhat-should-eat"
+            >
+              가입
+            </Link>
+          </div>
+          <div className="guest-entry">
+            <span>저장하지 않는 체험은 계정 없이 가능합니다.</span>
             <button
               type="button"
-              role="tab"
-              aria-selected={mode === "signup"}
-              onClick={() => changeMode("signup")}
+              className="secondary-button"
+              onClick={onGuest}
             >
-              처음이에요
+              로그인 없이 시작하기 <ChevronRight size={17} />
             </button>
           </div>
-          <form onSubmit={submit} className="form-stack">
-            <div className="field-group">
-              <label htmlFor="auth-login-id">ID</label>
-              <div className={mode === "signup" ? "input-action" : undefined}>
-                <input
-                  id="auth-login-id"
-                  name="loginId"
-                  value={loginId}
-                  onChange={(event) => {
-                    setLoginId(event.target.value.toLowerCase());
-                    setCheckedLoginId("");
-                    setIdCheckStatus("idle");
-                  }}
-                  autoComplete="username"
-                  placeholder="영문 소문자와 숫자"
-                  pattern="[a-z0-9]{3,20}"
-                  minLength={3}
-                  maxLength={20}
-                  required
-                />
-                {mode === "signup" && (
-                  <button
-                    type="button"
-                    onClick={checkLoginId}
-                    disabled={idCheckStatus === "checking"}
-                  >
-                    {idCheckStatus === "checking" ? (
-                      <LoaderCircle className="spin" size={17} />
-                    ) : (
-                      "중복확인"
-                    )}
-                  </button>
-                )}
-              </div>
-              {mode === "signup" &&
-                checkedLoginId === loginId.trim().toLowerCase() &&
-                idCheckStatus === "available" && (
-                  <p className="field-message success" role="status">
-                    사용할 수 있는 ID입니다.
-                  </p>
-                )}
-              {mode === "signup" &&
-                checkedLoginId === loginId.trim().toLowerCase() &&
-                idCheckStatus === "taken" && (
-                  <p className="field-message error" role="alert">
-                    이미 사용 중인 ID입니다.
-                  </p>
-                )}
-            </div>
-            <label>
-              <span>PIN</span>
-              <input
-                name="pin"
-                type="password"
-                inputMode="numeric"
-                autoComplete={
-                  mode === "login" ? "current-password" : "new-password"
-                }
-                placeholder="숫자 4~6자리"
-                pattern="[0-9]{4,6}"
-                minLength={4}
-                maxLength={6}
-                required
-              />
-            </label>
-            {mode === "signup" && (
-              <>
-                <label>
-                  <span>표시 이름</span>
-                  <input
-                    name="displayName"
-                    autoComplete="name"
-                    placeholder="친구들에게 보일 이름"
-                    maxLength={30}
-                    required
-                  />
-                </label>
-                <div className="form-row">
-                  <label>
-                    <span>출생연도</span>
-                    <select name="birthYear" defaultValue="" required>
-                      <option value="" disabled>
-                        연도 선택
-                      </option>
-                      {birthYears.map((year) => (
-                        <option key={year} value={year}>
-                          {year}년
-                        </option>
-                      ))}
-                    </select>
-                  </label>
-                  <fieldset className="gender-field">
-                    <legend>성별</legend>
-                    <div className="gender-toggle">
-                      <label>
-                        <input
-                          type="radio"
-                          name="gender"
-                          value="male"
-                          required
-                        />
-                        <span>남성</span>
-                      </label>
-                      <label>
-                        <input
-                          type="radio"
-                          name="gender"
-                          value="female"
-                          required
-                        />
-                        <span>여성</span>
-                      </label>
-                    </div>
-                  </fieldset>
-                </div>
-              </>
-            )}
-            {error && (
-              <p className="message error" role="alert">
-                {error}
-              </p>
-            )}
-            <button className="primary-button" disabled={busy}>
-              {busy && <LoaderCircle className="spin" size={18} />}
-              {mode === "login" ? "로그인" : "가입하고 시작하기"}
-            </button>
-            <div className="guest-entry">
-              <span>계정 없이 먼저 둘러볼 수 있어요.</span>
-              <button
-                type="button"
-                className="secondary-button"
-                onClick={onGuest}
-                disabled={busy}
-              >
-                로그인 없이 시작하기 <ChevronRight size={17} />
-              </button>
-            </div>
-          </form>
         </div>
       </section>
+    </main>
+  );
+}
+
+function MealProfileScreen({
+  onComplete,
+}: {
+  onComplete: (user: AppUser) => void;
+}) {
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState("");
+  const currentYear = new Date().getFullYear();
+  const years = Array.from(
+    { length: currentYear - 1899 },
+    (_, index) => currentYear - index,
+  );
+
+  async function submit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    setBusy(true);
+    setError("");
+    const form = new FormData(event.currentTarget);
+    try {
+      const { user } = await requestApi<{ user: AppUser }>(
+        "/what-should-eat/api/profile",
+        {
+          method: "POST",
+          body: JSON.stringify({
+            birthYear: Number(form.get("birthYear")),
+            gender: form.get("gender") as Gender,
+          }),
+        },
+      );
+      onComplete(user);
+    } catch (caught) {
+      setError(
+        caught instanceof Error
+          ? caught.message
+          : "프로필을 저장하지 못했습니다.",
+      );
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <main className="auth-page">
+      <WorkbenchHomeLink />
+      <section className="auth-intro">
+        <div className="brand-lockup">
+          <span className="brand-mark">
+            <Utensils size={24} />
+          </span>
+          <h1>식사 프로필</h1>
+        </div>
+      </section>
+      <form className="form-stack" onSubmit={submit}>
+        <p className="auth-shared-copy">
+          맞춤 추천에 사용할 정보입니다. 다른 Workbench 앱에는 적용되지
+          않습니다.
+        </p>
+        <label>
+          <span>출생연도</span>
+          <select defaultValue="" name="birthYear" required>
+            <option disabled value="">
+              연도 선택
+            </option>
+            {years.map((year) => (
+              <option key={year} value={year}>
+                {year}년
+              </option>
+            ))}
+          </select>
+        </label>
+        <fieldset className="gender-field">
+          <legend>성별</legend>
+          <div className="gender-toggle">
+            <label>
+              <input name="gender" required type="radio" value="male" />
+              <span>남성</span>
+            </label>
+            <label>
+              <input name="gender" required type="radio" value="female" />
+              <span>여성</span>
+            </label>
+            <label>
+              <input
+                name="gender"
+                required
+                type="radio"
+                value="prefer_not_to_say"
+              />
+              <span>응답 안 함</span>
+            </label>
+          </div>
+        </fieldset>
+        {error && (
+          <p className="message error" role="alert">
+            {error}
+          </p>
+        )}
+        <button className="primary-button" disabled={busy}>
+          {busy ? "저장 중…" : "프로필 저장"}
+        </button>
+      </form>
     </main>
   );
 }
@@ -455,6 +332,7 @@ function AppHeader({
   return (
     <header className="app-header">
       <div className="header-inner">
+        <WorkbenchHomeLink className="meal-home-link" />
         <button
           className="brand-lockup brand-button"
           onClick={() => onView("decide")}
@@ -546,6 +424,7 @@ function AppHeader({
                       </p>
                     )}
                     <div className="profile-actions">
+                      <Link href="/account">계정 관리</Link>
                       <button
                         type="button"
                         className="secondary-button"
@@ -1646,12 +1525,31 @@ function DecisionFlow({
 }
 
 export default function MealApp() {
+  const router = useRouter();
   const [auth, setAuth] = useState<AuthState>({ status: "loading" });
   const [view, setView] = useState<AppView>("decide");
 
   useEffect(() => {
-    requestApi<{ user: AppUser }>("/what-should-eat/api/auth/me")
+    fetch("/what-should-eat/api/auth/me")
+      .then(async (response) => {
+        if (response.status === 403) {
+          const body = (await response.json().catch(() => ({}))) as {
+            requiresPinChange?: boolean;
+          };
+          if (body.requiresPinChange) {
+            router.replace("/account");
+            return null;
+          }
+        }
+        if (response.status === 428) {
+          setAuth({ status: "needsProfile" });
+          return null;
+        }
+        if (!response.ok) throw new Error("signed out");
+        return (await response.json()) as { user: AppUser };
+      })
       .then((data) => {
+        if (!data) return;
         sessionStorage.removeItem(GUEST_SESSION_KEY);
         setAuth({ status: "member", user: data.user });
       })
@@ -1662,7 +1560,7 @@ export default function MealApp() {
             : { status: "signedOut" },
         ),
       );
-  }, []);
+  }, [router]);
 
   function authenticated(user: AppUser) {
     sessionStorage.removeItem(GUEST_SESSION_KEY);
@@ -1692,8 +1590,10 @@ export default function MealApp() {
   }
 
   if (auth.status === "loading") return <LoadingScreen />;
+  if (auth.status === "needsProfile")
+    return <MealProfileScreen onComplete={authenticated} />;
   if (auth.status === "signedOut") {
-    return <AuthScreen onAuthenticated={authenticated} onGuest={startGuest} />;
+    return <AuthScreen onGuest={startGuest} />;
   }
 
   const user = auth.status === "member" ? auth.user : null;

@@ -158,6 +158,33 @@
   width: 100%;
 }
 
+.what-should-eat-app .workbench-home-link {
+  color: var(--primary);
+}
+
+.what-should-eat-app .auth-shared-copy {
+  margin: 0 0 1rem;
+  color: var(--muted-foreground);
+  font-size: 13px;
+  line-height: 1.6;
+  text-align: center;
+}
+
+.what-should-eat-app .auth-shared-actions {
+  display: grid;
+  gap: 10px;
+}
+
+.what-should-eat-app .auth-shared-actions a {
+  display: flex;
+}
+
+.what-should-eat-app .meal-home-link {
+  flex: 0 0 auto;
+  padding: 6px 8px;
+  font-size: 11px;
+}
+
 .what-should-eat-app .auth-tabs {
   display: grid;
   grid-template-columns: 1fr 1fr;

@@ -2,65 +2,136 @@ export type Database = {
   __InternalSupabase: { PostgrestVersion: "14.15" };
   public: {
     Tables: {
-      what_should_eat_sessions: {
+      workbench_sessions: {
         Row: {
           created_at: string;
           expires_at: string;
           id: number;
           token_hash: string;
-          user_id: number;
+          account_id: number;
         };
         Insert: {
           created_at?: string;
           expires_at: string;
           id?: never;
           token_hash: string;
-          user_id: number;
+          account_id: number;
         };
         Update: {
           created_at?: string;
           expires_at?: string;
           id?: never;
           token_hash?: string;
-          user_id?: number;
+          account_id?: number;
         };
         Relationships: [
           {
             foreignKeyName: "what_should_eat_sessions_user_id_fkey";
-            columns: ["user_id"];
+            columns: ["account_id"];
             isOneToOne: false;
-            referencedRelation: "what_should_eat_users";
+            referencedRelation: "workbench_accounts";
             referencedColumns: ["id"];
           },
         ];
       };
-      what_should_eat_users: {
+      workbench_accounts: {
         Row: {
-          birth_year: number;
           created_at: string;
+          disabled_at: string | null;
           display_name: string;
-          gender: string;
+          failed_login_attempts: number;
           id: number;
+          last_login_at: string | null;
           login_id: string;
+          locked_until: string | null;
+          must_change_pin: boolean;
           pin_hash: string;
+          role: string;
+          updated_at: string;
         };
         Insert: {
-          birth_year: number;
           created_at?: string;
+          disabled_at?: string | null;
           display_name: string;
-          gender: string;
+          failed_login_attempts?: number;
           id?: never;
+          last_login_at?: string | null;
           login_id: string;
+          locked_until?: string | null;
+          must_change_pin?: boolean;
           pin_hash: string;
+          role?: string;
+          updated_at?: string;
         };
         Update: {
+          created_at?: string;
+          disabled_at?: string | null;
+          display_name?: string;
+          failed_login_attempts?: number;
+          id?: never;
+          last_login_at?: string | null;
+          login_id?: string;
+          locked_until?: string | null;
+          must_change_pin?: boolean;
+          pin_hash?: string;
+          role?: string;
+          updated_at?: string;
+        };
+        Relationships: [];
+      };
+      what_should_eat_profiles: {
+        Row: {
+          account_id: number;
+          birth_year: number;
+          created_at: string;
+          gender: string;
+          updated_at: string;
+        };
+        Insert: {
+          account_id: number;
+          birth_year: number;
+          created_at?: string;
+          gender: string;
+          updated_at?: string;
+        };
+        Update: {
+          account_id?: number;
           birth_year?: number;
           created_at?: string;
-          display_name?: string;
           gender?: string;
-          id?: never;
-          login_id?: string;
-          pin_hash?: string;
+          updated_at?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "what_should_eat_profiles_account_id_fkey";
+            columns: ["account_id"];
+            isOneToOne: true;
+            referencedRelation: "workbench_accounts";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
+      workbench_auth_rate_limits: {
+        Row: {
+          action: string;
+          expires_at: string;
+          key_hash: string;
+          request_count: number;
+          window_started_at: string;
+        };
+        Insert: {
+          action: string;
+          expires_at: string;
+          key_hash: string;
+          request_count?: number;
+          window_started_at: string;
+        };
+        Update: {
+          action?: string;
+          expires_at?: string;
+          key_hash?: string;
+          request_count?: number;
+          window_started_at?: string;
         };
         Relationships: [];
       };
@@ -80,7 +151,7 @@ export type Database = {
             foreignKeyName: "what_should_eat_decision_participants_user_id_fkey";
             columns: ["user_id"];
             isOneToOne: false;
-            referencedRelation: "what_should_eat_users";
+            referencedRelation: "workbench_accounts";
             referencedColumns: ["id"];
           },
         ];
@@ -133,7 +204,7 @@ export type Database = {
             foreignKeyName: "what_should_eat_decisions_host_user_id_fkey";
             columns: ["host_user_id"];
             isOneToOne: false;
-            referencedRelation: "what_should_eat_users";
+            referencedRelation: "workbench_accounts";
             referencedColumns: ["id"];
           },
         ];
@@ -184,7 +255,7 @@ export type Database = {
             foreignKeyName: "what_should_eat_comparisons_host_user_id_fkey";
             columns: ["host_user_id"];
             isOneToOne: false;
-            referencedRelation: "what_should_eat_users";
+            referencedRelation: "workbench_accounts";
             referencedColumns: ["id"];
           },
         ];
@@ -253,14 +324,32 @@ export type Database = {
             foreignKeyName: "what_should_eat_place_feedback_user_id_fkey";
             columns: ["user_id"];
             isOneToOne: false;
-            referencedRelation: "what_should_eat_users";
+            referencedRelation: "workbench_accounts";
             referencedColumns: ["id"];
           },
         ];
       };
     };
     Views: { [_ in never]: never };
-    Functions: { [_ in never]: never };
+    Functions: {
+      workbench_record_login_failure: {
+        Args: { p_account_id: number };
+        Returns: string | null;
+      };
+      workbench_record_login_success: {
+        Args: { p_account_id: number };
+        Returns: undefined;
+      };
+      workbench_take_rate_limit: {
+        Args: {
+          p_action: string;
+          p_key_hash: string;
+          p_limit: number;
+          p_window_seconds: number;
+        };
+        Returns: boolean;
+      };
+    };
     Enums: { [_ in never]: never };
     CompositeTypes: { [_ in never]: never };
   };

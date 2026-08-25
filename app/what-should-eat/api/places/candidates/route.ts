@@ -63,9 +63,9 @@ export async function POST(request: Request) {
 
   const supabase = getSupabaseAdmin();
   const { data: participants, error: participantError } = await supabase
-    .from("what_should_eat_users")
-    .select("id, birth_year, gender")
-    .in("id", participantIds);
+    .from("what_should_eat_profiles")
+    .select("account_id, birth_year, gender")
+    .in("account_id", participantIds);
   if (participantError || participants?.length !== participantIds.length) {
     return apiError("참가자 정보를 확인해 주세요.");
   }
@@ -142,9 +142,9 @@ export async function POST(request: Request) {
     populationUserIds.length === 0
       ? { data: [], error: null }
       : await supabase
-          .from("what_should_eat_users")
-          .select("id, birth_year, gender")
-          .in("id", populationUserIds);
+          .from("what_should_eat_profiles")
+          .select("account_id, birth_year, gender")
+          .in("account_id", populationUserIds);
   if (populationError)
     return apiError("추천 집단 데이터를 확인하지 못했습니다.", 500);
 
@@ -167,12 +167,12 @@ export async function POST(request: Request) {
     );
     const candidates = selectRecommendedCandidates(places, {
       participants: (participants ?? []).map((participant) => ({
-        id: Number(participant.id),
+        id: Number(participant.account_id),
         birthYear: participant.birth_year,
         gender: participant.gender as Gender,
       })),
       population: (population ?? []).map((member) => ({
-        id: Number(member.id),
+        id: Number(member.account_id),
         birthYear: member.birth_year,
         gender: member.gender as Gender,
       })),

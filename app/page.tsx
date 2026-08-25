@@ -1,26 +1,22 @@
 import Link from "next/link";
 
-const apps = [
-  {
-    name: "오늘 뭐 먹지?",
-    description: "함께 고르는 오늘의 한 끼와 장소 추천",
-    href: "/what-should-eat",
-    status: "사용 가능",
-    accent: "meal",
-  },
-  {
-    name: "월드컵 예측 내기",
-    description: "5명이 함께 쓰는 월드컵 결과 예측 보드",
-    href: "/worldcup-prediction",
-    status: "사용 가능",
-    accent: "worldcup",
-  },
-] as const;
+import { WorkbenchAccountControl } from "@/components/workbench-account-control";
+import { WORKBENCH_APPS } from "@/lib/workbench/apps";
 
 export default function Home() {
+  const activeCount = WORKBENCH_APPS.filter(
+    (app) => app.statusTone === "active",
+  ).length;
+  const completedCount = WORKBENCH_APPS.filter(
+    (app) => app.statusTone === "complete",
+  ).length;
+
   return (
     <main className="workbench-home">
       <section className="workbench-hero">
+        <div className="workbench-hero-account">
+          <WorkbenchAccountControl />
+        </div>
         <p className="workbench-eyebrow">TYPEMIN · PERSONAL LAB</p>
         <h1>Workbench</h1>
         <p className="workbench-intro">
@@ -32,10 +28,12 @@ export default function Home() {
       <section aria-labelledby="apps-heading" className="workbench-apps">
         <div className="workbench-section-heading">
           <h2 id="apps-heading">Apps</h2>
-          <span>{apps.length}개 운영 중</span>
+          <span>
+            {activeCount}개 운영 · {completedCount}개 완료
+          </span>
         </div>
         <div className="workbench-grid">
-          {apps.map((app) => (
+          {WORKBENCH_APPS.map((app) => (
             <Link
               aria-label={`${app.name} 열기`}
               className={`workbench-card workbench-card--${app.accent}`}
@@ -43,7 +41,11 @@ export default function Home() {
               key={app.href}
             >
               <div className="workbench-card-topline">
-                <span className="workbench-status">{app.status}</span>
+                <span
+                  className={`workbench-status workbench-status--${app.statusTone}`}
+                >
+                  {app.status}
+                </span>
                 <span aria-hidden="true" className="workbench-arrow">
                   ↗
                 </span>

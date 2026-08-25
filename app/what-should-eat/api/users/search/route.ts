@@ -22,21 +22,31 @@ export async function GET(request: Request) {
   }
 
   const supabase = getSupabaseAdmin();
+  const { data: profiles, error: profileError } = await supabase
+    .from("what_should_eat_profiles")
+    .select("account_id");
+  if (profileError) return apiError("사용자를 검색하지 못했습니다.", 500);
+  const profileAccountIds = (profiles ?? []).map(
+    (profile) => profile.account_id,
+  );
+  if (profileAccountIds.length === 0) return Response.json({ users: [] });
   const columns = "id, login_id, display_name";
   const excludedUserId = currentUser?.id ?? -1;
   const [idMatches, nameMatches] = await Promise.all([
     supabase
-      .from("what_should_eat_users")
+      .from("workbench_accounts")
       .select(columns)
       .ilike("login_id", `${query.toLowerCase()}%`)
       .neq("id", excludedUserId)
+      .in("id", profileAccountIds)
       .order("login_id")
       .limit(8),
     supabase
-      .from("what_should_eat_users")
+      .from("workbench_accounts")
       .select(columns)
       .ilike("display_name", `%${query}%`)
       .neq("id", excludedUserId)
+      .in("id", profileAccountIds)
       .order("login_id")
       .limit(8),
   ]);

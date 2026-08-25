@@ -1,5 +1,5 @@
 import { apiError } from "@/lib/what-should-eat/api";
-import { isValidLoginId, normalizeLoginId } from "@/lib/what-should-eat/auth";
+import { isValidLoginId, normalizeLoginId } from "@/lib/workbench/auth";
 import { getSupabaseAdmin } from "@/lib/supabase/admin";
 
 export async function GET(request: Request) {
@@ -12,7 +12,7 @@ export async function GET(request: Request) {
   }
 
   const { data, error } = await getSupabaseAdmin()
-    .from("what_should_eat_users")
+    .from("workbench_accounts")
     .select("id")
     .eq("login_id", loginId)
     .maybeSingle<{ id: number }>();

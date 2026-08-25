@@ -1,6 +1,7 @@
 import { apiError, readJson } from "@/lib/what-should-eat/api";
 import { getCurrentUser } from "@/lib/what-should-eat/auth";
 import { getSupabaseAdmin } from "@/lib/supabase/admin";
+import { mutationOriginError } from "@/lib/workbench/request";
 import type {
   PlaceCandidate,
   PlaceFeedback,
@@ -75,6 +76,8 @@ export async function GET() {
 }
 
 export async function POST(request: Request) {
+  const originError = mutationOriginError(request);
+  if (originError) return originError;
   const currentUser = await getCurrentUser();
   if (!currentUser) return apiError("로그인이 필요합니다.", 401);
 

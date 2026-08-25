@@ -1,10 +1,10 @@
 import { apiError, readJson } from "@/lib/what-should-eat/api";
 import { getCurrentUser } from "@/lib/what-should-eat/auth";
 import { getSupabaseAdmin } from "@/lib/supabase/admin";
+import { mutationOriginError } from "@/lib/workbench/request";
 import type {
   DecisionHistory,
   DuelComparison,
-  Gender,
   PlaceCandidate,
   PreferenceResponse,
 } from "@/lib/what-should-eat/types";
@@ -33,11 +33,11 @@ type UserRow = {
   id: number;
   login_id: string;
   display_name: string;
-  birth_year: number;
-  gender: Gender;
 };
 
 export async function POST(request: Request) {
+  const originError = mutationOriginError(request);
+  if (originError) return originError;
   const currentUser = await getCurrentUser();
   if (!currentUser) return apiError("로그인이 필요합니다.", 401);
 
@@ -77,9 +77,9 @@ export async function POST(request: Request) {
 
   const supabase = getSupabaseAdmin();
   const { data: participants, error: participantError } = await supabase
-    .from("what_should_eat_users")
-    .select("id")
-    .in("id", participantIds);
+    .from("what_should_eat_profiles")
+    .select("account_id")
+    .in("account_id", participantIds);
   if (participantError || participants?.length !== participantIds.length) {
     return apiError("참가자 정보를 확인해 주세요.");
   }
@@ -194,8 +194,8 @@ export async function GET() {
     ...new Set((participantRows ?? []).map((row) => Number(row.user_id))),
   ];
   const { data: users, error: userError } = await supabase
-    .from("what_should_eat_users")
-    .select("id, login_id, display_name, birth_year, gender")
+    .from("workbench_accounts")
+    .select("id, login_id, display_name")
     .in("id", userIds);
   if (userError) return apiError("참가자 이력을 불러오지 못했습니다.", 500);
 

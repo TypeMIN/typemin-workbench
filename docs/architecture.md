@@ -20,29 +20,36 @@ flowchart TD
     Next --> Home["/"]
     Next --> Meal["/what-should-eat"]
     Next --> WorldCup["/worldcup-prediction"]
+    Next --> Account["/account/*<br/>ID + PIN"]
     GitHub --> Vercel["Vercel<br/>workbench"]
     Vercel --> Host["workbench-type-min.vercel.app"]
     Host --> Home
     Meal --> MealAPI["/what-should-eat/api/*"]
-    MealAPI --> ServerSecret["SUPABASE_SECRET_KEY<br/>server only"]
+    Account --> AuthAPI["/api/workbench/auth/*"]
+    AuthAPI --> ServerSecret["SUPABASE_SECRET_KEY<br/>server only"]
+    MealAPI --> ServerSecret
+    ServerSecret --> Accounts["workbench_accounts<br/>workbench_sessions"]
+    ServerSecret --> Profiles["what_should_eat_profiles"]
     ServerSecret --> MealTables["public.what_should_eat_*"]
-    WorldCup --> PublicKey["Supabase publishable key"]
+    WorldCup --> PublicKey["Supabase publishable key<br/>read only"]
     PublicKey --> RPC["public.worldcup_* RPC wrappers"]
     RPC --> PrivateRPC["private.worldcup_*<br/>SECURITY DEFINER"]
     PrivateRPC --> WorldCupTables["public.worldcup_*"]
-    Edge["sync-football-data<br/>verify_jwt=true"] --> WorldCupTables
+    Edge["sync-football-data<br/>410 Archived"] -.-> WorldCupTables
     Supabase["Supabase<br/>Workbench · Seoul"] --> MealTables
     Supabase --> WorldCupTables
 ```
 
 ## 2. 공개 URL과 라우트
 
-| 책임         | 경로                     |
-| ------------ | ------------------------ |
-| Workbench 홈 | `/`                      |
-| 식사 앱      | `/what-should-eat`       |
-| 월드컵 앱    | `/worldcup-prediction`   |
-| 식사 앱 API  | `/what-should-eat/api/*` |
+| 책임          | 경로                     |
+| ------------- | ------------------------ |
+| Workbench 홈  | `/`                      |
+| 공통 계정     | `/account/*`             |
+| 공통 계정 API | `/api/workbench/*`       |
+| 식사 앱       | `/what-should-eat`       |
+| 월드컵 앱     | `/worldcup-prediction`   |
+| 식사 앱 API   | `/what-should-eat/api/*` |
 
 식사 앱 API는 다른 Workbench 앱의 `/api/*`와 충돌하지 않도록 앱 경로 아래에 둡니다. 앱 slug는 소문자 kebab-case, 데이터베이스 접두사는 대응하는 snake_case를 사용합니다.
 
@@ -82,38 +89,49 @@ typemin-workbench/
 - `app/<app-name>`에는 앱의 라우트, metadata와 라우트 전용 CSS를 둡니다.
 - `components/<app-name>`과 `lib/<app-name>`에는 해당 앱만 사용하는 UI와 도메인 로직을 둡니다.
 - `lib/supabase`에는 두 앱이 공유하는 설정과 클라이언트 생성 코드만 둡니다.
+- `components/workbench-*`, `lib/workbench`와 `app/account`에는 모든 앱이 공유하는 귀환 링크, 앱 카탈로그와 계정 기능을 둡니다.
 - 둘 이상의 앱에서 실제로 같은 책임으로 재사용되는 코드만 루트 공통 모듈로 승격합니다.
 - 앱 CSS는 각각 `.what-should-eat-app`, `.worldcup-prediction-app` 아래로 제한합니다.
-- 식사 앱의 `what_should_eat_session` 쿠키는 `Path=/what-should-eat`로 제한합니다.
+- 모든 앱은 `WorkbenchHomeLink`와 공통 계정 상태 UI를 헤더에 배치합니다. 새 앱은 `lib/workbench/apps.ts` 카탈로그에 등록하고 카탈로그 기반 E2E로 누락을 검사합니다.
+- `workbench_session` 쿠키는 `HttpOnly`, `SameSite=Lax`, Production `Secure`, `Path=/`, 30일 만료를 사용합니다. DB에는 32바이트 원문 토큰이 아니라 SHA-256 해시만 저장합니다.
 
 새 앱은 Next.js App Router의 [공식 프로젝트 구조](https://nextjs.org/docs/app/getting-started/project-structure)에 맞춰 `app/<app-name>/page.tsx`로 추가합니다.
 
 ## 4. Supabase 데이터와 권한
 
-두 앱은 Supabase 프로젝트를 공유하지만 현재 Supabase Auth는 사용하지 않습니다. 식사 앱은 자체 서버 세션, 월드컵 앱은 참가자·관리자 PIN 모델을 유지합니다.
+두 앱은 Supabase 프로젝트를 공유하지만 Supabase Auth는 사용하지 않습니다. 이메일 가입을 비활성화하고 Workbench 자체 `ID + PIN` 계정을 유일한 인증원으로 사용합니다.
+
+### 공통 계정
+
+- `workbench_accounts`: ID, scrypt PIN 해시, 표시 이름, `member`/`owner` 역할과 잠금 상태
+- `workbench_sessions`: 계정별 루트 세션의 토큰 해시와 30일 만료
+- `workbench_auth_rate_limits`: `WORKBENCH_AUTH_PEPPER` HMAC으로 익명화한 IP별 제한 버킷
+- `what_should_eat_profiles`: 식사 추천에만 필요한 출생연도·성별
+
+PIN은 숫자 4~6자리이며 계정별 5회 실패 시 15분 잠급니다. IP별 로그인은 15분에 30회, 가입은 시간당 5회로 제한합니다. owner가 발급한 임시 6자리 PIN은 기존 세션을 전부 폐기하며 다음 로그인 뒤 PIN 변경을 강제합니다. 유일한 owner 복구는 [관리자 복구 절차](account-recovery.md)를 따릅니다.
 
 ### 식사 앱
 
-- `what_should_eat_users`
-- `what_should_eat_sessions`
+- `workbench_accounts`와 `workbench_sessions`의 공통 계정 참조
+- `what_should_eat_profiles`
 - `what_should_eat_decisions`
 - `what_should_eat_decision_participants`
 - `what_should_eat_place_feedback`
 - `what_should_eat_comparisons`
 
-여섯 테이블은 빈 상태로 시작합니다. 브라우저 역할에는 직접 테이블 권한을 부여하지 않고, Vercel 서버의 `SUPABASE_SECRET_KEY`를 사용하는 식사 앱 API만 접근합니다.
+브라우저 역할에는 직접 테이블 권한을 부여하지 않고, Vercel 서버의 `SUPABASE_SECRET_KEY`를 사용하는 API만 접근합니다. 비회원은 저장되지 않는 체험을 계속 사용할 수 있지만 저장·이력·친구 검색·피드백은 공통 계정과 식사 프로필을 모두 요구합니다.
 
 ### 월드컵 앱
 
-- `worldcup_settings`: 설정 1건
-- `worldcup_participants`: 빈 참가 슬롯 5개
-- `worldcup_matches`: 기본 경기 브래킷 32건
-- `worldcup_predictions`: 빈 상태
+- `worldcup_settings`: `archived_at`이 설정된 설정 1건
+- `worldcup_participants`: 기존 참가자 5명
+- `worldcup_matches`: 완료된 경기 32건
+- `worldcup_predictions`: 기존 예측 40건
 - `worldcup_events`: Realtime 갱신 알림
 
-`anon`은 이벤트 조회와 공개 RPC wrapper 실행만 할 수 있습니다. 직접 테이블 접근은 차단합니다. `SECURITY DEFINER` 구현 함수는 `private` 스키마에 두고 빈 `search_path`, 내부 PIN 검증, `PUBLIC` 실행 권한 회수와 함수별 최소 `GRANT`를 적용합니다.
+`anon`은 공개 상태 조회 RPC만 실행할 수 있습니다. 직접 테이블 접근과 참가·예측·관리 RPC 실행 권한은 차단합니다. 테이블 쓰기 트리거도 `archived_at`을 검사하므로 UI 우회나 기존 RPC 호출로 기록을 바꿀 수 없습니다.
 
-관리자 PIN은 기존 동작을 유지하기 위해 `0000`입니다. 공개 사용자가 값을 추측해 참가자·경기 설정과 결과를 바꿀 수 있는 위험이 있으므로 임시 운영 값으로 취급하고 공개 공유 범위를 제한해야 합니다.
+기존 참가 PIN과 관리자 `0000` 로그인은 더 이상 인증 인터페이스가 아닙니다. 향후 다른 예측 프로젝트로 기능을 재활성화할 때는 PIN이 아니라 Workbench 계정 권한을 사용합니다.
 
 ### 공통 규칙
 
@@ -128,13 +146,9 @@ typemin-workbench/
 
 ## 5. 경기 데이터 동기화
 
-`supabase/functions/sync-football-data`는 `verify_jwt=true`로 배포합니다. `FOOTBALL_DATA_TOKEN`은 설정하지 않았고 `NEXT_PUBLIC_WORLDCUP_SYNC_ENABLED=false`이므로 자동 동기화 UI를 비활성화합니다.
+`supabase/functions/sync-football-data`는 `verify_jwt=true`를 유지하지만 월드컵 프로젝트가 아카이브된 동안 항상 `410 Archived`를 반환합니다. 동기화 UI와 `FOOTBALL_DATA_TOKEN`은 사용하지 않습니다.
 
-새 football-data.org 토큰을 준비하면 다음 값만 설정해 활성화할 수 있습니다.
-
-- Supabase Edge Function secret `FOOTBALL_DATA_TOKEN`
-- Supabase Edge Function secret `FOOTBALL_DATA_SEASON=2026`
-- Vercel 환경변수 `NEXT_PUBLIC_WORLDCUP_SYNC_ENABLED=true`
+재활성화하려면 새 프로젝트 계획과 Workbench 계정 기반 권한을 먼저 구현한 뒤 DB 아카이브 상태, Edge Function 방어와 UI 플래그를 함께 변경해야 합니다.
 
 ## 6. 배포 흐름
 

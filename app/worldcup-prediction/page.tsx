@@ -1,6 +1,8 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
+import { WorkbenchAccountControl } from "@/components/workbench-account-control";
+import { WorkbenchHomeLink } from "@/components/workbench-home-link";
 import { createClient } from "@/lib/supabase/client";
 import {
   calculateScore,
@@ -24,6 +26,7 @@ import {
 
 const STORAGE_KEY = "typemin-worldcup-bet-v1";
 const SESSION_KEY = "typemin-worldcup-session-v1";
+const ARCHIVED = true;
 
 type Session =
   | { role: null }
@@ -121,7 +124,9 @@ export default function Home() {
   const [stage, setStage] = useState<Stage>("r32");
   const [name, setName] = useState("");
   const [pin, setPin] = useState("");
-  const [message, setMessage] = useState("브라우저에 자동 저장됩니다.");
+  const [message, setMessage] = useState(
+    "완료된 기록을 읽기 전용으로 공개합니다.",
+  );
   const [ready, setReady] = useState(false);
   const [dark, setDark] = useState(false);
   const [syncing, setSyncing] = useState(false);
@@ -134,7 +139,12 @@ export default function Home() {
   useEffect(() => {
     const timer = window.setTimeout(() => {
       setState(loadLocalState());
-      const storedSession = loadSession();
+      const storedSession = ARCHIVED
+        ? ({ role: null } as Session)
+        : loadSession();
+      if (ARCHIVED && typeof localStorage.removeItem === "function") {
+        localStorage.removeItem(SESSION_KEY);
+      }
       sessionRef.current = storedSession;
       setSession(storedSession);
       setDark(localStorage.getItem("worldcup-theme") === "dark");
@@ -154,11 +164,11 @@ export default function Home() {
     let active = true;
     const refresh = async () => {
       const rpc =
-        session.role === "admin"
+        !ARCHIVED && session.role === "admin"
           ? "worldcup_admin_state"
           : "worldcup_public_state";
       const args =
-        session.role === "admin"
+        !ARCHIVED && session.role === "admin"
           ? { p_admin_pin: session.pin }
           : session.role === "participant"
             ? {
@@ -173,7 +183,8 @@ export default function Home() {
         return;
       }
       setState(mergeRemote(data as RemoteState));
-      if (!sessionRef.current.role) setMessage("Supabase에 연결했습니다.");
+      if (!sessionRef.current.role)
+        setMessage("보존된 예측과 결과를 불러왔습니다.");
     };
     void refresh();
     const channel = client
@@ -438,67 +449,85 @@ export default function Home() {
       </button>
 
       <header className="hero shell">
+        <div className="archive-nav">
+          <WorkbenchHomeLink />
+          <WorkbenchAccountControl returnTo="/worldcup-prediction" />
+        </div>
         <h1>월드컵 예측 내기</h1>
       </header>
 
       <div className="app-stack shell">
-        <section className="panel login-tool">
-          <div className="block-heading">
-            <h2>로그인</h2>
-            <span>이름 + 4자리 PIN</span>
-          </div>
-          {session.role ? (
-            <div className="login-bar">
-              <span>
-                <em>현재</em>{" "}
-                <strong>
-                  {session.role === "admin"
-                    ? "관리자"
-                    : state.participants[session.participantIndex]}
-                </strong>
-              </span>
-              <button
-                className="button ghost"
-                type="button"
-                onClick={() => saveSession({ role: null })}
-              >
-                로그아웃
-              </button>
+        {ARCHIVED ? (
+          <section className="panel archive-notice">
+            <div className="block-heading">
+              <h2>읽기 전용 아카이브</h2>
+              <span>2026 예측 프로젝트 완료</span>
             </div>
-          ) : (
-            <>
-              <div className="login-form">
-                <input
-                  aria-label="이름"
-                  value={name}
-                  onChange={(event) => setName(event.target.value)}
-                  placeholder="이름"
-                />
-                <input
-                  aria-label="PIN"
-                  value={pin}
-                  onChange={(event) =>
-                    setPin(event.target.value.replace(/\D/g, "").slice(0, 4))
-                  }
-                  placeholder="PIN 4자리"
-                  inputMode="numeric"
-                  type="password"
-                />
+            <p>
+              기존 참가자 5명, 예측 40건, 완료된 32경기의 기록을 그대로
+              공개합니다. 참가, 예측 수정, 관리자 기능과 경기 동기화는
+              종료되었습니다.
+            </p>
+          </section>
+        ) : (
+          <section className="panel login-tool">
+            <div className="block-heading">
+              <h2>로그인</h2>
+              <span>이름 + 4자리 PIN</span>
+            </div>
+            {session.role ? (
+              <div className="login-bar">
+                <span>
+                  <em>현재</em>{" "}
+                  <strong>
+                    {session.role === "admin"
+                      ? "관리자"
+                      : state.participants[session.participantIndex]}
+                  </strong>
+                </span>
                 <button
-                  className="button primary"
+                  className="button ghost"
                   type="button"
-                  onClick={() => void login()}
+                  onClick={() => saveSession({ role: null })}
                 >
-                  참가 / 로그인
+                  로그아웃
                 </button>
               </div>
-              <p className="hint">처음 입력한 이름·PIN이 내 계정이 됩니다.</p>
-            </>
-          )}
-          <p className="save-note" role="status">
-            {message}
-          </p>
-        </section>
+            ) : (
+              <>
+                <div className="login-form">
+                  <input
+                    aria-label="이름"
+                    value={name}
+                    onChange={(event) => setName(event.target.value)}
+                    placeholder="이름"
+                  />
+                  <input
+                    aria-label="PIN"
+                    value={pin}
+                    onChange={(event) =>
+                      setPin(event.target.value.replace(/\D/g, "").slice(0, 4))
+                    }
+                    placeholder="PIN 4자리"
+                    inputMode="numeric"
+                    type="password"
+                  />
+                  <button
+                    className="button primary"
+                    type="button"
+                    onClick={() => void login()}
+                  >
+                    참가 / 로그인
+                  </button>
+                </div>
+                <p className="hint">처음 입력한 이름·PIN이 내 계정이 됩니다.</p>
+              </>
+            )}
+            <p className="save-note" role="status">
+              {message}
+            </p>
+          </section>
+        )}
 
         <section className="panel scoreboard" aria-label="점수판">
           <SectionHeading eyebrow="Leaderboard" title="점수판">
@@ -546,8 +575,7 @@ export default function Home() {
 
         <section className="panel prediction-board" aria-label="예측">
           <SectionHeading eyebrow="Predictions" title="예측">
-            경기 시작 전까지 본인 예측만 수정할 수 있고, 다른 사람의 선택은 경기
-            종료 후 공개됩니다.
+            완료된 경기 결과와 참가자별 예측을 공개 기록으로 확인할 수 있습니다.
           </SectionHeading>
           <div className="round-tabs" role="tablist">
             {stages.map((item) => (
@@ -586,7 +614,7 @@ export default function Home() {
           </div>
         </section>
 
-        {session.role === "admin" && (
+        {!ARCHIVED && session.role === "admin" && (
           <AdminPanels
             state={state}
             onSetup={saveAdminSetup}
@@ -598,8 +626,8 @@ export default function Home() {
           />
         )}
         <p className="credit">
-          월드컵 32강부터 결승까지의 결과 예측 보드 ·{" "}
-          {remoteEnabled ? "Supabase 연결 모드" : "브라우저 로컬 모드"}
+          월드컵 32강부터 결승까지의 결과 예측 보드 · 읽기 전용 아카이브 ·{" "}
+          {remoteEnabled ? "Supabase 보존 데이터" : "브라우저 보존 데이터"}
         </p>
       </div>
     </main>

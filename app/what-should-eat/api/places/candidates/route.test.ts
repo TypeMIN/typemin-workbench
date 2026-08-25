@@ -103,8 +103,8 @@ describe("비회원 후보 추천 API", () => {
   test("추가한 가입 친구만 개인화 참가자로 사용한다", async () => {
     const from = vi.fn((table: string) =>
       thenableQuery(
-        table === "what_should_eat_users"
-          ? [{ id: 11, birth_year: 1998, gender: "female" }]
+        table === "what_should_eat_profiles"
+          ? [{ account_id: 11, birth_year: 1998, gender: "female" }]
           : [],
       ),
     );

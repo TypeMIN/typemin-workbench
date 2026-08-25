@@ -21,6 +21,7 @@ function searchQueryResult(data: unknown[]) {
     select: vi.fn(),
     ilike: vi.fn(),
     neq: vi.fn(),
+    in: vi.fn(),
     order: vi.fn(),
     limit: vi.fn(),
   };
@@ -30,6 +31,7 @@ function searchQueryResult(data: unknown[]) {
     mocks.neq(...args);
     return query;
   });
+  query.in.mockReturnValue(query);
   query.order.mockReturnValue(query);
   query.limit.mockResolvedValue({ data, error: null });
   return query;
@@ -49,9 +51,16 @@ describe("비회원 친구 검색 API", () => {
       { id: 2, login_id: "bob", display_name: "밥친구" },
       { id: 3, login_id: "carol", display_name: "친구" },
     ]);
+    const profiles = {
+      select: vi.fn().mockResolvedValue({
+        data: [{ account_id: 2 }, { account_id: 3 }],
+        error: null,
+      }),
+    };
     mocks.getSupabaseAdmin.mockReturnValue({
       from: vi
         .fn()
+        .mockReturnValueOnce(profiles)
         .mockReturnValueOnce(idMatches)
         .mockReturnValueOnce(nameMatches),
     });

@@ -49,6 +49,16 @@ Deno.serve(async (request) => {
     return new Response("ok", { headers: corsHeaders });
   }
 
+  if (Deno.env.get("WORLDCUP_ARCHIVED") !== "false") {
+    return json(
+      {
+        error: "Archived",
+        message: "월드컵 예측 프로젝트는 읽기 전용 아카이브입니다.",
+      },
+      410,
+    );
+  }
+
   try {
     const token = Deno.env.get("FOOTBALL_DATA_TOKEN");
     const supabaseUrl = Deno.env.get("SUPABASE_URL");

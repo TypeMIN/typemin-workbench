@@ -12,13 +12,14 @@
 
 Vercel Preview와 Production에 다음 이름을 설정합니다. 값은 로그와 Git에 남기지 않습니다.
 
-| 이름                                   | 공개 여부       | 출처                  |
-| -------------------------------------- | --------------- | --------------------- |
-| `NEXT_PUBLIC_SUPABASE_URL`             | 공개            | 새 Workbench Supabase |
-| `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` | 공개            | 새 Workbench Supabase |
-| `SUPABASE_SECRET_KEY`                  | 비밀, 서버 전용 | 새 Workbench Supabase |
-| `KAKAO_REST_API_KEY`                   | 비밀, 서버 전용 | 기존 식사 앱 Vercel   |
-| `NEXT_PUBLIC_WORLDCUP_SYNC_ENABLED`    | 공개            | 기본값 `false`        |
+| 이름                                   | 공개 여부       | 출처                    |
+| -------------------------------------- | --------------- | ----------------------- |
+| `NEXT_PUBLIC_SUPABASE_URL`             | 공개            | 새 Workbench Supabase   |
+| `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` | 공개            | 새 Workbench Supabase   |
+| `SUPABASE_SECRET_KEY`                  | 비밀, 서버 전용 | 새 Workbench Supabase   |
+| `WORKBENCH_AUTH_PEPPER`                | 비밀, 서버 전용 | 32바이트 이상 무작위 값 |
+| `KAKAO_REST_API_KEY`                   | 비밀, 서버 전용 | 기존 식사 앱 Vercel     |
+| `NEXT_PUBLIC_WORLDCUP_SYNC_ENABLED`    | 공개            | 기본값 `false`          |
 
 Edge Function의 `FOOTBALL_DATA_TOKEN`은 현재 설정하지 않습니다. `FOOTBALL_DATA_SEASON`은 함수 기본값 `2026`을 사용하며 토큰 발급 시 secret에도 명시합니다.
 
@@ -29,10 +30,10 @@ Edge Function의 `FOOTBALL_DATA_TOKEN`은 현재 설정하지 않습니다. `FOO
 1. 기능 브랜치 Preview가 `READY`인지 확인합니다.
 2. `npm run check`와 `npm run test:e2e`를 통과시킵니다.
 3. 홈에서 두 앱으로 이동하고 앱별 metadata, CSS와 API 경계를 확인합니다.
-4. 식사 앱의 가입, 로그인, 결정, 피드백과 장소 검색을 확인합니다.
-5. 월드컵의 빈 슬롯 참가, 예측, 공개 상태와 관리자 `0000` 흐름을 확인합니다.
-6. 식사 앱 6개 테이블이 비어 있고 월드컵에는 설정 1건, 슬롯 5개, 경기 32건만 있는지 확인합니다.
-7. 직접 테이블 접근 차단, RPC의 PIN 검증과 Edge Function의 JWT 검증을 확인합니다.
+4. 공통 계정의 가입, 로그인, 중복 ID, 잠금, PIN 변경, owner 임시 PIN과 루트 세션 공유를 확인합니다.
+5. 식사 앱의 비회원 체험, 식사 프로필 등록, 결정, 피드백과 장소 검색을 확인합니다.
+6. 월드컵 기존 참가자 5명, 예측 40건, 완료 경기 32건이 공개되며 참가·예측·관리 UI가 없는지 확인합니다.
+7. 직접 테이블 접근 차단, 월드컵 모든 쓰기 RPC·테이블 쓰기 차단과 Edge Function의 `410 Archived`를 확인합니다.
 8. Supabase security advisor의 경고와 Vercel runtime error를 해소합니다.
 9. `main`에 병합하고 Production의 두 공개 경로가 HTTP 200인지 확인합니다.
 

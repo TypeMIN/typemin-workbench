@@ -1,43 +1,41 @@
-import { getCurrentUser, toAppUser } from "@/lib/what-should-eat/auth";
 import { apiError, readJson } from "@/lib/what-should-eat/api";
+import { getCurrentUser } from "@/lib/what-should-eat/auth";
 import { getSupabaseAdmin } from "@/lib/supabase/admin";
-import type { Gender } from "@/lib/what-should-eat/types";
-
-type UpdateProfileBody = { displayName?: string };
-
-type UserRow = {
-  id: number;
-  login_id: string;
-  display_name: string;
-  birth_year: number;
-  gender: Gender;
-};
+import { getCurrentAccount } from "@/lib/workbench/auth";
+import { mutationOriginError } from "@/lib/workbench/request";
 
 export async function GET() {
+  const account = await getCurrentAccount();
+  if (!account) return apiError("로그인이 필요합니다.", 401);
+  if (account.mustChangePin) {
+    return Response.json(
+      { error: "PIN 변경이 필요합니다.", requiresPinChange: true },
+      { status: 403 },
+    );
+  }
   const user = await getCurrentUser();
-  return user ? Response.json({ user }) : apiError("로그인이 필요합니다.", 401);
+  return user
+    ? Response.json({ user })
+    : Response.json({ account, requiresProfile: true }, { status: 428 });
 }
 
 export async function PATCH(request: Request) {
-  const currentUser = await getCurrentUser();
-  if (!currentUser) return apiError("로그인이 필요합니다.", 401);
-
-  const body = await readJson<UpdateProfileBody>(request);
+  const originError = mutationOriginError(request);
+  if (originError) return originError;
+  const account = await getCurrentAccount();
+  if (!account) return apiError("로그인이 필요합니다.", 401);
+  const body = await readJson<{ displayName?: string }>(request);
   const displayName = (body?.displayName ?? "").trim();
   if (displayName.length < 1 || displayName.length > 30) {
     return apiError("표시 이름은 1~30자로 입력해 주세요.");
   }
-
-  const { data, error } = await getSupabaseAdmin()
-    .from("what_should_eat_users")
-    .update({ display_name: displayName })
-    .eq("id", currentUser.id)
-    .select("id, login_id, display_name, birth_year, gender")
-    .maybeSingle<UserRow>();
-
-  if (error || !data) {
-    return apiError("표시 이름을 변경하지 못했습니다.", 500);
-  }
-
-  return Response.json({ user: toAppUser(data) });
+  const { error } = await getSupabaseAdmin()
+    .from("workbench_accounts")
+    .update({ display_name: displayName, updated_at: new Date().toISOString() })
+    .eq("id", account.id);
+  if (error) return apiError("표시 이름을 변경하지 못했습니다.", 500);
+  const user = await getCurrentUser();
+  return user
+    ? Response.json({ user })
+    : apiError("식사 프로필이 필요합니다.", 428);
 }

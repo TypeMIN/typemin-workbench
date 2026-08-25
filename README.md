@@ -4,10 +4,10 @@
 
 ## 현재 앱
 
-| 앱               | 경로                   | 상태                                       |
-| ---------------- | ---------------------- | ------------------------------------------ |
-| 오늘 뭐 먹지?    | `/what-should-eat`     | 마이그레이션 완료                          |
-| 월드컵 예측 내기 | `/worldcup-prediction` | 마이그레이션 완료, 자동 경기 동기화 비활성 |
+| 앱               | 경로                   | 상태                           |
+| ---------------- | ---------------------- | ------------------------------ |
+| 오늘 뭐 먹지?    | `/what-should-eat`     | 마이그레이션 완료              |
+| 월드컵 예측 내기 | `/worldcup-prediction` | 완료된 공개 읽기 전용 아카이브 |
 
 홈 `/`에서 두 앱으로 이동할 수 있습니다. 실제 배포 주소는 [`https://workbench-type-min.vercel.app`](https://workbench-type-min.vercel.app)입니다.
 
@@ -24,6 +24,17 @@
 - 공개 호스트 1개와 앱별 서브패스
 
 사용자, 데이터, 배포 주기 또는 브랜드를 분리할 실질적 가치가 생기면 해당 앱의 저장소, Vercel, Supabase와 도메인을 함께 독립시킵니다.
+
+## 공통 계정
+
+Workbench 내부 앱은 `/account`에서 관리하는 하나의 `ID + PIN` 계정과 `workbench_session` 세션을 공유합니다. 이메일·전화번호를 위조하지 않으며 Supabase Auth 대신 서버에서만 접근하는 자체 계정 테이블을 인증원으로 사용합니다.
+
+- 로그인: `/account/sign-in`
+- 가입: `/account/sign-up`
+- 계정 관리: `/account`
+- owner 관리: `/account/admin`
+
+모든 등록 앱은 Workbench 홈 귀환 링크와 공통 계정 상태를 제공해야 합니다. 월드컵 아카이브처럼 로그인 없이 공개되는 앱에서도 계정 상태는 동일하게 표시됩니다.
 
 ## 기술 기준
 
@@ -53,3 +64,4 @@ npm run test:e2e
 
 - [아키텍처와 보안 경계](docs/architecture.md)
 - [마이그레이션과 운영 절차](docs/migration.md)
+- [owner 계정 복구 절차](docs/account-recovery.md)

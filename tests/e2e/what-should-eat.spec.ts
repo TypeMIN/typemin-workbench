@@ -28,7 +28,7 @@ const candidates = Array.from({ length: 3 }, (_, index) => ({
   longitude: 127,
 }));
 
-test("로그인 화면이 열리고 가입 항목에는 제외조건이 없다", async ({ page }) => {
+test("공통 계정 링크와 비회원 체험을 제공한다", async ({ page }) => {
   await page.route("**/what-should-eat/api/auth/me", (route) =>
     route.fulfill({
       status: 401,
@@ -44,16 +44,17 @@ test("로그인 화면이 열리고 가입 항목에는 제외조건이 없다",
   );
   await expect(page.getByText("고민은 짧게,")).toHaveCount(0);
   await expect(page.getByText("멤버 모으기")).toHaveCount(0);
-  await page.getByRole("tab", { name: "처음이에요" }).click();
-  await expect(page.getByLabel("출생연도")).toBeVisible();
-  await expect(page.getByLabel("출생연도")).toHaveJSProperty(
-    "tagName",
-    "SELECT",
+  await expect(page.getByRole("link", { name: "로그인" })).toHaveAttribute(
+    "href",
+    "/account/sign-in?next=%2Fwhat-should-eat",
   );
-  await expect(page.getByRole("radio", { name: "남성" })).toBeVisible();
-  await expect(page.getByRole("radio", { name: "여성" })).toBeVisible();
-  await expect(page.getByRole("button", { name: "중복확인" })).toBeVisible();
-  await expect(page.getByLabel("PIN")).toHaveAttribute("maxlength", "6");
+  await expect(page.getByRole("link", { name: "가입" })).toHaveAttribute(
+    "href",
+    "/account/sign-up?next=%2Fwhat-should-eat",
+  );
+  await expect(
+    page.getByRole("link", { name: "Workbench 홈으로 돌아가기" }),
+  ).toHaveAttribute("href", "/");
   await expect(page.getByText(/못 먹는 음식/)).toHaveCount(0);
   await expect(
     page.getByRole("button", { name: /로그인 없이 시작하기/ }),
@@ -145,7 +146,7 @@ test("비회원이 친구를 추가해 결과까지 보고 탭 상태를 복원�
     page.getByRole("heading", { name: "오늘 누구와 함께하나요?" }),
   ).toBeVisible();
   await page.getByRole("button", { name: "로그인/가입" }).click();
-  await expect(page.getByRole("tab", { name: "로그인" })).toBeVisible();
+  await expect(page.getByRole("link", { name: "로그인" })).toBeVisible();
   expect(
     await page.evaluate(() => sessionStorage.getItem("what_should_eat_guest")),
   ).toBeNull();
@@ -211,13 +212,6 @@ test("현재 위치와 참가자 선택부터 A/B 결과와 이력까지 완주�
   await context.grantPermissions(["geolocation"]);
   await context.setGeolocation({ latitude: 37.5, longitude: 127 });
   await page.route("**/what-should-eat/api/auth/me", (route) =>
-    route.fulfill({
-      status: 401,
-      contentType: "application/json",
-      body: JSON.stringify({ error: "로그인이 필요합니다." }),
-    }),
-  );
-  await page.route("**/what-should-eat/api/auth/login", (route) =>
     route.fulfill({
       contentType: "application/json",
       body: JSON.stringify({ user }),
@@ -292,9 +286,6 @@ test("현재 위치와 참가자 선택부터 A/B 결과와 이력까지 완주�
   });
 
   await page.goto("/what-should-eat");
-  await page.getByLabel("ID").fill("hostuser");
-  await page.getByLabel("PIN").fill("1234");
-  await page.getByRole("button", { name: "로그인", exact: true }).click();
   await expect(page.getByRole("banner").getByText("@hostuser")).toBeVisible();
   await expectNoHorizontalOverflow(page);
 
@@ -368,30 +359,40 @@ test("실제 API에서 가입·로그인·결정·피드백을 저장한다", as
   };
 
   await page.goto("/what-should-eat");
-  const signup = await page.request.post("/what-should-eat/api/auth/signup", {
+  const origin = new URL(page.url()).origin;
+  const signup = await page.request.post("/api/workbench/auth/sign-up", {
+    headers: { Origin: origin },
     data: {
       loginId,
       pin,
       displayName: "E2E 사용자",
-      birthYear: 2000,
-      gender: "male",
     },
   });
   expect(signup.status()).toBe(201);
-  const signupBody = (await signup.json()) as { user: { id: number } };
+  const signupBody = (await signup.json()) as { account: { id: number } };
 
   const sessionCookie = (await page.context().cookies()).find(
-    (cookie) => cookie.name === "what_should_eat_session",
+    (cookie) => cookie.name === "workbench_session",
   );
-  expect(sessionCookie?.path).toBe("/what-should-eat");
+  expect(sessionCookie?.path).toBe("/");
 
-  await page.request.post("/what-should-eat/api/auth/logout");
-  const login = await page.request.post("/what-should-eat/api/auth/login", {
+  const mealProfile = await page.request.post("/what-should-eat/api/profile", {
+    headers: { Origin: origin },
+    data: { birthYear: 2000, gender: "male" },
+  });
+  expect(mealProfile.status()).toBe(200);
+
+  await page.request.post("/api/workbench/auth/sign-out", {
+    headers: { Origin: origin },
+  });
+  const login = await page.request.post("/api/workbench/auth/sign-in", {
+    headers: { Origin: origin },
     data: { loginId, pin },
   });
   expect(login.status()).toBe(200);
 
   const profile = await page.request.patch("/what-should-eat/api/auth/me", {
+    headers: { Origin: origin },
     data: { displayName: "E2E 새 이름" },
   });
   expect(profile.status()).toBe(200);
@@ -401,8 +402,9 @@ test("실제 API에서 가입·로그인·결정·피드백을 저장한다", as
   expect(profileBody.user.displayName).toBe("E2E 새 이름");
 
   const decision = await page.request.post("/what-should-eat/api/decisions", {
+    headers: { Origin: origin },
     data: {
-      participantIds: [signupBody.user.id],
+      participantIds: [signupBody.account.id],
       place,
       comparisons: [],
     },
@@ -411,6 +413,7 @@ test("실제 API에서 가입·로그인·결정·피드백을 저장한다", as
   const decisionBody = (await decision.json()) as { decision: { id: number } };
 
   const feedback = await page.request.post("/what-should-eat/api/feedback", {
+    headers: { Origin: origin },
     data: {
       decisionId: decisionBody.decision.id,
       response: "liked",
