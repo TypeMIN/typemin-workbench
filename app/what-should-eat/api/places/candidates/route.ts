@@ -36,14 +36,36 @@ export async function POST(request: Request) {
     return apiError("세션 진행자는 참가자에 포함되어야 합니다.");
   }
 
+  if (participantIds.length === 0) {
+    try {
+      const { places, accuracyRanks } = await searchNearbyRestaurants(
+        latitude,
+        longitude,
+      );
+      const candidates = selectRecommendedCandidates(places, {
+        participants: [],
+        population: [],
+        feedback: [],
+        comparisons: [],
+        recentPlaceIds: new Set(),
+        visitedPlaceIds: new Set(),
+        accuracyRanks,
+      });
+      return Response.json({ candidates });
+    } catch (error) {
+      console.error("음식점 후보 조회 실패", error);
+      return apiError(
+        "주변 음식점을 불러오지 못했습니다. 잠시 후 다시 시도해 주세요.",
+        502,
+      );
+    }
+  }
+
   const supabase = getSupabaseAdmin();
-  const { data: participants, error: participantError } =
-    participantIds.length === 0
-      ? { data: [], error: null }
-      : await supabase
-          .from("what_should_eat_users")
-          .select("id, birth_year, gender")
-          .in("id", participantIds);
+  const { data: participants, error: participantError } = await supabase
+    .from("what_should_eat_users")
+    .select("id, birth_year, gender")
+    .in("id", participantIds);
   if (participantError || participants?.length !== participantIds.length) {
     return apiError("참가자 정보를 확인해 주세요.");
   }
@@ -54,26 +76,20 @@ export async function POST(request: Request) {
     comparisonResult,
     populationFeedbackResult,
   ] = await Promise.all([
-    participantIds.length === 0
-      ? Promise.resolve({ data: [], error: null })
-      : supabase
-          .from("what_should_eat_decision_participants")
-          .select("decision_id")
-          .in("user_id", participantIds),
-    participantIds.length === 0
-      ? Promise.resolve({ data: [], error: null })
-      : supabase
-          .from("what_should_eat_place_feedback")
-          .select("user_id, place_id, category_name, response, updated_at")
-          .in("user_id", participantIds),
-    participantIds.length === 0
-      ? Promise.resolve({ data: [], error: null })
-      : supabase
-          .from("what_should_eat_comparisons")
-          .select("host_user_id, winner_category_name, loser_category_name")
-          .in("host_user_id", participantIds)
-          .order("created_at", { ascending: false })
-          .limit(500),
+    supabase
+      .from("what_should_eat_decision_participants")
+      .select("decision_id")
+      .in("user_id", participantIds),
+    supabase
+      .from("what_should_eat_place_feedback")
+      .select("user_id, place_id, category_name, response, updated_at")
+      .in("user_id", participantIds),
+    supabase
+      .from("what_should_eat_comparisons")
+      .select("host_user_id, winner_category_name, loser_category_name")
+      .in("host_user_id", participantIds)
+      .order("created_at", { ascending: false })
+      .limit(500),
     supabase
       .from("what_should_eat_place_feedback")
       .select("user_id, place_id, category_name, response, updated_at")
@@ -99,30 +115,19 @@ export async function POST(request: Request) {
   ];
   const recentPlaceIds = new Set<string>();
   const visitedPlaceIds = new Set<string>();
-  const recentCategoryCounts = new Map<string, number>();
 
   if (decisionIds.length > 0) {
     const { data: decisions, error: decisionError } = await supabase
       .from("what_should_eat_decisions")
-      .select("place_id, category_name, decided_at")
+      .select("place_id, decided_at")
       .in("id", decisionIds);
     if (decisionError)
       return apiError("최근 선택 이력을 확인하지 못했습니다.", 500);
     const recentSince = Date.now() - 7 * 24 * 60 * 60 * 1000;
-    const categorySince = Date.now() - 30 * 24 * 60 * 60 * 1000;
     for (const decision of decisions ?? []) {
       visitedPlaceIds.add(decision.place_id);
       const decidedAt = new Date(decision.decided_at).getTime();
       if (decidedAt >= recentSince) recentPlaceIds.add(decision.place_id);
-      if (decidedAt >= categorySince) {
-        const category =
-          decision.category_name.split(">").map((level) => level.trim())[1] ||
-          "기타";
-        recentCategoryCounts.set(
-          category,
-          (recentCategoryCounts.get(category) ?? 0) + 1,
-        );
-      }
     }
   }
 
@@ -144,7 +149,10 @@ export async function POST(request: Request) {
     return apiError("추천 집단 데이터를 확인하지 못했습니다.", 500);
 
   try {
-    const places = await searchNearbyRestaurants(latitude, longitude);
+    const { places, accuracyRanks } = await searchNearbyRestaurants(
+      latitude,
+      longitude,
+    );
     const feedbackByIdentity = new Map(
       combinedFeedback.map((row) => [
         `${row.user_id}:${row.place_id}:${row.updated_at}`,
@@ -176,7 +184,7 @@ export async function POST(request: Request) {
       })),
       recentPlaceIds,
       visitedPlaceIds,
-      recentCategoryCounts,
+      accuracyRanks,
     });
     return Response.json({ candidates });
   } catch (error) {

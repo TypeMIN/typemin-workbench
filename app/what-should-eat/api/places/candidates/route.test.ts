@@ -74,7 +74,10 @@ describe("비회원 후보 추천 API", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mocks.getCurrentUser.mockResolvedValue(null);
-    mocks.searchNearbyRestaurants.mockResolvedValue([place]);
+    mocks.searchNearbyRestaurants.mockResolvedValue({
+      places: [place],
+      accuracyRanks: new Map([[place.id, 1]]),
+    });
     mocks.selectRecommendedCandidates.mockReturnValue([place]);
   });
 
@@ -85,10 +88,14 @@ describe("비회원 후보 추천 API", () => {
     const response = await POST(candidateRequest([]));
 
     expect(response.status).toBe(200);
-    expect(from).toHaveBeenCalledTimes(1);
+    expect(from).not.toHaveBeenCalled();
+    expect(mocks.getSupabaseAdmin).not.toHaveBeenCalled();
     expect(mocks.selectRecommendedCandidates).toHaveBeenCalledWith(
       [place],
-      expect.objectContaining({ participants: [] }),
+      expect.objectContaining({
+        participants: [],
+        accuracyRanks: new Map([[place.id, 1]]),
+      }),
     );
     await expect(response.json()).resolves.toEqual({ candidates: [place] });
   });
@@ -110,6 +117,7 @@ describe("비회원 후보 추천 API", () => {
       [place],
       expect.objectContaining({
         participants: [{ id: 11, birthYear: 1998, gender: "female" }],
+        accuracyRanks: new Map([[place.id, 1]]),
       }),
     );
   });

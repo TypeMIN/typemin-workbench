@@ -20,6 +20,13 @@ type KakaoResponse = {
   meta: { is_end: boolean };
 };
 
+type KakaoSort = "accuracy" | "distance";
+
+export type NearbyRestaurantSearchResult = {
+  places: PlaceCandidate[];
+  accuracyRanks: ReadonlyMap<string, number>;
+};
+
 function getKakaoKey() {
   const key = process.env.KAKAO_REST_API_KEY;
   if (!key) throw new Error("카카오 REST API 키가 설정되지 않았습니다.");
@@ -54,9 +61,10 @@ function toCandidate(place: KakaoPlace): PlaceCandidate {
   };
 }
 
-export async function searchNearbyRestaurants(
+async function searchNearbyRestaurantsBySort(
   latitude: number,
   longitude: number,
+  sort: KakaoSort,
 ) {
   const places: PlaceCandidate[] = [];
 
@@ -66,7 +74,7 @@ export async function searchNearbyRestaurants(
       x: String(longitude),
       y: String(latitude),
       radius: "1000",
-      sort: "distance",
+      sort,
       page: String(page),
       size: "15",
     });
@@ -76,6 +84,49 @@ export async function searchNearbyRestaurants(
   }
 
   return places;
+}
+
+export async function searchNearbyRestaurants(
+  latitude: number,
+  longitude: number,
+): Promise<NearbyRestaurantSearchResult> {
+  const [accuracyResult, distanceResult] = await Promise.allSettled([
+    searchNearbyRestaurantsBySort(latitude, longitude, "accuracy"),
+    searchNearbyRestaurantsBySort(latitude, longitude, "distance"),
+  ]);
+
+  if (
+    accuracyResult.status === "rejected" &&
+    distanceResult.status === "rejected"
+  ) {
+    throw new AggregateError(
+      [accuracyResult.reason, distanceResult.reason],
+      "카카오 음식점 검색에 모두 실패했습니다.",
+    );
+  }
+
+  if (accuracyResult.status === "rejected") {
+    console.error("카카오 정확도순 음식점 조회 실패", accuracyResult.reason);
+  }
+  if (distanceResult.status === "rejected") {
+    console.error("카카오 거리순 음식점 조회 실패", distanceResult.reason);
+  }
+
+  const accuracyPlaces =
+    accuracyResult.status === "fulfilled" ? accuracyResult.value : [];
+  const distancePlaces =
+    distanceResult.status === "fulfilled" ? distanceResult.value : [];
+  const accuracyRanks = new Map<string, number>();
+  for (const [index, place] of accuracyPlaces.entries()) {
+    if (!accuracyRanks.has(place.id)) accuracyRanks.set(place.id, index + 1);
+  }
+  const placesById = new Map<string, PlaceCandidate>();
+
+  for (const place of [...accuracyPlaces, ...distancePlaces]) {
+    if (!placesById.has(place.id)) placesById.set(place.id, place);
+  }
+
+  return { places: [...placesById.values()], accuracyRanks };
 }
 
 export async function searchRegions(query: string): Promise<RegionResult[]> {
