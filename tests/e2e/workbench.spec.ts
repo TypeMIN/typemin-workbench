@@ -14,6 +14,32 @@ test("홈에서 두 앱으로 이동한다", async ({ page }) => {
   await expect(
     page.getByText("작은 웹앱을 만들고 직접 사용하는 공간입니다."),
   ).toHaveCount(0);
+  await expect(
+    page.getByRole("list", { name: "오늘 뭐 먹지? 주요 기능" }),
+  ).toContainText("메뉴 선택");
+  await expect(
+    page.getByRole("list", { name: "월드컵 예측 내기 주요 기능" }),
+  ).toContainText("점수판");
+  await expect(
+    page.getByText("함께 고르는 오늘의 한 끼와 장소 추천"),
+  ).toHaveCount(0);
+  await expect(
+    page.getByText("완료된 5인 월드컵 예측 결과 아카이브"),
+  ).toHaveCount(0);
+
+  const desktopMealCard = await page
+    .getByRole("link", { name: "오늘 뭐 먹지? 열기" })
+    .boundingBox();
+  const desktopWorldcupCard = await page
+    .getByRole("link", { name: "월드컵 예측 내기 열기" })
+    .boundingBox();
+  expect(desktopMealCard).not.toBeNull();
+  expect(desktopWorldcupCard).not.toBeNull();
+  expect(Math.abs(desktopMealCard!.y - desktopWorldcupCard!.y)).toBeLessThan(2);
+  expect(desktopMealCard!.width).toBeGreaterThan(400);
+  expect(desktopWorldcupCard!.width).toBeGreaterThan(400);
+  expect(desktopMealCard!.height).toBeLessThanOrEqual(180);
+  expect(desktopWorldcupCard!.height).toBeLessThanOrEqual(180);
 
   await page.setViewportSize({ width: 390, height: 844 });
   const mealCard = await page

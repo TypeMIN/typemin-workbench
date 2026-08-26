@@ -29,13 +29,22 @@ export default function Home() {
                 key={app.href}
               >
                 <div className="workbench-card-topline">
-                  <span aria-hidden="true" className="workbench-card-accent" />
+                  <span aria-hidden="true" className="workbench-card-emoji">
+                    {app.emoji}
+                  </span>
                   <span className="workbench-status">{app.status}</span>
                 </div>
 
                 <div className="workbench-card-copy">
                   <h3>{app.name}</h3>
-                  <p>{app.description}</p>
+                  <ul
+                    aria-label={`${app.name} 주요 기능`}
+                    className="workbench-card-keywords"
+                  >
+                    {app.keywords.map((keyword) => (
+                      <li key={keyword}>{keyword}</li>
+                    ))}
+                  </ul>
                 </div>
 
                 <span className="workbench-card-action">
