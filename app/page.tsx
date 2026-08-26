@@ -1,7 +1,5 @@
-import Link from "next/link";
-
 import { WorkbenchAccountControl } from "@/components/workbench-account-control";
-import { WORKBENCH_APPS } from "@/lib/workbench/apps";
+import { WorkbenchProjectCatalog } from "@/components/workbench-project-catalog";
 
 export default function Home() {
   return (
@@ -19,40 +17,7 @@ export default function Home() {
 
         <section aria-labelledby="apps-heading" className="workbench-apps">
           <h2 id="apps-heading">프로젝트</h2>
-
-          <div className="workbench-grid">
-            {WORKBENCH_APPS.map((app) => (
-              <Link
-                aria-label={`${app.name} 열기`}
-                className={`workbench-card workbench-card--${app.accent}`}
-                href={app.href}
-                key={app.href}
-              >
-                <div className="workbench-card-topline">
-                  <span aria-hidden="true" className="workbench-card-emoji">
-                    {app.emoji}
-                  </span>
-                  <span className="workbench-status">{app.status}</span>
-                </div>
-
-                <div className="workbench-card-copy">
-                  <h3>{app.name}</h3>
-                  <ul
-                    aria-label={`${app.name} 주요 기능`}
-                    className="workbench-card-keywords"
-                  >
-                    {app.keywords.map((keyword) => (
-                      <li key={keyword}>{keyword}</li>
-                    ))}
-                  </ul>
-                </div>
-
-                <span className="workbench-card-action">
-                  열기 <span aria-hidden="true">→</span>
-                </span>
-              </Link>
-            ))}
-          </div>
+          <WorkbenchProjectCatalog />
         </section>
       </div>
     </main>

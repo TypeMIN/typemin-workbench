@@ -4,7 +4,7 @@ export const WORKBENCH_APPS = [
     emoji: "🍽️",
     keywords: ["메뉴 선택", "장소 추천"],
     href: "/what-should-eat",
-    status: "사용 가능",
+    status: "available",
     accent: "meal",
   },
   {
@@ -12,7 +12,7 @@ export const WORKBENCH_APPS = [
     emoji: "⚽",
     keywords: ["예측 결과", "점수판"],
     href: "/worldcup-prediction",
-    status: "아카이브",
+    status: "archived",
     accent: "worldcup",
   },
 ] as const;
