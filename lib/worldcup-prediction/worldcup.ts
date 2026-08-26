@@ -42,6 +42,67 @@ export type WorldCupState = {
   };
 };
 
+const FLAG_ICONS_VERSION = "7.5.0";
+
+const teamFlagCodes: Record<string, string> = {
+  algeria: "dz",
+  argentina: "ar",
+  australia: "au",
+  austria: "at",
+  belgium: "be",
+  "bosnia h": "ba",
+  "bosnia and herzegovina": "ba",
+  brazil: "br",
+  canada: "ca",
+  "cabo verde": "cv",
+  "cape verde": "cv",
+  colombia: "co",
+  "congo dr": "cd",
+  "democratic republic of the congo": "cd",
+  "dr congo": "cd",
+  croatia: "hr",
+  ecuador: "ec",
+  egypt: "eg",
+  england: "gb-eng",
+  france: "fr",
+  germany: "de",
+  ghana: "gh",
+  "cote d ivoire": "ci",
+  "ivory coast": "ci",
+  japan: "jp",
+  mexico: "mx",
+  morocco: "ma",
+  netherlands: "nl",
+  norway: "no",
+  paraguay: "py",
+  portugal: "pt",
+  senegal: "sn",
+  "south africa": "za",
+  spain: "es",
+  sweden: "se",
+  switzerland: "ch",
+  "united states": "us",
+  "united states of america": "us",
+  usa: "us",
+};
+
+function normalizeTeamName(name: string): string {
+  return name
+    .normalize("NFKD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase()
+    .replace(/&/g, " and ")
+    .replace(/[^a-z0-9]+/g, " ")
+    .trim();
+}
+
+export function teamFlagSource(name: string, fallback = ""): string {
+  const code = teamFlagCodes[normalizeTeamName(name)];
+  return code
+    ? `https://cdn.jsdelivr.net/npm/flag-icons@${FLAG_ICONS_VERSION}/flags/4x3/${code}.svg`
+    : fallback;
+}
+
 export const stageLabels: Record<Stage, string> = {
   r32: "32강",
   r16: "16강",
@@ -120,6 +181,14 @@ export function parsePick(value: string): Pick | null {
     return null;
   }
   return { team, regular };
+}
+
+export function joinFailureMessage(reason?: string): string {
+  if (reason === "historical") {
+    return "이전 참가 기록은 점수판에서만 볼 수 있으며 로그인할 수 없습니다.";
+  }
+  if (reason === "full") return "참가 인원이 이미 5명입니다.";
+  return "이름 또는 PIN을 확인해 주세요.";
 }
 
 export function formatPick(pick: Pick | undefined, match: Match): string {

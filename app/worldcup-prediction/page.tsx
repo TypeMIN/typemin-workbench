@@ -1,6 +1,8 @@
 "use client";
 
+import Link from "next/link";
 import { useEffect, useMemo, useRef, useState } from "react";
+import { Moon, Sun, Trophy } from "lucide-react";
 import { WorkbenchAccountControl } from "@/components/workbench-account-control";
 import { createClient } from "@/lib/supabase/client";
 import {
@@ -11,11 +13,13 @@ import {
   isRoundComplete,
   isRoundLocked,
   isRoundOpen,
+  joinFailureMessage,
   normalizeState,
   parsePick,
   stageLabels,
   stageScores,
   stages,
+  teamFlagSource,
   type Match,
   type MatchResult,
   type Pick,
@@ -265,12 +269,7 @@ export default function Home() {
           pin,
         });
         setMessage(`${result.name || cleanName}님으로 참가했습니다.`);
-      } else
-        setMessage(
-          result.reason === "full"
-            ? "참가 인원이 이미 5명입니다."
-            : "이름 또는 PIN을 확인해 주세요.",
-        );
+      } else setMessage(joinFailureMessage(result.reason));
       return;
     }
 
@@ -386,28 +385,20 @@ export default function Home() {
   }
 
   async function syncFootballData() {
-    if (!remoteEnabled || !syncEnabled || syncing) return;
+    if (!remoteEnabled || !syncEnabled || syncing || session.role !== "admin")
+      return;
     setSyncing(true);
     setMessage("football-data.org 경기 정보를 확인하는 중입니다.");
     try {
       const client = createClient();
-      const { data, error } =
-        await client.functions.invoke("sync-football-data");
+      const { data, error } = await client.functions.invoke(
+        "sync-football-data",
+        { body: { adminPin: session.pin } },
+      );
       if (error) throw error;
-      const rpc =
-        session.role === "admin"
-          ? "worldcup_admin_state"
-          : "worldcup_public_state";
-      const args =
-        session.role === "admin"
-          ? { p_admin_pin: session.pin }
-          : session.role === "participant"
-            ? {
-                p_participant_id: session.participantId || null,
-                p_pin: session.pin,
-              }
-            : { p_participant_id: null, p_pin: null };
-      const refreshed = await client.rpc(rpc, args);
+      const refreshed = await client.rpc("worldcup_admin_state", {
+        p_admin_pin: session.pin,
+      });
       if (refreshed.error) throw refreshed.error;
       setState(mergeRemote(refreshed.data as RemoteState));
       setMessage(
@@ -433,25 +424,42 @@ export default function Home() {
 
   return (
     <main className={dark ? "bet-app dark" : "bet-app"}>
-      <button
-        className="theme-toggle"
-        type="button"
-        aria-label="라이트/다크 전환"
-        onClick={() => {
-          setDark((current) => {
-            localStorage.setItem("worldcup-theme", current ? "light" : "dark");
-            return !current;
-          });
-        }}
-      >
-        {dark ? "☀" : "☾"}
-      </button>
-
-      <header className="hero shell">
-        <div className="archive-account">
-          <WorkbenchAccountControl returnTo="/worldcup-prediction" />
+      <header className="app-header">
+        <div className="header-inner shell">
+          <Link
+            className="brand-lockup"
+            href="/"
+            aria-label="Workbench 홈으로 돌아가기"
+          >
+            <span className="brand-mark" aria-hidden="true">
+              <Trophy size={21} />
+            </span>
+            <span className="brand-copy">
+              <h1>월드컵 예측 내기</h1>
+              <small>2026 · ARCHIVE</small>
+            </span>
+          </Link>
+          <div className="header-actions">
+            <WorkbenchAccountControl returnTo="/worldcup-prediction" />
+            <button
+              className="theme-toggle"
+              type="button"
+              aria-label={dark ? "라이트 모드로 전환" : "다크 모드로 전환"}
+              title={dark ? "라이트 모드" : "다크 모드"}
+              onClick={() => {
+                setDark((current) => {
+                  localStorage.setItem(
+                    "worldcup-theme",
+                    current ? "light" : "dark",
+                  );
+                  return !current;
+                });
+              }}
+            >
+              {dark ? <Sun size={18} /> : <Moon size={18} />}
+            </button>
+          </div>
         </div>
-        <h1>월드컵 예측 내기</h1>
       </header>
 
       <div className="app-stack shell">
@@ -806,14 +814,22 @@ function Team({
   crest: string;
   winner: boolean;
 }) {
+  const flag = teamFlagSource(name, crest);
+
   return (
     <div
       className={["team-side", winner && "is-winner"].filter(Boolean).join(" ")}
     >
       <span className="team-badge">
-        {crest ? (
+        {flag ? (
           // eslint-disable-next-line @next/next/no-img-element
-          <img src={crest} alt={name} loading="lazy" />
+          <img
+            src={flag}
+            alt={`${name} 국기`}
+            width="44"
+            height="33"
+            loading="lazy"
+          />
         ) : (
           name.replace(/\s/g, "").slice(0, 2)
         )}

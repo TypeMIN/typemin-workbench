@@ -24,8 +24,11 @@ test("공통 계정 상태만 제공한다", async ({ page }) => {
   await page.goto("/worldcup-prediction");
   await expect(
     page.getByRole("link", { name: "Workbench 홈으로 돌아가기" }),
-  ).toHaveCount(0);
+  ).toBeVisible();
   await expect(
     page.getByRole("navigation", { name: "Workbench 계정" }),
+  ).toBeVisible();
+  await expect(
+    page.getByRole("button", { name: "다크 모드로 전환" }),
   ).toBeVisible();
 });

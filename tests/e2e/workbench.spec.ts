@@ -74,7 +74,7 @@ test("홈에서 두 앱으로 이동한다", async ({ page }) => {
   await expect(page).toHaveURL(/\/worldcup-prediction$/);
   await expect(
     page.getByRole("link", { name: "Workbench 홈으로 돌아가기" }),
-  ).toHaveCount(0);
+  ).toBeVisible();
   await expect(
     page.getByRole("heading", { name: "읽기 전용 아카이브" }),
   ).toBeVisible();
