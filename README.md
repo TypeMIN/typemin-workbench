@@ -4,12 +4,12 @@
 
 ## 현재 앱
 
-| 앱               | 경로                   | 상태                           |
-| ---------------- | ---------------------- | ------------------------------ |
-| 오늘 뭐 먹지?    | `/what-should-eat`     | 마이그레이션 완료              |
-| 월드컵 예측 내기 | `/worldcup-prediction` | 완료된 공개 읽기 전용 아카이브 |
+| 앱               | 경로                   | 홈 분류   | 접근 방식                    |
+| ---------------- | ---------------------- | --------- | ---------------------------- |
+| 오늘 뭐 먹지?    | `/what-should-eat`     | 사용 가능 | 비회원 체험 또는 공통 계정   |
+| 월드컵 예측 내기 | `/worldcup-prediction` | 아카이브  | 완료된 기록의 공개 읽기 전용 |
 
-홈 `/`에서 두 앱으로 이동할 수 있습니다. 실제 배포 주소는 [`https://workbench-type-min.vercel.app`](https://workbench-type-min.vercel.app)입니다.
+홈 `/`은 `사용 가능`과 `아카이브` 탭으로 프로젝트를 구분하며 카드 전체가 각 프로젝트의 진입 링크입니다. 실제 프로덕션 주소는 [`https://workbench-type-min.vercel.app`](https://workbench-type-min.vercel.app)입니다.
 
 문서에 남아 있는 `https://workbench.example.com/<app-name>`은 커스텀 도메인이 정해지기 전까지의 placeholder이며 실제 호스트가 아닙니다.
 
@@ -24,6 +24,25 @@
 - 공개 호스트 1개와 앱별 서브패스
 
 사용자, 데이터, 배포 주기 또는 브랜드를 분리할 실질적 가치가 생기면 해당 앱의 저장소, Vercel, Supabase와 도메인을 함께 독립시킵니다.
+
+## 앱 카탈로그와 추가 규칙
+
+[`lib/workbench/apps.ts`](lib/workbench/apps.ts)가 홈에 노출되는 프로젝트의 정본입니다. 각 항목은 다음 정보를 가집니다.
+
+- `name`: 프로젝트 표시명
+- `emoji`: 카드에서 프로젝트를 구분하는 장식 아이콘
+- `keywords`: 소개 문장이 아닌 짧은 기능명 목록
+- `href`: 소문자 kebab-case 서브패스
+- `status`: `available` 또는 `archived`
+- `accent`: 프로젝트별 포인트 컬러 식별자
+
+새 프로젝트를 추가할 때는 다음 항목을 함께 반영합니다.
+
+1. `app/<app-name>/page.tsx`에 App Router 경로를 만듭니다.
+2. 앱 전용 코드와 CSS를 `components/<app-name>`, `lib/<app-name>`과 앱 루트 클래스 아래로 격리합니다.
+3. 카탈로그에 프로젝트명, 기능 키워드, 상태와 포인트 컬러를 등록합니다.
+4. 로그인이 필요한 기능은 Workbench 공통 계정과 루트 세션을 사용합니다.
+5. 단위 테스트와 Playwright에서 탭 노출, 카드 이동, 모바일 오버플로를 검증합니다.
 
 ## 공통 계정
 
@@ -41,12 +60,13 @@ Workbench 내부 앱은 `/account`에서 관리하는 하나의 `ID + PIN` 계�
 - Node.js 24.14.1, npm 11.11.0
 - Next.js 16.3.0, React 19.2.8
 - Tailwind CSS 4.3.3
-- Vercel과 Supabase 서울 리전
+- GitHub `main`과 연결된 Vercel Production
+- Supabase `ap-northeast-2` 서울 리전
 
 ## 로컬 실행
 
 ```bash
-npm install
+npm ci
 cp .env.example .env.local
 npm run dev
 ```
