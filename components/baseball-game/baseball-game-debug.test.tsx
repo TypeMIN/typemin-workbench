@@ -28,9 +28,8 @@ describe("BaseballGameDebug", () => {
         name: /경기 점수판, 1회초, 무사, 주자 없음/,
       }),
     ).toBeVisible();
-    expect(screen.getByText("NOW AT BAT")).toBeVisible();
-    expect(screen.getByText("볼 0")).toBeVisible();
-    expect(screen.getByText("스트라이크 0")).toBeVisible();
+    expect(screen.getByLabelText("볼 0")).toBeVisible();
+    expect(screen.getByLabelText("스트라이크 0")).toBeVisible();
     expect(
       screen.getByRole("heading", { name: "첫 투구를 준비하세요" }),
     ).toBeVisible();
@@ -44,6 +43,10 @@ describe("BaseballGameDebug", () => {
       "원정팀 공격",
     );
     expect(container.querySelector(".bbg-fence")).toBeVisible();
+    expect(container.querySelector(".bbg-fielders")).not.toBeInTheDocument();
+    expect(
+      container.querySelector(".bbg-distance-marks"),
+    ).not.toBeInTheDocument();
     expect(container.querySelectorAll(".bbg-team-score")).toHaveLength(2);
     expect(
       container.querySelectorAll(".bbg-team-score.is-batting"),
@@ -55,7 +58,7 @@ describe("BaseballGameDebug", () => {
     render(<BaseballGameDebug />);
 
     fireEvent.click(screen.getByRole("button", { name: "투구 주사위 굴리기" }));
-    expect(screen.getAllByText("스트라이크 1").length).toBeGreaterThan(0);
+    expect(screen.getByLabelText("스트라이크 1")).toBeVisible();
     expect(screen.getByText("같은 타자에게 다음 투구")).toBeVisible();
 
     fireEvent.click(screen.getByRole("button", { name: /9번 면 C 컨택/ }));

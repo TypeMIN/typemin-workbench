@@ -28,6 +28,12 @@ test("야구 게임에서 강제 주사위 판정과 새 경기를 진행한다"
   await expect(page.locator(".bbg-d12")).toBeVisible();
   await expect(page.getByLabel("원정팀 공격 중")).toContainText("원정팀 공격");
   await expect(page.locator(".bbg-fence")).toBeVisible();
+  await expect(page.locator(".bbg-fielders")).toHaveCount(0);
+  await expect(page.locator(".bbg-distance-marks")).toHaveCount(0);
+  await expect(page.locator(".bbg-stadium svg")).toHaveAttribute(
+    "preserveAspectRatio",
+    "xMidYMid meet",
+  );
   await expect(page.getByRole("img", { name: /주자 없음/ })).toBeVisible();
   await expect(page.locator("[data-nextjs-dialog]")).toHaveCount(0);
 
@@ -38,10 +44,10 @@ test("야구 게임에서 강제 주사위 판정과 새 경기를 진행한다"
       return { x: rect.x + rect.width / 2, y: rect.y + rect.height / 2 };
     };
     return {
-      first: center(".bbg-base--first"),
-      second: center(".bbg-base--second"),
-      third: center(".bbg-base--third"),
-      home: center(".bbg-home-plate"),
+      first: center(".bbg-field-base--first"),
+      second: center(".bbg-field-base--second"),
+      third: center(".bbg-field-base--third"),
+      home: center(".bbg-field-home"),
     };
   });
   expect(baseLayout.second.y).toBeLessThan(baseLayout.first.y);
