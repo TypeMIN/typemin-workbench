@@ -3409,6 +3409,21 @@
   }
 }
 
+@media (max-width: 1100px) {
+  .bbg-broadcast-heading > .bbg-scoreboard .bbg-score-teams {
+    grid-template-columns: 1fr;
+  }
+
+  .bbg-broadcast-heading > .bbg-scoreboard .bbg-team-score {
+    min-height: 25px;
+  }
+
+  .bbg-broadcast-heading > .bbg-scoreboard .bbg-team-score + .bbg-team-score {
+    border-top: 1px solid rgba(210, 226, 243, 0.12);
+    border-left: 0;
+  }
+}
+
 @media (max-width: 680px) {
   .bbg-game-console .bbg-broadcast-stage {
     grid-template-rows: 58px minmax(0, 1fr) 62px;
@@ -3452,7 +3467,7 @@
 
   .bbg-broadcast-heading > .bbg-scoreboard .bbg-team-score {
     grid-template-columns: minmax(0, 1fr) 13px;
-    min-height: 46px;
+    min-height: 23px;
     padding: 2px 4px;
   }
 
