@@ -2641,3 +2641,642 @@
     transition: none;
   }
 }
+
+/* Stadium view: the field owns the screen and information floats above it. */
+.bbg-game-console {
+  height: clamp(560px, calc(100dvh - 168px), 760px);
+}
+
+.bbg-game-console .bbg-broadcast-stage {
+  grid-template-rows: 48px minmax(0, 1fr);
+  padding: 0;
+}
+
+.bbg-game-console .bbg-broadcast-heading {
+  min-height: 48px;
+  margin: 0;
+  padding: 8px 16px;
+  background: rgba(3, 9, 14, 0.9);
+}
+
+.bbg-game-console .bbg-field-content {
+  display: block;
+  position: relative;
+  min-height: 0;
+  padding: 0;
+  overflow: hidden;
+  background:
+    radial-gradient(
+      circle at 50% 42%,
+      rgba(31, 126, 84, 0.16),
+      transparent 48%
+    ),
+    #06111b;
+}
+
+.bbg-game-console .bbg-stadium {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  max-width: none;
+  height: 100%;
+  max-height: none;
+  aspect-ratio: auto;
+  margin: 0;
+  overflow: hidden;
+  background: transparent;
+  filter: none;
+}
+
+.bbg-game-console .bbg-stadium > svg {
+  width: 100%;
+  height: 100%;
+  overflow: visible;
+}
+
+.bbg-stands-ring {
+  fill: #1a2b3d;
+  stroke: rgba(205, 226, 242, 0.24);
+  stroke-width: 7;
+}
+
+.bbg-warning-track {
+  fill: #a87145;
+  stroke: #d5ae7b;
+  stroke-width: 4;
+}
+
+.bbg-outfield {
+  stroke: rgba(193, 239, 215, 0.22);
+  stroke-width: 3;
+}
+
+.bbg-fence {
+  fill: none;
+  stroke: #e8bc68;
+  stroke-dasharray: 5 7;
+  stroke-width: 7;
+}
+
+.bbg-foul-line-svg {
+  fill: none;
+  stroke: rgba(255, 255, 255, 0.72);
+  stroke-width: 3;
+}
+
+.bbg-infield-dirt {
+  fill: #a56b40;
+  stroke: rgba(244, 219, 184, 0.55);
+  stroke-width: 2;
+}
+
+.bbg-infield-grass {
+  fill: #126143;
+  stroke: rgba(219, 246, 230, 0.2);
+  stroke-width: 2;
+}
+
+.bbg-mound-dirt,
+.bbg-home-dirt {
+  fill: #b77a4a;
+  stroke: rgba(245, 221, 188, 0.48);
+  stroke-width: 2;
+}
+
+.bbg-distance-marks {
+  fill: rgba(255, 239, 203, 0.84);
+  font-size: 14px;
+  font-weight: 900;
+  letter-spacing: 0.06em;
+}
+
+.bbg-fielders circle {
+  fill: rgba(4, 14, 22, 0.72);
+  stroke: rgba(169, 239, 206, 0.48);
+  stroke-width: 2;
+}
+
+.bbg-fielders text {
+  fill: #b7d7c8;
+  font-size: 10px;
+  font-weight: 900;
+}
+
+.bbg-stadium .bbg-base {
+  width: 50px;
+  gap: 1px;
+  transform: translate(-50%, -50%);
+}
+
+.bbg-stadium .bbg-base i {
+  width: 24px;
+  height: 24px;
+  border-width: 1px;
+  border-radius: 4px;
+}
+
+.bbg-stadium .bbg-base strong {
+  font-size: 9px;
+  text-shadow: 0 2px 5px #06111b;
+}
+
+.bbg-stadium .bbg-base small {
+  display: none;
+}
+
+.bbg-stadium .bbg-base--second {
+  top: 54.5%;
+  left: 50%;
+}
+
+.bbg-stadium .bbg-base--third {
+  top: 70.8%;
+  left: 36.9%;
+}
+
+.bbg-stadium .bbg-base--first {
+  top: 70.8%;
+  right: auto;
+  left: 63.1%;
+}
+
+.bbg-stadium .bbg-home-plate {
+  bottom: 4.1%;
+  width: 48px;
+  gap: 2px;
+}
+
+.bbg-stadium .bbg-home-plate i {
+  width: 22px;
+  height: 22px;
+}
+
+.bbg-stadium .bbg-home-plate small {
+  font-size: 8px;
+  text-shadow: 0 2px 5px #06111b;
+}
+
+.bbg-stadium .bbg-mound {
+  top: 70.8%;
+  width: 40px;
+  height: 22px;
+  border-color: rgba(255, 255, 255, 0.7);
+  border-radius: 999px;
+  color: #fff7df;
+  background: rgba(56, 29, 15, 0.36);
+  font-size: 8px;
+  text-shadow: 0 1px 4px #2e170b;
+}
+
+.bbg-offense-indicator {
+  --bbg-offense-accent: var(--bbg-yellow);
+  display: grid;
+  position: absolute;
+  z-index: 5;
+  top: 16px;
+  left: 16px;
+  min-width: 205px;
+  gap: 2px;
+  padding: 12px 15px 12px 18px;
+  overflow: hidden;
+  border: 1px solid
+    color-mix(in srgb, var(--bbg-offense-accent) 38%, transparent);
+  border-radius: 10px;
+  background: rgba(3, 10, 16, 0.88);
+  box-shadow: 0 16px 38px rgba(0, 0, 0, 0.34);
+  backdrop-filter: blur(13px);
+  animation: bbg-offense-enter 420ms ease-out both;
+}
+
+.bbg-offense-indicator::before {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 0;
+  width: 5px;
+  background: var(--bbg-offense-accent);
+  content: "";
+}
+
+.bbg-offense-indicator[data-team="home"] {
+  --bbg-offense-accent: var(--bbg-mint);
+}
+
+.bbg-offense-indicator > span {
+  color: var(--bbg-offense-accent);
+  font-size: 9px;
+  font-weight: 950;
+  letter-spacing: 0.08em;
+}
+
+.bbg-offense-indicator > strong {
+  color: #fff;
+  font-size: 19px;
+  letter-spacing: -0.045em;
+}
+
+.bbg-offense-indicator > small {
+  color: var(--bbg-muted);
+  font-size: 9px;
+  font-weight: 750;
+}
+
+.bbg-field-content > .bbg-scoreboard {
+  position: absolute;
+  z-index: 5;
+  top: 16px;
+  right: 16px;
+  width: 300px;
+  min-height: 0;
+  grid-template-columns: minmax(0, 1fr) 66px;
+  grid-template-areas:
+    "teams inning"
+    "counts bases";
+  border: 1px solid rgba(210, 226, 243, 0.22);
+  border-radius: 10px;
+  background: rgba(3, 9, 15, 0.9);
+  box-shadow: 0 16px 38px rgba(0, 0, 0, 0.34);
+  backdrop-filter: blur(13px);
+}
+
+.bbg-field-content > .bbg-scoreboard .bbg-live-channel {
+  display: none;
+}
+
+.bbg-field-content > .bbg-scoreboard .bbg-score-teams {
+  grid-area: teams;
+}
+
+.bbg-field-content > .bbg-scoreboard .bbg-team-score {
+  grid-template-columns: 38px minmax(0, 1fr) 24px;
+  min-height: 38px;
+  gap: 5px;
+  padding: 6px 9px;
+}
+
+.bbg-field-content > .bbg-scoreboard .bbg-team-score.is-batting {
+  background: linear-gradient(90deg, rgba(255, 209, 102, 0.19), transparent);
+  box-shadow: inset 4px 0 var(--bbg-yellow);
+}
+
+.bbg-field-content > .bbg-scoreboard .bbg-team-score.is-batting > strong {
+  color: #fff4bf;
+}
+
+.bbg-field-content > .bbg-scoreboard .bbg-team-score > b {
+  font-size: 18px;
+}
+
+.bbg-field-content > .bbg-scoreboard .bbg-inning-block {
+  grid-area: inning;
+  min-height: 76px;
+  border-right: 0;
+}
+
+.bbg-field-content > .bbg-scoreboard .bbg-inning-block strong {
+  font-size: 24px;
+}
+
+.bbg-field-content > .bbg-scoreboard .bbg-broadcast-counts {
+  grid-area: counts;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 4px;
+  min-width: 0;
+  padding: 7px 8px;
+  border-top: 1px solid var(--bbg-line);
+  border-right: 1px solid var(--bbg-line);
+}
+
+.bbg-field-content > .bbg-scoreboard .bbg-count-row {
+  display: flex;
+  justify-content: center;
+  gap: 4px;
+}
+
+.bbg-field-content > .bbg-scoreboard .bbg-count-label em,
+.bbg-field-content > .bbg-scoreboard .bbg-count-row > small {
+  display: none;
+}
+
+.bbg-field-content > .bbg-scoreboard .bbg-count-lights {
+  gap: 2px;
+}
+
+.bbg-field-content > .bbg-scoreboard .bbg-count-row i {
+  width: 7px;
+  height: 7px;
+}
+
+.bbg-field-content > .bbg-scoreboard .bbg-broadcast-bases {
+  grid-area: bases;
+  min-height: 39px;
+  padding: 3px;
+}
+
+.bbg-field-content > .bbg-scoreboard .bbg-broadcast-bases > div {
+  transform: scale(0.62);
+}
+
+.bbg-field-content > .bbg-scoreboard .bbg-broadcast-bases small {
+  display: none;
+}
+
+.bbg-game-console .bbg-broadcast-situation {
+  position: absolute;
+  z-index: 5;
+  top: 142px;
+  right: 16px;
+  width: 226px;
+  padding: 12px;
+  border-radius: 10px;
+  background: rgba(3, 9, 14, 0.84);
+}
+
+.bbg-game-console .bbg-broadcast-situation > strong {
+  font-size: 22px;
+}
+
+.bbg-game-console .bbg-broadcast-situation .bbg-phase-steps {
+  display: none;
+}
+
+.bbg-game-console .bbg-play-result {
+  position: absolute;
+  z-index: 6;
+  right: 16px;
+  bottom: 14px;
+  left: 16px;
+  height: 96px;
+  min-height: 0;
+  border: 1px solid
+    color-mix(in srgb, var(--bbg-result-accent) 34%, transparent);
+  border-left-width: 5px;
+  background: rgba(3, 9, 14, 0.9);
+}
+
+.bbg-ball-trail-shadow,
+.bbg-ball-trail {
+  fill: none;
+  stroke-linecap: round;
+}
+
+.bbg-ball-trail-shadow {
+  stroke: rgba(0, 0, 0, 0.5);
+  stroke-width: 11;
+}
+
+.bbg-ball-trail {
+  stroke: #fff4b7;
+  stroke-dasharray: 10 8;
+  stroke-width: 4;
+  filter: drop-shadow(0 0 7px rgba(255, 239, 174, 0.82));
+  animation: bbg-trail-draw 820ms ease-out both;
+}
+
+.bbg-ball-flight[data-kind="ground"] .bbg-ball-trail {
+  stroke: #f4d7ae;
+  stroke-dasharray: 3 8;
+}
+
+.bbg-ball-flight[data-kind="line"] .bbg-ball-trail {
+  stroke: #8cf6ca;
+}
+
+.bbg-live-ball {
+  fill: #fff;
+  stroke: #d32d3f;
+  stroke-width: 2;
+}
+
+.bbg-ball-landing {
+  fill: rgba(255, 209, 102, 0.18);
+  stroke: #ffe19b;
+  stroke-width: 3;
+  transform-box: fill-box;
+  transform-origin: center;
+  animation: bbg-landing-pulse 900ms 650ms ease-out both;
+}
+
+.bbg-flight-label rect {
+  fill: rgba(3, 9, 14, 0.9);
+  stroke: rgba(255, 225, 155, 0.62);
+}
+
+.bbg-flight-label text {
+  fill: #fff2bf;
+  font-size: 12px;
+  font-weight: 900;
+  letter-spacing: -0.02em;
+}
+
+@keyframes bbg-offense-enter {
+  from {
+    opacity: 0;
+    transform: translateX(-14px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+@keyframes bbg-trail-draw {
+  from {
+    opacity: 0;
+    stroke-dashoffset: 180;
+  }
+
+  to {
+    opacity: 1;
+    stroke-dashoffset: 0;
+  }
+}
+
+@keyframes bbg-landing-pulse {
+  from {
+    opacity: 0;
+    transform: scale(0.25);
+  }
+
+  55% {
+    opacity: 1;
+    transform: scale(1.45);
+  }
+
+  to {
+    opacity: 0.72;
+    transform: scale(1);
+  }
+}
+
+@media (max-width: 900px) {
+  .bbg-game-console {
+    grid-template-columns: minmax(0, 1fr) 250px;
+  }
+
+  .bbg-offense-indicator {
+    min-width: 170px;
+  }
+
+  .bbg-field-content > .bbg-scoreboard {
+    width: 260px;
+  }
+
+  .bbg-game-console .bbg-broadcast-situation {
+    width: 190px;
+  }
+}
+
+@media (max-width: 680px) {
+  .bbg-game-console {
+    grid-template-columns: 1fr;
+    grid-template-rows: 450px 211px;
+    height: 661px;
+  }
+
+  .bbg-game-console .bbg-broadcast-stage {
+    grid-template-rows: 42px minmax(0, 1fr);
+    padding: 0;
+  }
+
+  .bbg-game-console .bbg-broadcast-heading {
+    min-height: 42px;
+    margin: 0;
+  }
+
+  .bbg-stadium {
+    width: 100%;
+    height: 100%;
+  }
+
+  .bbg-stadium .bbg-base {
+    transform: translate(-50%, -50%) scale(0.78);
+  }
+
+  .bbg-stadium .bbg-mound {
+    transform: translate(-50%, -50%) scale(0.78);
+  }
+
+  .bbg-stadium .bbg-home-plate {
+    transform: translate(-50%, 0) scale(0.78);
+  }
+
+  .bbg-fielders text,
+  .bbg-distance-marks {
+    display: none;
+  }
+
+  .bbg-fielders circle {
+    r: 9px;
+  }
+
+  .bbg-offense-indicator {
+    top: 8px;
+    left: 8px;
+    min-width: 136px;
+    padding: 8px 9px 8px 12px;
+  }
+
+  .bbg-offense-indicator > span {
+    font-size: 7px;
+  }
+
+  .bbg-offense-indicator > strong {
+    max-width: 116px;
+    overflow: hidden;
+    font-size: 14px;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .bbg-offense-indicator > small {
+    display: none;
+  }
+
+  .bbg-field-content > .bbg-scoreboard {
+    top: 8px;
+    right: 8px;
+    width: 168px;
+    grid-template-columns: minmax(0, 1fr) 48px;
+    grid-template-areas: "teams inning";
+  }
+
+  .bbg-field-content > .bbg-scoreboard .bbg-team-score {
+    grid-template-columns: 27px minmax(0, 1fr) 18px;
+    min-height: 31px;
+    padding: 4px 6px;
+  }
+
+  .bbg-field-content > .bbg-scoreboard .bbg-team-score > span {
+    font-size: 6px;
+  }
+
+  .bbg-field-content > .bbg-scoreboard .bbg-team-score > strong {
+    font-size: 9px;
+  }
+
+  .bbg-field-content > .bbg-scoreboard .bbg-team-score > b {
+    font-size: 14px;
+  }
+
+  .bbg-field-content > .bbg-scoreboard .bbg-inning-block {
+    min-height: 62px;
+  }
+
+  .bbg-field-content > .bbg-scoreboard .bbg-inning-block strong {
+    font-size: 18px;
+  }
+
+  .bbg-field-content > .bbg-scoreboard .bbg-broadcast-counts,
+  .bbg-field-content > .bbg-scoreboard .bbg-broadcast-bases {
+    display: none;
+  }
+
+  .bbg-game-console .bbg-broadcast-situation {
+    top: 78px;
+    right: 8px;
+    width: 132px;
+    padding: 8px;
+  }
+
+  .bbg-game-console .bbg-broadcast-situation > strong {
+    font-size: 16px;
+  }
+
+  .bbg-game-console .bbg-broadcast-situation .bbg-situation-facts {
+    margin-top: 5px;
+  }
+
+  .bbg-game-console .bbg-broadcast-situation .bbg-situation-count {
+    font-size: 7px;
+  }
+
+  .bbg-game-console .bbg-play-result {
+    right: 8px;
+    bottom: 8px;
+    left: 8px;
+    height: 82px;
+  }
+
+  .bbg-utility-strip {
+    flex-flow: row wrap;
+  }
+
+  .bbg-utility-card {
+    width: calc(50% - 4px);
+  }
+
+  .bbg-utility-card[open] {
+    width: 100%;
+    flex-basis: 100%;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .bbg-offense-indicator,
+  .bbg-ball-trail,
+  .bbg-ball-landing {
+    animation: none;
+  }
+}

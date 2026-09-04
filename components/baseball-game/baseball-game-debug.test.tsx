@@ -39,7 +39,11 @@ describe("BaseballGameDebug", () => {
     ).toBeVisible();
     expect(container.querySelector(".bbg-d12")).toBeVisible();
     expect(screen.getAllByRole("button", { name: /번 면/ })).toHaveLength(12);
-    expect(screen.getByRole("img", { name: "주자 없음" })).toBeVisible();
+    expect(screen.getByRole("img", { name: /주자 없음/ })).toBeVisible();
+    expect(screen.getByLabelText("원정팀 공격 중")).toHaveTextContent(
+      "원정팀 공격",
+    );
+    expect(container.querySelector(".bbg-fence")).toBeVisible();
     expect(container.querySelectorAll(".bbg-team-score")).toHaveLength(2);
     expect(
       container.querySelectorAll(".bbg-team-score.is-batting"),
@@ -69,7 +73,10 @@ describe("BaseballGameDebug", () => {
     fireEvent.click(
       screen.getByRole("button", { name: /1번 면 IH 내야 안타/ }),
     );
-    expect(screen.getByRole("img", { name: "1루 주자 있음" })).toBeVisible();
+    expect(
+      document.querySelector('.bbg-ball-flight[aria-label*="IH"]'),
+    ).toBeVisible();
+    expect(screen.getByRole("img", { name: /1루 주자 있음/ })).toBeVisible();
     const result = screen.getByTestId("play-result");
     expect(
       within(result).getByRole("heading", { name: "IH 단타" }),

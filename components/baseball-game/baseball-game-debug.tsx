@@ -122,8 +122,6 @@ export default function BaseballGameDebug() {
       </header>
 
       <main className="bbg-main">
-        <BroadcastScoreboard game={game} />
-
         <div className="bbg-game-console">
           <section
             className="bbg-field-panel bbg-broadcast-field"
@@ -144,7 +142,18 @@ export default function BaseballGameDebug() {
               </div>
 
               <div className="bbg-field-content">
-                <BaseballDiamond game={game} />
+                <BaseballStadium
+                  face={lastRoll?.face}
+                  game={game}
+                  key={`field-${game.revision}`}
+                />
+                <OffenseIndicator
+                  battingTeamName={battingTeamName}
+                  fieldingTeamName={fieldingTeamName}
+                  game={game}
+                  key={`${game.inning}-${game.half}-${game.battingTeam}`}
+                />
+                <BroadcastScoreboard game={game} />
                 <aside className="bbg-broadcast-situation" aria-live="polite">
                   <span>NOW AT BAT</span>
                   <strong>{battingTeamName}</strong>
@@ -437,23 +446,147 @@ function TeamScore({ game, side }: { game: GameState; side: "away" | "home" }) {
   );
 }
 
-function BaseballDiamond({ game }: { game: GameState }) {
+function OffenseIndicator({
+  battingTeamName,
+  fieldingTeamName,
+  game,
+}: {
+  battingTeamName: string;
+  fieldingTeamName: string;
+  game: GameState;
+}) {
+  return (
+    <div
+      aria-label={`${battingTeamName} 공격 중`}
+      className="bbg-offense-indicator"
+      data-team={game.battingTeam}
+    >
+      <span>
+        {game.half === "top" ? "▲" : "▼"} {game.inning}회
+        {game.half === "top" ? "초" : "말"}
+      </span>
+      <strong>{battingTeamName} 공격</strong>
+      <small>{fieldingTeamName} 수비</small>
+    </div>
+  );
+}
+
+type BallFlight = {
+  kind: "ground" | "fly" | "line" | "contact";
+  label: string;
+  path: string;
+  target: { x: number; y: number };
+};
+
+function BaseballStadium({ face, game }: { face?: DieFace; game: GameState }) {
   const occupied = [
     game.bases.first ? "1루" : null,
     game.bases.second ? "2루" : null,
     game.bases.third ? "3루" : null,
   ].filter(Boolean);
+  const flight = getBallFlight(face);
+  const battingTeamName =
+    game.config[game.battingTeam === "away" ? "awayTeamName" : "homeTeamName"];
+  const baseLabel = occupied.length
+    ? `${occupied.join(", ")} 주자 있음`
+    : "주자 없음";
+
   return (
     <div
-      aria-label={
-        occupied.length ? `${occupied.join(", ")} 주자 있음` : "주자 없음"
-      }
-      className="bbg-diamond"
+      aria-label={`${battingTeamName} 공격, ${baseLabel}${flight ? `, ${flight.label} 타구 표시` : ""}`}
+      className="bbg-diamond bbg-stadium"
       role="img"
     >
-      <span className="bbg-infield" aria-hidden="true" />
-      <span className="bbg-foul-line bbg-foul-line--left" aria-hidden="true" />
-      <span className="bbg-foul-line bbg-foul-line--right" aria-hidden="true" />
+      <svg aria-hidden="true" viewBox="0 0 900 650">
+        <defs>
+          <linearGradient id="stands" x1="0" x2="0" y1="0" y2="1">
+            <stop offset="0" stopColor="#17283a" />
+            <stop offset="1" stopColor="#07111b" />
+          </linearGradient>
+          <linearGradient id="grass" x1="0" x2="1" y1="0" y2="1">
+            <stop offset="0" stopColor="#176846" />
+            <stop offset="0.5" stopColor="#0f573b" />
+            <stop offset="1" stopColor="#0b412e" />
+          </linearGradient>
+          <pattern
+            height="64"
+            id="mow-pattern"
+            patternUnits="userSpaceOnUse"
+            width="64"
+            x="0"
+            y="0"
+          >
+            <rect fill="rgba(255,255,255,.018)" height="64" width="32" />
+            <rect fill="rgba(0,0,0,.035)" height="64" width="32" x="32" />
+          </pattern>
+          <filter id="ball-glow" height="300%" width="300%" x="-100%" y="-100%">
+            <feGaussianBlur result="blur" stdDeviation="6" />
+            <feMerge>
+              <feMergeNode in="blur" />
+              <feMergeNode in="SourceGraphic" />
+            </feMerge>
+          </filter>
+        </defs>
+
+        <rect fill="url(#stands)" height="650" rx="30" width="900" />
+        <path
+          className="bbg-stands-ring"
+          d="M35 80 Q450 -62 865 80 L830 130 Q450 8 70 130 Z"
+        />
+        <path
+          className="bbg-warning-track"
+          d="M450 610 L48 92 Q450 -48 852 92 Z"
+        />
+        <path
+          className="bbg-outfield"
+          d="M450 590 L76 105 Q450 -18 824 105 Z"
+          fill="url(#grass)"
+        />
+        <path
+          d="M450 590 L76 105 Q450 -18 824 105 Z"
+          fill="url(#mow-pattern)"
+          opacity=".72"
+        />
+        <path className="bbg-fence" d="M76 105 Q450 -18 824 105" />
+        <path className="bbg-foul-line-svg" d="M450 580 L76 105" />
+        <path className="bbg-foul-line-svg" d="M450 580 L824 105" />
+        <path
+          className="bbg-infield-dirt"
+          d="M450 326 L584 460 L450 594 L316 460 Z"
+        />
+        <path
+          className="bbg-infield-grass"
+          d="M450 354 L556 460 L450 566 L344 460 Z"
+        />
+        <circle className="bbg-mound-dirt" cx="450" cy="460" r="31" />
+        <circle className="bbg-home-dirt" cx="450" cy="574" r="33" />
+
+        <g className="bbg-distance-marks">
+          <text x="92" y="115">
+            99m
+          </text>
+          <text textAnchor="middle" x="450" y="43">
+            122m
+          </text>
+          <text textAnchor="end" x="808" y="115">
+            99m
+          </text>
+        </g>
+
+        <g className="bbg-fielders">
+          <Fielder label="LF" x={235} y={215} />
+          <Fielder label="CF" x={450} y={150} />
+          <Fielder label="RF" x={665} y={215} />
+          <Fielder label="SS" x={395} y={405} />
+          <Fielder label="2B" x={505} y={405} />
+          <Fielder label="3B" x={325} y={463} />
+          <Fielder label="1B" x={575} y={463} />
+          <Fielder label="C" x={450} y={607} />
+        </g>
+
+        {flight ? <BallFlightVisual face={face} flight={flight} /> : null}
+      </svg>
+
       <BaseMarker base="second" label="2루" occupied={game.bases.second} />
       <BaseMarker base="third" label="3루" occupied={game.bases.third} />
       <BaseMarker base="first" label="1루" occupied={game.bases.first} />
@@ -462,10 +595,192 @@ function BaseballDiamond({ game }: { game: GameState }) {
         <small>홈</small>
       </span>
       <span className="bbg-mound" aria-hidden="true">
-        P
+        투수
       </span>
     </div>
   );
+}
+
+function Fielder({ label, x, y }: { label: string; x: number; y: number }) {
+  return (
+    <g transform={`translate(${x} ${y})`}>
+      <circle r="13" />
+      <text dy="4" textAnchor="middle">
+        {label}
+      </text>
+    </g>
+  );
+}
+
+function BallFlightVisual({
+  face,
+  flight,
+}: {
+  face?: DieFace;
+  flight: BallFlight;
+}) {
+  return (
+    <g
+      aria-label={`${face ?? ""} ${flight.label} 타구 궤적`}
+      className="bbg-ball-flight"
+      data-kind={flight.kind}
+      role="img"
+    >
+      <path className="bbg-ball-trail-shadow" d={flight.path} />
+      <path className="bbg-ball-trail" d={flight.path} />
+      <circle
+        className="bbg-ball-landing"
+        cx={flight.target.x}
+        cy={flight.target.y}
+        r="18"
+      />
+      <circle className="bbg-live-ball" filter="url(#ball-glow)" r="7">
+        <animateMotion dur="850ms" fill="freeze" path={flight.path} />
+      </circle>
+      <g
+        className="bbg-flight-label"
+        transform={`translate(${flight.target.x} ${flight.target.y - 27})`}
+      >
+        <rect height="29" rx="14" width="112" x="-56" y="-17" />
+        <text dy="2" textAnchor="middle">
+          {flight.label}
+        </text>
+      </g>
+    </g>
+  );
+}
+
+function getBallFlight(face?: DieFace): BallFlight | null {
+  if (!face) return null;
+  const flights: Partial<Record<DieFace, BallFlight>> = {
+    C: {
+      kind: "contact",
+      label: "컨택",
+      path: "M450 460 Q448 520 450 574",
+      target: { x: 450, y: 574 },
+    },
+    GF: {
+      kind: "ground",
+      label: "1루 땅볼",
+      path: "M450 574 Q500 515 565 463",
+      target: { x: 565, y: 463 },
+    },
+    G3: {
+      kind: "ground",
+      label: "3루 땅볼",
+      path: "M450 574 Q395 515 335 463",
+      target: { x: 335, y: 463 },
+    },
+    GA: {
+      kind: "ground",
+      label: "유격수 땅볼",
+      path: "M450 574 Q425 490 397 405",
+      target: { x: 397, y: 405 },
+    },
+    PO: {
+      kind: "fly",
+      label: "내야 뜬공",
+      path: "M450 574 Q390 410 444 382",
+      target: { x: 444, y: 382 },
+    },
+    FO: {
+      kind: "fly",
+      label: "외야 뜬공",
+      path: "M450 574 Q520 305 525 215",
+      target: { x: 525, y: 215 },
+    },
+    F2: {
+      kind: "fly",
+      label: "좌익수 뜬공",
+      path: "M450 574 Q330 320 248 218",
+      target: { x: 248, y: 218 },
+    },
+    F3: {
+      kind: "fly",
+      label: "중견수 뜬공",
+      path: "M450 574 Q450 300 450 157",
+      target: { x: 450, y: 157 },
+    },
+    FA: {
+      kind: "fly",
+      label: "우익수 뜬공",
+      path: "M450 574 Q570 320 652 218",
+      target: { x: 652, y: 218 },
+    },
+    HIT: {
+      kind: "line",
+      label: "안타 방향 판정",
+      path: "M450 574 Q450 365 450 255",
+      target: { x: 450, y: 255 },
+    },
+    HR: {
+      kind: "fly",
+      label: "HOME RUN",
+      path: "M450 574 Q535 270 490 36",
+      target: { x: 490, y: 36 },
+    },
+    IH: {
+      kind: "ground",
+      label: "내야 안타",
+      path: "M450 574 Q470 500 490 430",
+      target: { x: 490, y: 430 },
+    },
+    L1: {
+      kind: "line",
+      label: "좌전 안타",
+      path: "M450 574 Q340 380 260 260",
+      target: { x: 260, y: 260 },
+    },
+    L2: {
+      kind: "line",
+      label: "좌중간 안타",
+      path: "M450 574 Q350 315 300 188",
+      target: { x: 300, y: 188 },
+    },
+    C1: {
+      kind: "line",
+      label: "중전 안타",
+      path: "M450 574 Q450 355 450 244",
+      target: { x: 450, y: 244 },
+    },
+    C2: {
+      kind: "line",
+      label: "중견수 앞 안타",
+      path: "M450 574 Q450 300 450 183",
+      target: { x: 450, y: 183 },
+    },
+    R1: {
+      kind: "line",
+      label: "우전 안타",
+      path: "M450 574 Q560 380 640 260",
+      target: { x: 640, y: 260 },
+    },
+    R2: {
+      kind: "line",
+      label: "우중간 안타",
+      path: "M450 574 Q550 315 600 188",
+      target: { x: 600, y: 188 },
+    },
+    D2: {
+      kind: "fly",
+      label: "좌중간 2루타",
+      path: "M450 574 Q330 290 245 130",
+      target: { x: 245, y: 130 },
+    },
+    D3: {
+      kind: "fly",
+      label: "중앙 펜스 2루타",
+      path: "M450 574 Q450 245 450 86",
+      target: { x: 450, y: 86 },
+    },
+    T3: {
+      kind: "fly",
+      label: "우중간 3루타",
+      path: "M450 574 Q590 275 690 126",
+      target: { x: 690, y: 126 },
+    },
+  };
+  return flights[face] ?? null;
 }
 
 function BaseMarker({

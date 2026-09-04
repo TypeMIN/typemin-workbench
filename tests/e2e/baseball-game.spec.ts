@@ -26,7 +26,9 @@ test("야구 게임에서 강제 주사위 판정과 새 경기를 진행한다"
     page.getByRole("button", { name: "투구 주사위 굴리기" }),
   ).toBeVisible();
   await expect(page.locator(".bbg-d12")).toBeVisible();
-  await expect(page.getByRole("img", { name: "주자 없음" })).toBeVisible();
+  await expect(page.getByLabel("원정팀 공격 중")).toContainText("원정팀 공격");
+  await expect(page.locator(".bbg-fence")).toBeVisible();
+  await expect(page.getByRole("img", { name: /주자 없음/ })).toBeVisible();
   await expect(page.locator("[data-nextjs-dialog]")).toHaveCount(0);
 
   const baseLayout = await page.locator(".bbg-diamond").evaluate((diamond) => {
@@ -58,7 +60,11 @@ test("야구 게임에서 강제 주사위 판정과 새 경기를 진행한다"
     page.getByRole("button", { name: "안타 주사위 굴리기" }),
   ).toBeVisible();
   await page.getByRole("button", { name: /1번 면 IH 내야 안타/ }).click();
-  await expect(page.getByRole("img", { name: "1루 주자 있음" })).toBeVisible();
+  await expect(
+    page.locator('.bbg-ball-flight[aria-label*="IH"]'),
+  ).toBeVisible();
+  await expect(page.locator(".bbg-flight-label")).toContainText("내야 안타");
+  await expect(page.getByRole("img", { name: /1루 주자 있음/ })).toBeVisible();
   await expect(
     page.getByTestId("play-result").getByRole("heading", { name: "IH 단타" }),
   ).toBeVisible();
@@ -66,11 +72,13 @@ test("야구 게임에서 강제 주사위 판정과 새 경기를 진행한다"
   await expect(page.getByTestId("play-result")).toContainText("1루");
 
   await page.getByText("새 경기 설정", { exact: true }).click();
-  await page.getByLabel("원정팀").fill("블루");
-  await page.getByLabel("홈팀").fill("레드");
+  await page.getByRole("textbox", { name: "원정팀" }).fill("블루");
+  await page.getByRole("textbox", { name: "홈팀" }).fill("레드");
   await page.getByLabel("경기 길이").selectOption("5");
   await page.getByRole("button", { name: /새 경기 시작/ }).click();
-  await expect(page.getByText("5이닝 경기", { exact: true })).toBeVisible();
+  await expect(
+    page.locator(".bbg-broadcast-heading").getByText(/5이닝 경기/),
+  ).toBeVisible();
   await expect(page.getByText(/REV 0/)).toBeVisible();
 
   await page.setViewportSize({ width: 390, height: 844 });
@@ -114,6 +122,7 @@ test("중계 화면에서 득점부터 공수교대와 경기 종료까지 이�
   await expect(
     page.getByRole("region", { name: /경기 점수판, 1회말/ }),
   ).toBeVisible();
+  await expect(page.getByLabel("홈팀 공격 중")).toContainText("홈팀 공격");
   await expect(page.getByTestId("play-result")).toContainText(
     "홈팀 첫 타자에게 투구",
   );
