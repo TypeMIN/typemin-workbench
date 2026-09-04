@@ -2,7 +2,7 @@
 
 import { ArrowRight, Dices, House, Radio, RotateCcw } from "lucide-react";
 import Link from "next/link";
-import { useState, type FormEvent } from "react";
+import { useRef, useState, type FormEvent } from "react";
 
 import { WorkbenchAccountControl } from "@/components/workbench-account-control";
 import { createGame, transition } from "@/lib/baseball-game/engine";
@@ -55,6 +55,7 @@ const PHASE_TITLE: Record<GamePhase, string> = {
 };
 
 export default function BaseballGameDebug() {
+  const setupDetailsRef = useRef<HTMLDetailsElement>(null);
   const [draft, setDraft] = useState<GameConfig>(DEFAULT_CONFIG);
   const [game, setGame] = useState(() => createGame(DEFAULT_CONFIG));
   const [error, setError] = useState<string | null>(null);
@@ -95,6 +96,7 @@ export default function BaseballGameDebug() {
     event.preventDefault();
     setGame(createGame(draft));
     setError(null);
+    setupDetailsRef.current?.removeAttribute("open");
   }
 
   return (
@@ -122,143 +124,152 @@ export default function BaseballGameDebug() {
       <main className="bbg-main">
         <BroadcastScoreboard game={game} />
 
-        <section
-          className="bbg-field-panel bbg-broadcast-field"
-          aria-labelledby="field-heading"
-        >
-          <div className="bbg-broadcast-stage">
-            <div className="bbg-broadcast-heading">
-              <div>
-                <span>
-                  <Radio aria-hidden="true" size={13} /> LIVE
-                </span>
-                <h1 id="field-heading">야구 게임 라이브</h1>
-              </div>
-              <p>
-                {game.config.innings}이닝 경기 · {game.rulesetVersion} · REV{" "}
-                {game.revision}
-              </p>
-            </div>
-
-            <div className="bbg-field-content">
-              <BaseballDiamond game={game} />
-              <aside className="bbg-broadcast-situation" aria-live="polite">
-                <span>NOW AT BAT</span>
-                <strong>{battingTeamName}</strong>
-                <small>
-                  {game.battingTeam === "away" ? "원정팀" : "홈팀"} 공격
-                </small>
-                <div className="bbg-situation-facts">
-                  <p>
-                    <span>이닝</span>
-                    <strong>
-                      {game.inning}회{game.half === "top" ? "초" : "말"}
-                    </strong>
-                  </p>
-                  <p>
-                    <span>아웃</span>
-                    <strong>{formatOuts(game.outs)}</strong>
-                  </p>
-                  <p>
-                    <span>주자</span>
-                    <strong>{formatBases(game)}</strong>
-                  </p>
+        <div className="bbg-game-console">
+          <section
+            className="bbg-field-panel bbg-broadcast-field"
+            aria-labelledby="field-heading"
+          >
+            <div className="bbg-broadcast-stage">
+              <div className="bbg-broadcast-heading">
+                <div>
+                  <span>
+                    <Radio aria-hidden="true" size={13} /> LIVE
+                  </span>
+                  <h1 id="field-heading">야구 게임 라이브</h1>
                 </div>
-                <p className="bbg-situation-count">
-                  <span>볼 {game.balls}</span>
-                  <span>스트라이크 {game.strikes}</span>
+                <p>
+                  {game.config.innings}이닝 경기 · {game.rulesetVersion} · REV{" "}
+                  {game.revision}
                 </p>
-                <PhaseStepper phase={game.phase} />
-              </aside>
-            </div>
-
-            <PlayResult
-              events={currentRevisionEvents}
-              face={lastRoll?.face}
-              game={game}
-              key={game.revision}
-            />
-          </div>
-        </section>
-
-        <section
-          className="bbg-control-panel bbg-control-panel--broadcast"
-          aria-labelledby="control-heading"
-        >
-          <div className="bbg-panel-heading">
-            <div>
-              <p>DICE CONTROL</p>
-              <h2 id="control-heading">주사위 판정</h2>
-            </div>
-            {currentDie ? <span>D12 · {DIE_LABELS[currentDie]}</span> : null}
-          </div>
-
-          <div className="bbg-phase-copy" aria-live="polite">
-            <span>NOW</span>
-            <strong>
-              {game.phase === "finished" ? "경기 종료" : actionOwnerLabel} ·{" "}
-              {PHASE_TITLE[game.phase]}
-            </strong>
-            <p>{PHASE_COPY[game.phase]}</p>
-          </div>
-
-          {game.phase === "finished" ? (
-            <div className="bbg-winner-card">
-              <span>FINAL</span>
-              <strong>
-                {game.winner === "home"
-                  ? game.config.homeTeamName
-                  : game.config.awayTeamName}
-              </strong>
-              <p>
-                {game.score.away} : {game.score.home} 승리
-              </p>
-            </div>
-          ) : (
-            <details className="bbg-force-panel">
-              <summary>특정 면 강제 입력</summary>
-              <p>엣지케이스를 재현할 D12의 면을 직접 선택합니다.</p>
-              <div className="bbg-face-grid">
-                {currentFaces.map((face, index) => (
-                  <button
-                    aria-label={`${index + 1}번 면 ${face} ${FACE_LABELS[face]}`}
-                    key={`${face}-${index}`}
-                    onClick={() =>
-                      currentDie && dispatchResult(currentDie, face)
-                    }
-                    type="button"
-                  >
-                    <small>{String(index + 1).padStart(2, "0")}</small>
-                    <strong>{face}</strong>
-                    <span>{FACE_LABELS[face]}</span>
-                  </button>
-                ))}
               </div>
-            </details>
-          )}
 
-          {error ? (
-            <p className="bbg-error" role="alert">
-              {error}
-            </p>
-          ) : null}
-        </section>
+              <div className="bbg-field-content">
+                <BaseballDiamond game={game} />
+                <aside className="bbg-broadcast-situation" aria-live="polite">
+                  <span>NOW AT BAT</span>
+                  <strong>{battingTeamName}</strong>
+                  <small>
+                    {game.battingTeam === "away" ? "원정팀" : "홈팀"} 공격
+                  </small>
+                  <div className="bbg-situation-facts">
+                    <p>
+                      <span>이닝</span>
+                      <strong>
+                        {game.inning}회{game.half === "top" ? "초" : "말"}
+                      </strong>
+                    </p>
+                    <p>
+                      <span>아웃</span>
+                      <strong>{formatOuts(game.outs)}</strong>
+                    </p>
+                    <p>
+                      <span>주자</span>
+                      <strong>{formatBases(game)}</strong>
+                    </p>
+                  </div>
+                  <p className="bbg-situation-count">
+                    <span>볼 {game.balls}</span>
+                    <span>스트라이크 {game.strikes}</span>
+                  </p>
+                  <PhaseStepper phase={game.phase} />
+                </aside>
+              </div>
 
-        <div className="bbg-lower-grid">
-          <section className="bbg-log-panel" aria-labelledby="log-heading">
+              <PlayResult
+                events={currentRevisionEvents}
+                face={lastRoll?.face}
+                game={game}
+                key={game.revision}
+              />
+            </div>
+          </section>
+
+          <section
+            className="bbg-control-panel bbg-control-panel--broadcast"
+            aria-labelledby="control-heading"
+          >
             <div className="bbg-panel-heading">
               <div>
-                <p>EVENT LOG</p>
-                <h2 id="log-heading">최근 경기 기록</h2>
+                <p>ON DECK</p>
+                <h2 id="control-heading">현재 판정</h2>
               </div>
-              <span>{game.eventLog.length} EVENTS</span>
+              {currentDie ? <span>D12 · {DIE_LABELS[currentDie]}</span> : null}
             </div>
+
+            <div className="bbg-phase-copy" aria-live="polite">
+              <span>NOW</span>
+              <strong>
+                {game.phase === "finished" ? "경기 종료" : actionOwnerLabel}
+              </strong>
+              <p>{PHASE_TITLE[game.phase]}</p>
+            </div>
+
+            {game.phase === "finished" ? (
+              <div className="bbg-winner-card">
+                <span>FINAL</span>
+                <strong>
+                  {game.winner === "home"
+                    ? game.config.homeTeamName
+                    : game.config.awayTeamName}
+                </strong>
+                <p>
+                  {game.score.away} : {game.score.home} 승리
+                </p>
+              </div>
+            ) : currentDie ? (
+              <QuickRollButton
+                actionOwnerLabel={actionOwnerLabel}
+                currentDie={currentDie}
+                face={lastRoll?.face}
+                key={`${game.revision}-${currentDie}`}
+                onRoll={rollCurrentDie}
+              />
+            ) : null}
+
+            <p className="bbg-die-help">{PHASE_COPY[game.phase]}</p>
+
+            {game.phase !== "finished" ? (
+              <details className="bbg-force-panel">
+                <summary>특정 면 강제 입력</summary>
+                <div className="bbg-face-grid">
+                  {currentFaces.map((face, index) => (
+                    <button
+                      aria-label={`${index + 1}번 면 ${face} ${FACE_LABELS[face]}`}
+                      key={`${face}-${index}`}
+                      onClick={() =>
+                        currentDie && dispatchResult(currentDie, face)
+                      }
+                      type="button"
+                    >
+                      <small>{String(index + 1).padStart(2, "0")}</small>
+                      <strong>{face}</strong>
+                      <span>{FACE_LABELS[face]}</span>
+                    </button>
+                  ))}
+                </div>
+              </details>
+            ) : null}
+
+            {error ? (
+              <p className="bbg-error" role="alert">
+                {error}
+              </p>
+            ) : null}
+          </section>
+        </div>
+
+        <div className="bbg-utility-strip">
+          <details className="bbg-utility-card bbg-log-panel">
+            <summary>
+              <span>최근 기록</span>
+              <strong>{game.eventLog.length}</strong>
+            </summary>
             {game.eventLog.length === 0 ? (
               <p className="bbg-empty-log">아직 기록된 플레이가 없습니다.</p>
             ) : (
               <ol className="bbg-event-list">
                 {game.eventLog
-                  .slice(-14)
+                  .slice(-6)
                   .toReversed()
                   .map((event) => (
                     <li key={event.sequence}>
@@ -271,16 +282,16 @@ export default function BaseballGameDebug() {
                   ))}
               </ol>
             )}
-          </section>
+          </details>
 
-          <section className="bbg-setup-panel" aria-labelledby="setup-heading">
-            <div className="bbg-panel-heading">
-              <div>
-                <p>NEW GAME</p>
-                <h2 id="setup-heading">경기 다시 만들기</h2>
-              </div>
-              <House aria-hidden="true" size={20} />
-            </div>
+          <details
+            className="bbg-utility-card bbg-setup-panel"
+            ref={setupDetailsRef}
+          >
+            <summary>
+              <span>새 경기 설정</span>
+              <House aria-hidden="true" size={16} />
+            </summary>
             <form className="bbg-setup-form" onSubmit={startGame}>
               <label>
                 원정팀
@@ -330,16 +341,9 @@ export default function BaseballGameDebug() {
                 <RotateCcw aria-hidden="true" size={17} />새 경기 시작
               </button>
             </form>
-          </section>
+          </details>
         </div>
       </main>
-      {currentDie ? (
-        <QuickRollButton
-          actionOwnerLabel={actionOwnerLabel}
-          currentDie={currentDie}
-          onRoll={rollCurrentDie}
-        />
-      ) : null}
     </div>
   );
 }
@@ -607,23 +611,35 @@ function PlayResult({
 function QuickRollButton({
   actionOwnerLabel,
   currentDie,
+  face,
   onRoll,
 }: {
   actionOwnerLabel: string;
   currentDie: DieKind;
+  face?: DieFace;
   onRoll: () => void;
 }) {
   return (
     <button
       aria-label={`${DIE_LABELS[currentDie]} 주사위 굴리기`}
-      className="bbg-quick-roll bbg-quick-roll--floating"
+      className="bbg-d12-button"
       onClick={onRoll}
       type="button"
     >
-      <Dices aria-hidden="true" size={15} />
-      <span>
+      <span className="bbg-d12" aria-hidden="true">
+        <i className="bbg-d12-facet bbg-d12-facet--one" />
+        <i className="bbg-d12-facet bbg-d12-facet--two" />
+        <i className="bbg-d12-facet bbg-d12-facet--three" />
+        <i className="bbg-d12-facet bbg-d12-facet--four" />
+        <small>D12</small>
+        <strong>{face ?? "?"}</strong>
+      </span>
+      <span className="bbg-roll-caption">
         <small>{actionOwnerLabel}</small>
-        <strong>{DIE_LABELS[currentDie]} 굴리기</strong>
+        <strong>
+          <Dices aria-hidden="true" size={18} />
+          {DIE_LABELS[currentDie]} 주사위 굴리기
+        </strong>
       </span>
     </button>
   );

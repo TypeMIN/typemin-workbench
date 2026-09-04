@@ -25,6 +25,7 @@ test("야구 게임에서 강제 주사위 판정과 새 경기를 진행한다"
   await expect(
     page.getByRole("button", { name: "투구 주사위 굴리기" }),
   ).toBeVisible();
+  await expect(page.locator(".bbg-d12")).toBeVisible();
   await expect(page.getByRole("img", { name: "주자 없음" })).toBeVisible();
   await expect(page.locator("[data-nextjs-dialog]")).toHaveCount(0);
 
@@ -64,6 +65,7 @@ test("야구 게임에서 강제 주사위 판정과 새 경기를 진행한다"
   await expect(page.getByTestId("play-result")).toContainText("타자");
   await expect(page.getByTestId("play-result")).toContainText("1루");
 
+  await page.getByText("새 경기 설정", { exact: true }).click();
   await page.getByLabel("원정팀").fill("블루");
   await page.getByLabel("홈팀").fill("레드");
   await page.getByLabel("경기 길이").selectOption("5");
@@ -72,12 +74,15 @@ test("야구 게임에서 강제 주사위 판정과 새 경기를 진행한다"
   await expect(page.getByText(/REV 0/)).toBeVisible();
 
   await page.setViewportSize({ width: 390, height: 844 });
-  await expect(
-    page.getByRole("heading", { name: "주사위 판정" }),
-  ).toBeVisible();
+  await expect(page.getByRole("heading", { name: "현재 판정" })).toBeVisible();
   expect(
     await page.evaluate(
       () => document.documentElement.scrollWidth <= window.innerWidth,
+    ),
+  ).toBe(true);
+  expect(
+    await page.evaluate(
+      () => document.documentElement.scrollHeight <= window.innerHeight,
     ),
   ).toBe(true);
   expect(browserErrors).toEqual([]);
@@ -120,7 +125,7 @@ test("중계 화면에서 득점부터 공수교대와 경기 종료까지 이�
   await strikeOutSide();
 
   await expect(page.getByText("FINAL", { exact: true })).toBeVisible();
-  await expect(page.getByText("원정팀", { exact: true }).last()).toBeVisible();
+  await expect(page.locator(".bbg-winner-card strong")).toHaveText("원정팀");
   await expect(page.getByTestId("play-result")).toContainText("경기 종료");
   await expect(page.getByRole("button", { name: /주사위 굴리기/ })).toHaveCount(
     0,

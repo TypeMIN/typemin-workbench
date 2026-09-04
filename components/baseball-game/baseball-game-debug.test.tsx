@@ -37,6 +37,7 @@ describe("BaseballGameDebug", () => {
     expect(
       screen.getByRole("button", { name: "투구 주사위 굴리기" }),
     ).toBeVisible();
+    expect(container.querySelector(".bbg-d12")).toBeVisible();
     expect(screen.getAllByRole("button", { name: /번 면/ })).toHaveLength(12);
     expect(screen.getByRole("img", { name: "주자 없음" })).toBeVisible();
     expect(container.querySelectorAll(".bbg-team-score")).toHaveLength(2);
@@ -82,9 +83,10 @@ describe("BaseballGameDebug", () => {
 
   it("creates a new game from edited team names and innings", () => {
     render(<BaseballGameDebug />);
+    fireEvent.click(screen.getByText("새 경기 설정", { exact: true }));
     const setup = screen
-      .getByRole("heading", { name: "경기 다시 만들기" })
-      .closest("section");
+      .getByText("새 경기 설정", { exact: true })
+      .closest("details");
     if (!setup) throw new Error("새 경기 패널을 찾지 못했습니다.");
     const form = within(setup);
 
