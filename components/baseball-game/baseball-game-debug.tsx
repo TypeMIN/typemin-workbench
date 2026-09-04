@@ -1,11 +1,24 @@
 "use client";
 
-import { ArrowRight, Dices, House, Radio, RotateCcw } from "lucide-react";
+import {
+  ArrowRight,
+  Dices,
+  House,
+  Layers3,
+  Radio,
+  RotateCcw,
+} from "lucide-react";
 import Link from "next/link";
 import { useRef, useState, type FormEvent } from "react";
 
 import { WorkbenchAccountControl } from "@/components/workbench-account-control";
-import { createGame, transition } from "@/lib/baseball-game/engine";
+import { CARD_DEFINITIONS } from "@/lib/baseball-game/cards";
+import {
+  createGame,
+  getActionOwner,
+  getLegalCards,
+  transition,
+} from "@/lib/baseball-game/engine";
 import {
   DIE_FACES,
   DIE_LABELS,
@@ -14,6 +27,9 @@ import {
 } from "@/lib/baseball-game/rules";
 import type {
   BattingFace,
+  CardAvailability,
+  CardInstance,
+  CardRole,
   DieFace,
   DieKind,
   GameAction,
@@ -44,6 +60,7 @@ const PHASE_COPY: Record<GamePhase, string> = {
   awaiting_batting:
     "공이 배트에 맞았습니다. 아웃·안타·홈런 중 타구 결과를 정합니다.",
   awaiting_hit: "안타성 타구입니다. 타구 방향과 모든 주자의 진루를 정합니다.",
+  awaiting_card: "사용할 전략카드를 고르거나 카드 없이 진행하세요.",
   finished: "경기가 종료되었습니다.",
 };
 
@@ -51,6 +68,7 @@ const PHASE_TITLE: Record<GamePhase, string> = {
   awaiting_pitch: "투구할 차례",
   awaiting_batting: "타격 결과를 정할 차례",
   awaiting_hit: "안타 결과를 정할 차례",
+  awaiting_card: "전략카드 결정",
   finished: "경기 종료",
 };
 
@@ -59,22 +77,19 @@ export default function BaseballGameDebug() {
   const [draft, setDraft] = useState<GameConfig>(DEFAULT_CONFIG);
   const [game, setGame] = useState(() => createGame(DEFAULT_CONFIG));
   const [error, setError] = useState<string | null>(null);
+  const [selectedCard, setSelectedCard] = useState<CardInstance | null>(null);
   const currentDie = PHASE_DIE[game.phase] ?? null;
   const currentFaces = currentDie ? DIE_FACES[currentDie] : [];
   const currentRevisionEvents = game.eventLog.filter(
     (event) => event.revision === game.revision,
   );
-  const lastRoll = currentRevisionEvents.find(
-    (event) => event.kind === "die_roll",
-  );
+  const lastRoll = game.eventLog.findLast((event) => event.kind === "die_roll");
   const battingTeamName =
     game.config[game.battingTeam === "away" ? "awayTeamName" : "homeTeamName"];
-  const fieldingTeamName =
-    game.config[game.battingTeam === "away" ? "homeTeamName" : "awayTeamName"];
-  const actionOwnerLabel =
-    game.phase === "awaiting_pitch"
-      ? `${fieldingTeamName} 수비`
-      : `${battingTeamName} 공격`;
+  const actionOwner = getActionOwner(game);
+  const actionOwnerLabel = actionOwner
+    ? `${game.config[actionOwner === "away" ? "awayTeamName" : "homeTeamName"]} ${actionOwner === game.battingTeam ? "공격" : "수비"}`
+    : "경기 종료";
 
   function dispatchResult(kind: DieKind, face: DieFace) {
     const action = actionFor(kind, face);
@@ -85,6 +100,18 @@ export default function BaseballGameDebug() {
     }
     setError(null);
     setGame(result.state);
+    setSelectedCard(null);
+  }
+
+  function dispatchAction(action: GameAction) {
+    const result = transition(game, action);
+    if (!result.ok) {
+      setError(result.error.message);
+      return;
+    }
+    setError(null);
+    setGame(result.state);
+    setSelectedCard(null);
   }
 
   function rollCurrentDie() {
@@ -94,8 +121,9 @@ export default function BaseballGameDebug() {
 
   function startGame(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    setGame(createGame(draft));
+    setGame(createGame(draft, { seed: createRandomSeed() }));
     setError(null);
+    setSelectedCard(null);
     setupDetailsRef.current?.removeAttribute("open");
   }
 
@@ -112,7 +140,7 @@ export default function BaseballGameDebug() {
           </span>
           <span>
             <strong>야구 게임</strong>
-            <small>CORE-V1 · LOCAL DEBUG</small>
+            <small>CARDS-V1 · OPEN HANDS</small>
           </span>
         </Link>
         <div className="bbg-topbar-side">
@@ -195,6 +223,20 @@ export default function BaseballGameDebug() {
                   {game.score.away} : {game.score.home} 승리
                 </p>
               </div>
+            ) : game.phase === "awaiting_card" ? (
+              <CardDecision
+                game={game}
+                onConfirm={() => {
+                  if (selectedCard) {
+                    dispatchAction({
+                      type: "PLAY_CARD",
+                      cardInstanceId: selectedCard.instanceId,
+                    });
+                  }
+                }}
+                onPass={() => dispatchAction({ type: "PASS_CARD_WINDOW" })}
+                selectedCard={selectedCard}
+              />
             ) : currentDie ? (
               <QuickRollButton
                 actionOwnerLabel={actionOwnerLabel}
@@ -206,6 +248,12 @@ export default function BaseballGameDebug() {
             ) : null}
 
             <p className="bbg-die-help">{PHASE_COPY[game.phase]}</p>
+
+            <CardHands
+              game={game}
+              onSelect={setSelectedCard}
+              selectedCard={selectedCard}
+            />
 
             {game.phase !== "finished" ? (
               <details className="bbg-force-panel">
@@ -325,6 +373,156 @@ export default function BaseballGameDebug() {
       </main>
     </div>
   );
+}
+
+function CardDecision({
+  game,
+  onConfirm,
+  onPass,
+  selectedCard,
+}: {
+  game: GameState;
+  onConfirm: () => void;
+  onPass: () => void;
+  selectedCard: CardInstance | null;
+}) {
+  const role = currentCardRole(game);
+  const respondingTo = game.cardWindow?.respondingTo;
+  const definition = selectedCard
+    ? CARD_DEFINITIONS[selectedCard.cardId]
+    : null;
+  return (
+    <div className="bbg-card-decision" aria-live="polite">
+      <div>
+        <span>
+          <Layers3 aria-hidden="true" size={14} />
+          {respondingTo ? "RESPONSE" : "STRATEGY"}
+        </span>
+        <strong>
+          {respondingTo
+            ? `${CARD_DEFINITIONS[respondingTo.cardId].name} 대응`
+            : `${role === "offense" ? "공격" : "수비"} 카드 선택`}
+        </strong>
+        <p>
+          {definition?.description ??
+            "사용할 카드를 고르거나 카드 없이 경기를 계속하세요."}
+        </p>
+      </div>
+      <div className="bbg-card-decision-actions">
+        <button disabled={!selectedCard} onClick={onConfirm} type="button">
+          {definition ? `${definition.id} 사용` : "카드 선택"}
+        </button>
+        <button onClick={onPass} type="button">
+          카드 없이 진행
+        </button>
+      </div>
+    </div>
+  );
+}
+
+function CardHands({
+  game,
+  onSelect,
+  selectedCard,
+}: {
+  game: GameState;
+  onSelect: (card: CardInstance) => void;
+  selectedCard: CardInstance | null;
+}) {
+  const activeRole =
+    game.phase === "awaiting_card" ? currentCardRole(game) : null;
+  return (
+    <div className="bbg-card-hands" aria-label="공개 전략카드 손패">
+      {(["offense", "defense"] as const).map((role) => (
+        <CardHand
+          active={activeRole === role}
+          availability={getLegalCards(game, role)}
+          game={game}
+          key={role}
+          onSelect={onSelect}
+          role={role}
+          selectedCard={selectedCard}
+        />
+      ))}
+    </div>
+  );
+}
+
+function CardHand({
+  active,
+  availability,
+  game,
+  onSelect,
+  role,
+  selectedCard,
+}: {
+  active: boolean;
+  availability: CardAvailability[];
+  game: GameState;
+  onSelect: (card: CardInstance) => void;
+  role: CardRole;
+  selectedCard: CardInstance | null;
+}) {
+  const team =
+    role === "offense"
+      ? game.battingTeam
+      : game.battingTeam === "away"
+        ? "home"
+        : "away";
+  const teamName =
+    game.config[team === "away" ? "awayTeamName" : "homeTeamName"];
+  return (
+    <section
+      className={`bbg-card-hand${active ? "is-active" : ""}`}
+      aria-label={`${teamName} ${role === "offense" ? "공격" : "수비"} 손패`}
+    >
+      <header>
+        <span>{role === "offense" ? "OFFENSE" : "DEFENSE"}</span>
+        <strong>{teamName}</strong>
+        <small>덱 {game.cards[role].drawPile.length}</small>
+      </header>
+      <div>
+        {availability.map(({ instance, playable, reason }) => {
+          const definition = CARD_DEFINITIONS[instance.cardId];
+          return (
+            <button
+              aria-label={`${definition.id} ${definition.name}${playable ? " 사용 가능" : ` 사용 불가: ${reason}`}`}
+              className={
+                selectedCard?.instanceId === instance.instanceId
+                  ? "is-selected"
+                  : undefined
+              }
+              data-playable={playable}
+              disabled={!playable}
+              key={instance.instanceId}
+              onClick={() => onSelect(instance)}
+              title={reason ?? definition.description}
+              type="button"
+            >
+              <b>{definition.id}</b>
+              <span>{definition.name}</span>
+              <small>{playable ? "사용 가능" : reason}</small>
+            </button>
+          );
+        })}
+      </div>
+    </section>
+  );
+}
+
+function currentCardRole(game: GameState): CardRole {
+  const window = game.cardWindow;
+  if (!window) return "offense";
+  if (window.respondingTo) {
+    return window.respondingTo.role === "offense" ? "defense" : "offense";
+  }
+  return window.priorityOrder[window.priorityIndex] ?? "offense";
+}
+
+function createRandomSeed() {
+  const values = new Uint32Array(1);
+  globalThis.crypto.getRandomValues(values);
+  return values[0];
 }
 
 function actionFor(kind: DieKind, face: DieFace): GameAction {
@@ -787,6 +985,14 @@ function PlayResult({
     events.findLast((item) => item.kind === "half_inning") ??
     events.at(-1);
   const sideChange = events.some((item) => item.kind === "half_inning");
+  const lastDieIndex = game.eventLog.findLastIndex(
+    (item) => item.kind === "die_roll",
+  );
+  const cardChain = game.eventLog
+    .slice(lastDieIndex + 1)
+    .filter((item) => item.kind === "card_play")
+    .slice(-4);
+  const displayToken = event?.cardId ?? face;
   const tone = !event
     ? "ready"
     : event.kind === "game_end"
@@ -807,16 +1013,18 @@ function PlayResult({
       data-testid="play-result"
     >
       <div className="bbg-result-die" aria-hidden="true">
-        <small>{face ? "D12" : "NEXT"}</small>
-        <strong>{face ?? "▶"}</strong>
+        <small>{event?.cardId ? "CARD" : face ? "D12" : "NEXT"}</small>
+        <strong>{displayToken ?? "▶"}</strong>
       </div>
       <div className="bbg-result-copy">
         <span>{event ? "방금 판정" : "PLAY BALL"}</span>
         <h2>{event?.summary ?? "첫 투구를 준비하세요"}</h2>
         <p>
-          {face
-            ? `${face} · ${FACE_LABELS[face]}`
-            : "투구 주사위부터 경기 흐름을 시작합니다."}
+          {event?.cardId
+            ? CARD_DEFINITIONS[event.cardId].description
+            : face
+              ? `${face} · ${FACE_LABELS[face]}`
+              : "투구 주사위부터 경기 흐름을 시작합니다."}
         </p>
         <div className="bbg-impact-list">
           {event?.runs ? <b className="is-score">+{event.runs}점</b> : null}
@@ -829,6 +1037,13 @@ function PlayResult({
               B {game.balls} · S {game.strikes}
             </b>
           ) : null}
+          {cardChain.map((cardEvent) =>
+            cardEvent.cardId ? (
+              <b className="is-card" key={cardEvent.sequence}>
+                {cardEvent.cardId}
+              </b>
+            ) : null,
+          )}
         </div>
       </div>
       <div className="bbg-result-side">

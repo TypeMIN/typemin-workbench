@@ -1,6 +1,14 @@
 import { describe, expect, it } from "vitest";
 
-import { createGame, getLegalActions, transition } from "./engine";
+import {
+  createGame,
+  getActionOwner,
+  getGameView,
+  getLegalActions,
+  getLegalCards,
+  transition,
+} from "./engine";
+import { CARD_DECK_COUNTS, CARD_DEFINITIONS } from "./cards";
 import {
   BATTING_DIE_FACES,
   HIT_DIE_FACES,
@@ -10,6 +18,9 @@ import {
 import type {
   Bases,
   BattingFace,
+  CardId,
+  CardRole,
+  CardTiming,
   GameAction,
   GameState,
   HitFace,
@@ -30,6 +41,10 @@ function game(overrides: Partial<GameState> = {}) {
     config: { ...initial.config, ...overrides.config },
     bases: { ...initial.bases, ...overrides.bases },
     score: { ...initial.score, ...overrides.score },
+    cards: overrides.cards ?? {
+      offense: { drawPile: [], hand: [], discardPile: [] },
+      defense: { drawPile: [], hand: [], discardPile: [] },
+    },
     eventLog: [...(overrides.eventLog ?? initial.eventLog)],
   } as GameState;
 }
@@ -152,7 +167,7 @@ describe("pitch and phase flow", () => {
   });
 
   it("moves from contact to batting and from HIT to hit resolution", () => {
-    let state = pitch(createGame(CONFIG), "C");
+    let state = pitch(game(), "C");
     expect(state.phase).toBe("awaiting_batting");
     expect(getLegalActions(state)).toEqual(["BATTING_RESULT"]);
     state = apply(state, { type: "BATTING_RESULT", face: "HIT" });
@@ -344,7 +359,412 @@ describe("innings and game completion", () => {
       { type: "PITCH_RESULT", face: "SM" },
       { type: "PITCH_RESULT", face: "S" },
     ];
-    const replay = () => actions.reduce(apply, createGame(CONFIG));
+    const replay = () => actions.reduce(apply, game());
     expect(replay()).toEqual(replay());
+  });
+});
+
+function cardState({
+  bases = { first: false, second: false, third: false },
+  offense = [],
+  defense = [],
+  timing,
+  pendingResolution = null,
+  priorityOrder,
+  respondingTo = null,
+  overrides = {},
+}: {
+  bases?: Bases;
+  offense?: CardId[];
+  defense?: CardId[];
+  timing: CardTiming;
+  pendingResolution?: GameState["pendingResolution"];
+  priorityOrder?: CardRole[];
+  respondingTo?: { cardId: CardId; role: CardRole } | null;
+  overrides?: Partial<GameState>;
+}) {
+  const instances = (role: CardRole, cards: CardId[]) =>
+    cards.map((cardId, index) => ({
+      instanceId: `${role}-${cardId}-test-${index}`,
+      cardId,
+    }));
+  const order =
+    priorityOrder ??
+    (timing === "after_batting"
+      ? (["defense", "offense"] as CardRole[])
+      : (["offense", "defense"] as CardRole[]));
+  return game({
+    ...overrides,
+    phase: "awaiting_card",
+    bases,
+    cards: {
+      offense: {
+        drawPile: [],
+        hand: instances("offense", offense),
+        discardPile: [],
+      },
+      defense: {
+        drawPile: [],
+        hand: instances("defense", defense),
+        discardPile: [],
+      },
+    },
+    cardWindow: {
+      timing,
+      priorityOrder: order,
+      priorityIndex: 0,
+      respondingTo: respondingTo
+        ? {
+            instanceId: `${respondingTo.role}-${respondingTo.cardId}-primary`,
+            ...respondingTo,
+          }
+        : null,
+    },
+    pendingResolution,
+  });
+}
+
+function playCardId(state: GameState, cardId: CardId) {
+  const card = getLegalCards(state).find(
+    (item) => item.instance.cardId === cardId && item.playable,
+  );
+  if (!card) throw new Error(`${cardId} 카드를 사용할 수 없습니다.`);
+  return apply(state, {
+    type: "PLAY_CARD",
+    cardInstanceId: card.instance.instanceId,
+  });
+}
+
+const PRIMARY_CARD_SCENARIOS = [
+  ["HBP", "offense", "after_pitch", { kind: "pitch", face: "B" }],
+  ["WP", "offense", "after_pitch", { kind: "pitch", face: "B" }],
+  ["BK", "offense", "before_pitch", null],
+  ["SB2", "offense", "after_pitch", { kind: "pitch", face: "S" }],
+  ["SB3", "offense", "after_pitch", { kind: "pitch", face: "SM" }],
+  ["SBH", "offense", "after_pitch", { kind: "pitch", face: "B" }],
+  ["SB", "offense", "after_contact", { kind: "contact" }],
+  ["E", "offense", "after_batting", { kind: "batting", face: "GA" }],
+  ["GDP", "defense", "after_batting", { kind: "batting", face: "GF" }],
+  ["PO1", "defense", "before_pitch", null],
+  ["PO2", "defense", "before_pitch", null],
+  ["GBH", "defense", "after_batting", { kind: "batting", face: "GA" }],
+] as const;
+
+describe("cards-v1 strategy cards", () => {
+  it("builds the exact starter decks and deterministic four-card hands", () => {
+    const first = createGame(CONFIG, { seed: 20260904 });
+    const replay = createGame(CONFIG, { seed: 20260904 });
+    const total = (role: CardRole) => [
+      ...first.cards[role].drawPile,
+      ...first.cards[role].hand,
+      ...first.cards[role].discardPile,
+    ];
+
+    expect(first).toEqual(replay);
+    expect(first.cards.offense.hand).toHaveLength(4);
+    expect(first.cards.defense.hand).toHaveLength(4);
+    expect(total("offense")).toHaveLength(25);
+    expect(total("defense")).toHaveLength(21);
+    for (const role of ["offense", "defense"] as const) {
+      for (const cardId of CARD_DECK_COUNTS[role]) {
+        expect(
+          total(role).filter((card) => card.cardId === cardId),
+        ).toHaveLength(CARD_DEFINITIONS[cardId].copies);
+      }
+    }
+  });
+
+  it("redacts hands for public and opposing viewers", () => {
+    const state = createGame(CONFIG, { seed: 7 });
+    const publicView = getGameView(state, "public");
+    expect(publicView.cards.offense.hand).toBeNull();
+    expect(publicView).not.toHaveProperty("rng");
+    expect(getGameView(state, "away").cards.offense.hand).toHaveLength(4);
+    expect(getGameView(state, "away").cards.defense.hand).toBeNull();
+    expect(getGameView(state, "home").cards.defense.hand).toHaveLength(4);
+    expect(getGameView(state, "debug").cards.offense.hand).toHaveLength(4);
+  });
+
+  it.each([
+    ["HBP", "offense", "after_pitch", { kind: "pitch", face: "B" }, {}],
+    [
+      "WP",
+      "offense",
+      "after_pitch",
+      { kind: "pitch", face: "B" },
+      { first: true },
+    ],
+    ["BK", "offense", "before_pitch", null, { first: true }],
+    [
+      "SB2",
+      "offense",
+      "after_pitch",
+      { kind: "pitch", face: "S" },
+      { first: true },
+    ],
+    [
+      "SB3",
+      "offense",
+      "after_pitch",
+      { kind: "pitch", face: "SM" },
+      { second: true },
+    ],
+    [
+      "SBH",
+      "offense",
+      "after_pitch",
+      { kind: "pitch", face: "B" },
+      { third: true },
+    ],
+    ["SB", "offense", "after_contact", { kind: "contact" }, { first: true }],
+    ["E", "offense", "after_batting", { kind: "batting", face: "GA" }, {}],
+    [
+      "GDP",
+      "defense",
+      "after_batting",
+      { kind: "batting", face: "GF" },
+      { first: true },
+    ],
+    ["PO1", "defense", "before_pitch", null, { first: true }],
+    ["PO2", "defense", "before_pitch", null, { second: true }],
+    [
+      "GBH",
+      "defense",
+      "after_batting",
+      { kind: "batting", face: "GA" },
+      { second: true },
+    ],
+  ] as const)(
+    "recognizes %s as playable in its documented primary window",
+    (cardId, role, timing, pendingResolution, partialBases) => {
+      const state = cardState({
+        bases: { first: false, second: false, third: false, ...partialBases },
+        offense: role === "offense" ? [cardId] : [],
+        defense: role === "defense" ? [cardId] : [],
+        timing,
+        pendingResolution,
+        priorityOrder: [role],
+      });
+      expect(getLegalCards(state, role)).toEqual([
+        expect.objectContaining({
+          instance: expect.objectContaining({ cardId }),
+          playable: true,
+          reason: null,
+        }),
+      ]);
+    },
+  );
+
+  it.each([
+    ["POE", "offense", "PO1", "defense", "before_pitch"],
+    ["CS2", "defense", "SB2", "offense", "after_pitch"],
+    ["CS3", "defense", "SB3", "offense", "after_pitch"],
+    ["CSH", "defense", "SBH", "offense", "after_pitch"],
+    ["BD", "defense", "SB", "offense", "after_contact"],
+  ] as const)(
+    "recognizes %s as the matching response to %s",
+    (cardId, role, primaryId, primaryRole, timing) => {
+      const state = cardState({
+        offense: role === "offense" ? [cardId] : [],
+        defense: role === "defense" ? [cardId] : [],
+        timing,
+        respondingTo: { cardId: primaryId, role: primaryRole },
+      });
+      expect(getLegalCards(state, role)[0]).toMatchObject({
+        instance: { cardId },
+        playable: true,
+        reason: null,
+      });
+    },
+  );
+
+  it("refills used cards, recycles discards, and redraws at side changes", () => {
+    let state = cardState({
+      bases: { first: true, second: false, third: false },
+      offense: ["BK", "HBP", "WP", "SB2"],
+      timing: "before_pitch",
+      priorityOrder: ["offense"],
+    });
+    state.cards.offense.discardPile = [
+      { instanceId: "offense-E-recycle", cardId: "E" },
+    ];
+    state = playCardId(state, "BK");
+    expect(state.cards.offense.hand).toHaveLength(4);
+    expect(
+      [
+        ...state.cards.offense.hand,
+        ...state.cards.offense.drawPile,
+        ...state.cards.offense.discardPile,
+      ].map((card) => card.cardId),
+    ).toContain("E");
+
+    const sideChange = pitch(
+      game({
+        outs: 2,
+        strikes: 2,
+        cards: createGame(CONFIG, { seed: 99 }).cards,
+      }),
+      "S",
+    );
+    expect(sideChange.half).toBe("bottom");
+    expect(sideChange.cards.offense.hand).toHaveLength(4);
+    expect(sideChange.cards.defense.hand).toHaveLength(4);
+    for (const role of ["offense", "defense"] as const) {
+      const all = [
+        ...sideChange.cards[role].drawPile,
+        ...sideChange.cards[role].hand,
+        ...sideChange.cards[role].discardPile,
+      ];
+      expect(new Set(all.map((card) => card.instanceId)).size).toBe(all.length);
+    }
+  });
+
+  it("rejects an unavailable card without changing revision", () => {
+    const state = cardState({
+      timing: "before_pitch",
+      offense: ["HBP"],
+    });
+    const result = transition(state, {
+      type: "PLAY_CARD",
+      cardInstanceId: state.cards.offense.hand[0].instanceId,
+    });
+    expect(result.ok).toBe(false);
+    expect(result.state).toBe(state);
+    expect(result.state.revision).toBe(0);
+  });
+
+  it.each(
+    BASE_COMBINATIONS.flatMap((bases) =>
+      ([0, 1, 2] as const).flatMap((outs) =>
+        PRIMARY_CARD_SCENARIOS.map(
+          ([cardId, role, timing, pendingResolution]) =>
+            [bases, outs, cardId, role, timing, pendingResolution] as const,
+        ),
+      ),
+    ),
+  )(
+    "keeps card invariants for bases %o, %i outs, %s",
+    (bases, outs, cardId, role, timing, pendingResolution) => {
+      const state = cardState({
+        bases,
+        offense: role === "offense" ? [cardId] : [],
+        defense: role === "defense" ? [cardId] : [],
+        timing,
+        pendingResolution,
+        priorityOrder: [role],
+        overrides: { outs },
+      });
+      const card = getLegalCards(state, role)[0];
+      if (!card.playable) {
+        expect(card.reason).toBeTruthy();
+        return;
+      }
+      const next = playCardId(state, cardId);
+      expect([true, false]).toContain(next.bases.first);
+      expect([true, false]).toContain(next.bases.second);
+      expect([true, false]).toContain(next.bases.third);
+      expect([0, 1, 2]).toContain(next.outs);
+      expect(next.score.away).toBeGreaterThanOrEqual(0);
+      expect(next.revision).toBe(1);
+    },
+  );
+
+  it("chains a wild pitch and steal response before applying the ball", () => {
+    let state = cardState({
+      bases: { first: true, second: false, third: true },
+      offense: ["SB2", "WP"],
+      defense: ["CS2"],
+      timing: "after_pitch",
+      pendingResolution: { kind: "pitch", face: "B" },
+      priorityOrder: ["offense"],
+    });
+    expect(getActionOwner(state)).toBe("away");
+    state = playCardId(state, "SB2");
+    expect(getActionOwner(state)).toBe("home");
+    state = playCardId(state, "CS2");
+    expect(state.bases).toEqual({ first: false, second: false, third: true });
+    state = playCardId(state, "WP");
+    expect(state.score.away).toBe(1);
+    expect(state.balls).toBe(1);
+    expect(state.phase).toBe("awaiting_pitch");
+  });
+
+  it("uses POE to reverse a pickoff and refills both cards", () => {
+    let state = cardState({
+      bases: { first: true, second: false, third: false },
+      offense: ["BK", "POE"],
+      defense: ["PO1"],
+      timing: "before_pitch",
+      priorityOrder: ["defense"],
+    });
+    state = playCardId(state, "PO1");
+    state = playCardId(state, "POE");
+    expect(state.bases).toEqual({ first: false, second: true, third: false });
+    expect(state.outs).toBe(0);
+    expect(state.eventLog.map((event) => event.cardId)).toContain("POE");
+  });
+
+  it("resolves sacrifice bunt defense and ground-ball error responses", () => {
+    let bunt = cardState({
+      bases: { first: true, second: true, third: false },
+      offense: ["SB"],
+      defense: ["BD"],
+      timing: "after_contact",
+      pendingResolution: { kind: "contact" },
+      priorityOrder: ["offense"],
+    });
+    bunt = playCardId(bunt, "SB");
+    bunt = playCardId(bunt, "BD");
+    expect(bunt.bases).toEqual({ first: true, second: true, third: false });
+    expect(bunt.outs).toBe(1);
+
+    let ground = cardState({
+      bases: { first: true, second: true, third: false },
+      offense: ["E"],
+      defense: ["GDP"],
+      timing: "after_batting",
+      pendingResolution: { kind: "batting", face: "GA" },
+    });
+    ground = playCardId(ground, "GDP");
+    ground = playCardId(ground, "E");
+    expect(ground.outs).toBe(0);
+    expect(ground.bases).toEqual({ first: true, second: true, third: true });
+  });
+
+  it("cancels a pending pitch on a card third out", () => {
+    let state = cardState({
+      bases: { first: true, second: false, third: false },
+      offense: ["SB2"],
+      defense: ["CS2"],
+      timing: "after_pitch",
+      pendingResolution: { kind: "pitch", face: "B" },
+      priorityOrder: ["offense"],
+      overrides: { outs: 2, balls: 2 },
+    });
+    state = playCardId(state, "SB2");
+    state = playCardId(state, "CS2");
+    expect(state.half).toBe("bottom");
+    expect(state.balls).toBe(0);
+    expect(state.pendingResolution).toBeNull();
+  });
+
+  it("finishes immediately on a walk-off home steal", () => {
+    let state = cardState({
+      bases: { first: false, second: false, third: true },
+      offense: ["SBH"],
+      timing: "after_pitch",
+      pendingResolution: { kind: "pitch", face: "S" },
+      priorityOrder: ["offense"],
+      overrides: {
+        inning: 3,
+        half: "bottom",
+        battingTeam: "home",
+        score: { away: 0, home: 0 },
+      },
+    });
+    state = playCardId(state, "SBH");
+    expect(state.phase).toBe("finished");
+    expect(state.winner).toBe("home");
+    expect(state.pendingResolution).toBeNull();
   });
 });

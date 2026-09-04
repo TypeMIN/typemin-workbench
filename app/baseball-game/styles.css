@@ -3512,3 +3512,350 @@
     font-size: 9px;
   }
 }
+
+/* Cards v1: both hands live in the manager console, never over the field. */
+.bbg-control-panel--broadcast {
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+  padding: 12px;
+  overflow: hidden;
+}
+
+.bbg-control-panel--broadcast .bbg-panel-heading,
+.bbg-control-panel--broadcast .bbg-phase-copy,
+.bbg-control-panel--broadcast .bbg-die-help,
+.bbg-control-panel--broadcast .bbg-force-panel,
+.bbg-control-panel--broadcast .bbg-d12-button {
+  flex: 0 0 auto;
+  margin-top: 0;
+}
+
+.bbg-control-panel--broadcast .bbg-phase-copy {
+  min-height: 48px;
+  padding: 7px 9px;
+}
+
+.bbg-control-panel--broadcast .bbg-phase-copy p {
+  display: none;
+}
+
+.bbg-control-panel--broadcast .bbg-d12-button {
+  gap: 3px;
+  padding: 0 6px 4px;
+}
+
+.bbg-control-panel--broadcast .bbg-d12 {
+  width: clamp(78px, 8vw, 104px);
+}
+
+.bbg-control-panel--broadcast .bbg-d12 > strong {
+  font-size: 28px;
+}
+
+.bbg-control-panel--broadcast .bbg-roll-caption strong {
+  font-size: 11px;
+}
+
+.bbg-control-panel--broadcast .bbg-roll-caption small,
+.bbg-control-panel--broadcast .bbg-die-help {
+  display: none;
+}
+
+.bbg-card-decision {
+  display: grid;
+  flex: 0 0 auto;
+  grid-template-columns: minmax(0, 1fr) 88px;
+  gap: 8px;
+  min-height: 91px;
+  padding: 9px;
+  border: 1px solid rgba(255, 209, 102, 0.32);
+  border-radius: 11px;
+  background: linear-gradient(135deg, rgba(255, 209, 102, 0.12), transparent);
+}
+
+.bbg-card-decision > div:first-child {
+  min-width: 0;
+}
+
+.bbg-card-decision > div:first-child > span {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  color: var(--bbg-yellow);
+  font-size: 7px;
+  font-weight: 950;
+  letter-spacing: 0.12em;
+}
+
+.bbg-card-decision strong {
+  display: block;
+  margin-top: 3px;
+  overflow: hidden;
+  font-size: 12px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.bbg-card-decision p {
+  display: -webkit-box;
+  margin: 4px 0 0;
+  overflow: hidden;
+  color: var(--bbg-muted);
+  font-size: 8px;
+  line-height: 1.35;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+}
+
+.bbg-card-decision-actions {
+  display: grid;
+  gap: 5px;
+}
+
+.bbg-card-decision-actions button {
+  border: 1px solid rgba(210, 226, 243, 0.2);
+  border-radius: 7px;
+  color: var(--bbg-text);
+  background: rgba(4, 11, 18, 0.75);
+  font-size: 8px;
+  font-weight: 900;
+  cursor: pointer;
+}
+
+.bbg-card-decision-actions button:first-child:not(:disabled) {
+  border-color: rgba(112, 240, 186, 0.62);
+  color: #05150f;
+  background: var(--bbg-mint);
+}
+
+.bbg-card-decision-actions button:disabled {
+  opacity: 0.38;
+  cursor: not-allowed;
+}
+
+.bbg-card-hands {
+  display: grid;
+  flex: 1 1 auto;
+  grid-template-rows: repeat(2, minmax(0, 1fr));
+  gap: 6px;
+  min-height: 164px;
+}
+
+.bbg-card-hand {
+  display: grid;
+  min-height: 0;
+  grid-template-rows: 20px minmax(0, 1fr);
+  padding: 5px;
+  overflow: hidden;
+  border: 1px solid rgba(210, 226, 243, 0.13);
+  border-radius: 10px;
+  background: rgba(3, 9, 15, 0.62);
+}
+
+.bbg-card-hand.is-active {
+  border-color: rgba(255, 209, 102, 0.62);
+  box-shadow: inset 3px 0 var(--bbg-yellow);
+}
+
+.bbg-card-hand > header {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 5px;
+  min-width: 0;
+  padding: 0 2px 4px;
+}
+
+.bbg-card-hand > header span {
+  color: var(--bbg-mint);
+  font-size: 6px;
+  font-weight: 950;
+  letter-spacing: 0.08em;
+}
+
+.bbg-card-hand:nth-child(2) > header span {
+  color: #91bfff;
+}
+
+.bbg-card-hand > header strong {
+  overflow: hidden;
+  font-size: 9px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.bbg-card-hand > header small {
+  color: var(--bbg-muted);
+  font-size: 6px;
+}
+
+.bbg-card-hand > div {
+  display: grid;
+  min-height: 0;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 4px;
+}
+
+.bbg-card-hand button {
+  display: grid;
+  min-width: 0;
+  min-height: 45px;
+  grid-template-columns: 30px minmax(0, 1fr);
+  align-content: center;
+  gap: 1px 4px;
+  padding: 5px 6px;
+  overflow: hidden;
+  border: 1px solid rgba(210, 226, 243, 0.17);
+  border-radius: 7px;
+  color: var(--bbg-text);
+  background: rgba(12, 27, 43, 0.92);
+  text-align: left;
+}
+
+.bbg-card-hand button[data-playable="true"] {
+  border-color: rgba(112, 240, 186, 0.48);
+  background: linear-gradient(135deg, rgba(38, 224, 155, 0.2), #0c1b2b 70%);
+  cursor: pointer;
+}
+
+.bbg-card-hand:nth-child(2) button[data-playable="true"] {
+  border-color: rgba(112, 168, 240, 0.55);
+  background: linear-gradient(135deg, rgba(75, 139, 225, 0.22), #0c1b2b 70%);
+}
+
+.bbg-card-hand button.is-selected {
+  border-color: var(--bbg-yellow);
+  box-shadow: 0 0 0 2px rgba(255, 209, 102, 0.2);
+}
+
+.bbg-card-hand button:disabled {
+  opacity: 0.5;
+}
+
+.bbg-card-hand button b {
+  grid-row: 1 / 3;
+  align-self: center;
+  color: var(--bbg-yellow);
+  font-size: 10px;
+}
+
+.bbg-card-hand button span,
+.bbg-card-hand button small {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.bbg-card-hand button span {
+  font-size: 8px;
+  font-weight: 850;
+}
+
+.bbg-card-hand button small {
+  color: var(--bbg-muted);
+  font-size: 6px;
+}
+
+.bbg-control-panel--broadcast .bbg-force-panel {
+  margin-top: 0;
+}
+
+@media (max-width: 680px) {
+  .bbg-game-console {
+    grid-template-rows: 366px 295px;
+  }
+
+  .bbg-control-panel--broadcast {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) 108px;
+    grid-template-rows: auto auto minmax(86px, 1fr) auto;
+    gap: 5px 8px;
+    padding: 8px;
+    overflow: hidden;
+  }
+
+  .bbg-control-panel--broadcast .bbg-panel-heading,
+  .bbg-control-panel--broadcast .bbg-phase-copy {
+    grid-column: 1;
+  }
+
+  .bbg-control-panel--broadcast .bbg-phase-copy {
+    margin: 0;
+  }
+
+  .bbg-control-panel--broadcast .bbg-d12-button {
+    grid-column: 2;
+    grid-row: 1 / 3;
+  }
+
+  .bbg-control-panel--broadcast .bbg-d12 {
+    width: 82px;
+  }
+
+  .bbg-card-decision {
+    grid-column: 1 / -1;
+    grid-row: 1 / 3;
+    min-height: 74px;
+  }
+
+  .bbg-card-hands {
+    display: grid;
+    grid-column: 1 / -1;
+    grid-row: 3;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    grid-template-rows: 1fr;
+    gap: 4px;
+    min-height: 86px;
+  }
+
+  .bbg-card-hand {
+    grid-template-rows: 16px minmax(0, 1fr);
+    padding: 3px;
+    border-radius: 7px;
+  }
+
+  .bbg-card-hand > header {
+    gap: 3px;
+    padding-bottom: 2px;
+  }
+
+  .bbg-card-hand > header strong {
+    font-size: 7px;
+  }
+
+  .bbg-card-hand > div {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 2px;
+  }
+
+  .bbg-card-hand button {
+    display: flex;
+    min-height: 0;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 1px;
+    padding: 3px 1px;
+    text-align: center;
+  }
+
+  .bbg-card-hand button b {
+    font-size: 8px;
+  }
+
+  .bbg-card-hand button span {
+    width: 100%;
+    font-size: 6px;
+  }
+
+  .bbg-card-hand button small {
+    display: none;
+  }
+
+  .bbg-control-panel--broadcast .bbg-force-panel {
+    grid-column: 1 / -1;
+    grid-row: 4;
+  }
+}

@@ -1,4 +1,12 @@
-export { createGame, getLegalActions, transition } from "./engine";
+export {
+  createGame,
+  getActionOwner,
+  getGameView,
+  getLegalActions,
+  getLegalCards,
+  transition,
+} from "./engine";
+export { CARD_DECK_COUNTS, CARD_DEFINITIONS } from "./cards";
 export {
   BATTING_DIE_FACES,
   DIE_FACES,

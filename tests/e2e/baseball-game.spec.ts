@@ -26,6 +26,13 @@ test("야구 게임에서 강제 주사위 판정과 새 경기를 진행한다"
     page.getByRole("button", { name: "투구 주사위 굴리기" }),
   ).toBeVisible();
   await expect(page.locator(".bbg-d12")).toBeVisible();
+  await expect(
+    page.getByRole("region", { name: "원정팀 공격 손패" }),
+  ).toBeVisible();
+  await expect(
+    page.getByRole("region", { name: "홈팀 수비 손패" }),
+  ).toBeVisible();
+  await expect(page.locator(".bbg-card-hand button")).toHaveCount(8);
   await expect(page.getByLabel("원정팀 공격 중")).toContainText("원정팀 공격");
   await expect(page.locator(".bbg-fence")).toBeVisible();
   await expect(page.locator(".bbg-fielders")).toHaveCount(0);
@@ -111,6 +118,19 @@ test("야구 게임에서 강제 주사위 판정과 새 경기를 진행한다"
   await expect(page.getByTestId("play-result")).toContainText("타자");
   await expect(page.getByTestId("play-result")).toContainText("1루");
 
+  await page.getByRole("button", { name: /BK 보크 사용 가능/ }).click();
+  await expect(page.getByText(/투구 전에 모든 주자가/)).toBeVisible();
+  await page.getByRole("button", { name: "BK 사용" }).click();
+  await expect(page.getByRole("img", { name: /2루 주자 있음/ })).toBeVisible();
+  while (
+    await page
+      .getByRole("button", { name: "카드 없이 진행" })
+      .isVisible()
+      .catch(() => false)
+  ) {
+    await page.getByRole("button", { name: "카드 없이 진행" }).click();
+  }
+
   await page.getByText("새 경기 설정", { exact: true }).click();
   await page.getByRole("textbox", { name: "원정팀" }).fill("블루");
   await page.getByRole("textbox", { name: "홈팀" }).fill("레드");
@@ -120,11 +140,25 @@ test("야구 게임에서 강제 주사위 판정과 새 경기를 진행한다"
 
   await page.setViewportSize({ width: 390, height: 844 });
   await expect(page.getByRole("heading", { name: "현재 판정" })).toBeVisible();
+  await expect(page.locator(".bbg-card-hand button")).toHaveCount(8);
   expect(
     await page.evaluate(
       () => document.documentElement.scrollWidth <= window.innerWidth,
     ),
   ).toBe(true);
+  const cardsFit = await page.locator(".bbg-card-hands").evaluate((element) => {
+    const rect = element.getBoundingClientRect();
+    const consoleRect = element
+      .closest(".bbg-game-console")
+      ?.getBoundingClientRect();
+    return {
+      bottom: rect.bottom,
+      consoleBottom: consoleRect?.bottom ?? 0,
+      viewportBottom: window.innerHeight,
+    };
+  });
+  expect(cardsFit.bottom).toBeLessThanOrEqual(cardsFit.consoleBottom + 1);
+  expect(cardsFit.bottom).toBeLessThanOrEqual(cardsFit.viewportBottom);
   expect(
     await page.evaluate(
       () => document.documentElement.scrollHeight <= window.innerHeight,
