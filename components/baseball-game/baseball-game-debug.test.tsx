@@ -114,7 +114,8 @@ describe("BaseballGameDebug", () => {
     const scoreboard = screen.getByRole("region", { name: /경기 점수판/ });
     expect(within(scoreboard).getByText("블루")).toBeVisible();
     expect(within(scoreboard).getByText("레드")).toBeVisible();
-    expect(screen.getByText("5이닝 경기")).toBeVisible();
-    expect(screen.getByText(/REV 0/)).toBeVisible();
+    expect(document.querySelector(".bbg-game-length")).toHaveTextContent(
+      "5이닝",
+    );
   });
 });

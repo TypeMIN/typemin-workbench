@@ -34,6 +34,10 @@ test("야구 게임에서 강제 주사위 판정과 새 경기를 진행한다"
     "preserveAspectRatio",
     "xMidYMid meet",
   );
+  await expect(page.locator(".bbg-stadium svg")).toHaveAttribute(
+    "viewBox",
+    "0 0 900 700",
+  );
   await expect(page.getByRole("img", { name: /주자 없음/ })).toBeVisible();
   await expect(page.locator("[data-nextjs-dialog]")).toHaveCount(0);
 
@@ -55,6 +59,36 @@ test("야구 게임에서 강제 주사위 판정과 새 경기를 진행한다"
   expect(baseLayout.first.x).toBeGreaterThan(baseLayout.second.x);
   expect(baseLayout.third.x).toBeLessThan(baseLayout.second.x);
   expect(Math.abs(baseLayout.first.y - baseLayout.third.y)).toBeLessThan(4);
+
+  const broadcastFit = await page.evaluate(() => {
+    const bounds = (selector: string) => {
+      const element = document.querySelector(selector);
+      if (!element) throw new Error(`${selector} 영역을 찾지 못했습니다.`);
+      const rect = element.getBoundingClientRect();
+      return { top: rect.top, bottom: rect.bottom };
+    };
+    return {
+      viewportBottom: window.innerHeight,
+      console: bounds(".bbg-game-console"),
+      heading: bounds(".bbg-broadcast-heading"),
+      field: bounds(".bbg-field-content"),
+      result: bounds(".bbg-play-result"),
+      resultCopy: bounds(".bbg-result-copy"),
+      resultSide: bounds(".bbg-result-side"),
+    };
+  });
+  expect(broadcastFit.console.bottom).toBeLessThanOrEqual(
+    broadcastFit.viewportBottom,
+  );
+  expect(broadcastFit.heading.bottom).toBeLessThanOrEqual(
+    broadcastFit.field.top + 1,
+  );
+  expect(broadcastFit.resultCopy.bottom).toBeLessThanOrEqual(
+    broadcastFit.result.bottom + 1,
+  );
+  expect(broadcastFit.resultSide.bottom).toBeLessThanOrEqual(
+    broadcastFit.result.bottom + 1,
+  );
 
   await page.getByText("특정 면 강제 입력").click();
   await page.getByRole("button", { name: /9번 면 C 컨택/ }).click();
@@ -82,10 +116,7 @@ test("야구 게임에서 강제 주사위 판정과 새 경기를 진행한다"
   await page.getByRole("textbox", { name: "홈팀" }).fill("레드");
   await page.getByLabel("경기 길이").selectOption("5");
   await page.getByRole("button", { name: /새 경기 시작/ }).click();
-  await expect(
-    page.locator(".bbg-broadcast-heading").getByText(/5이닝 경기/),
-  ).toBeVisible();
-  await expect(page.getByText(/REV 0/)).toBeVisible();
+  await expect(page.locator(".bbg-game-length")).toHaveText("5이닝");
 
   await page.setViewportSize({ width: 390, height: 844 });
   await expect(page.getByRole("heading", { name: "현재 판정" })).toBeVisible();

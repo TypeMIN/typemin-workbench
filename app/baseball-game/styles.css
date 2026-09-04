@@ -3161,3 +3161,339 @@
     animation: none;
   }
 }
+
+/* Compact broadcast strip: all public game data stays outside the field. */
+.bbg-game-console .bbg-broadcast-stage {
+  grid-template-rows: 64px minmax(0, 1fr) 72px;
+}
+
+.bbg-game-console .bbg-broadcast-heading {
+  display: grid;
+  grid-template-columns: auto minmax(112px, 0.52fr) minmax(250px, 1fr);
+  align-items: stretch;
+  gap: 8px;
+  min-width: 0;
+  min-height: 64px;
+  padding: 6px 10px;
+}
+
+.bbg-game-console .bbg-broadcast-heading > div:first-child {
+  align-self: center;
+  min-width: 108px;
+  gap: 6px;
+}
+
+.bbg-game-console .bbg-game-length {
+  color: var(--bbg-muted);
+  font-size: 7px;
+  font-weight: 850;
+  white-space: nowrap;
+}
+
+.bbg-broadcast-heading > .bbg-offense-indicator {
+  position: relative;
+  top: auto;
+  left: auto;
+  min-width: 0;
+  max-width: none;
+  justify-content: center;
+  padding: 6px 8px 6px 11px;
+  border-radius: 7px;
+  background: rgba(8, 19, 30, 0.76);
+  box-shadow: none;
+}
+
+.bbg-broadcast-heading > .bbg-offense-indicator > span,
+.bbg-broadcast-heading > .bbg-scoreboard span {
+  padding: 0;
+  border-radius: 0;
+  background: transparent;
+}
+
+.bbg-broadcast-heading > .bbg-offense-indicator > strong {
+  max-width: 110px;
+  overflow: hidden;
+  font-size: 12px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.bbg-broadcast-heading > .bbg-scoreboard {
+  display: grid;
+  position: relative;
+  top: auto;
+  right: auto;
+  width: auto;
+  min-width: 0;
+  min-height: 0;
+  grid-template-columns: minmax(96px, 1fr) 46px 84px;
+  grid-template-areas: "teams inning counts";
+  overflow: hidden;
+  border: 1px solid rgba(210, 226, 243, 0.16);
+  border-radius: 7px;
+  background: rgba(8, 19, 30, 0.76);
+  box-shadow: none;
+  backdrop-filter: none;
+}
+
+.bbg-broadcast-heading > .bbg-scoreboard .bbg-live-channel,
+.bbg-broadcast-heading > .bbg-scoreboard .bbg-broadcast-bases {
+  display: none;
+}
+
+.bbg-broadcast-heading > .bbg-scoreboard .bbg-score-teams {
+  display: grid;
+  grid-area: teams;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.bbg-broadcast-heading > .bbg-scoreboard .bbg-team-score {
+  grid-template-columns: 24px minmax(0, 1fr) 16px;
+  min-height: 50px;
+  gap: 4px;
+  padding: 2px 6px;
+}
+
+.bbg-broadcast-heading > .bbg-scoreboard .bbg-team-score + .bbg-team-score {
+  border-top: 0;
+  border-left: 1px solid rgba(210, 226, 243, 0.12);
+}
+
+.bbg-broadcast-heading > .bbg-scoreboard .bbg-team-score > span {
+  font-size: 6px;
+}
+
+.bbg-broadcast-heading > .bbg-scoreboard .bbg-team-score > strong {
+  overflow: hidden;
+  font-size: 9px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.bbg-broadcast-heading > .bbg-scoreboard .bbg-team-score > b {
+  font-size: 13px;
+}
+
+.bbg-broadcast-heading > .bbg-scoreboard .bbg-inning-block {
+  grid-area: inning;
+  min-height: 50px;
+  border-right: 1px solid var(--bbg-line);
+}
+
+.bbg-broadcast-heading > .bbg-scoreboard .bbg-inning-block strong {
+  font-size: 16px;
+}
+
+.bbg-broadcast-heading > .bbg-scoreboard .bbg-broadcast-counts {
+  display: grid;
+  grid-area: counts;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  align-content: stretch;
+  gap: 1px;
+  min-width: 0;
+  padding: 0;
+  border: 0;
+  background: rgba(210, 226, 243, 0.08);
+}
+
+.bbg-broadcast-heading > .bbg-scoreboard .bbg-broadcast-counts > span {
+  display: grid;
+  min-width: 0;
+  place-content: center;
+  gap: 2px;
+  color: var(--bbg-muted);
+  background: #080f19;
+  text-align: center;
+}
+
+.bbg-broadcast-heading > .bbg-scoreboard .bbg-broadcast-counts b {
+  font-size: 8px;
+}
+
+.bbg-broadcast-heading > .bbg-scoreboard .bbg-broadcast-counts em {
+  color: #fff;
+  font-size: 13px;
+  font-style: normal;
+  font-weight: 900;
+  line-height: 1;
+}
+
+.bbg-broadcast-heading
+  > .bbg-scoreboard
+  .bbg-broadcast-counts
+  > span[data-tone="ball"]
+  b {
+  color: var(--bbg-mint);
+}
+
+.bbg-broadcast-heading
+  > .bbg-scoreboard
+  .bbg-broadcast-counts
+  > span[data-tone="strike"]
+  b {
+  color: var(--bbg-yellow);
+}
+
+.bbg-broadcast-heading
+  > .bbg-scoreboard
+  .bbg-broadcast-counts
+  > span[data-tone="out"]
+  b {
+  color: var(--bbg-red);
+}
+
+.bbg-game-console .bbg-play-result {
+  grid-template-columns: 46px minmax(0, 1fr) minmax(86px, auto);
+  gap: 10px;
+  height: 72px;
+  padding: 7px 12px;
+  overflow: hidden;
+}
+
+.bbg-game-console .bbg-result-die {
+  width: 44px;
+  height: 44px;
+}
+
+.bbg-game-console .bbg-result-die strong {
+  font-size: 18px;
+}
+
+.bbg-game-console .bbg-result-copy > span {
+  font-size: 7px;
+}
+
+.bbg-game-console .bbg-result-copy h2 {
+  margin-top: 2px;
+  font-size: clamp(14px, 1.6vw, 18px);
+  line-height: 1.15;
+}
+
+.bbg-game-console .bbg-result-copy p,
+.bbg-game-console .bbg-move-list {
+  display: none;
+}
+
+.bbg-game-console .bbg-impact-list {
+  gap: 3px;
+  margin-top: 3px;
+}
+
+.bbg-game-console .bbg-impact-list b {
+  padding: 2px 5px;
+  font-size: 7px;
+}
+
+.bbg-game-console .bbg-result-side {
+  gap: 0;
+  padding-left: 10px;
+}
+
+@media (max-width: 1400px) {
+  .bbg-game-console .bbg-broadcast-heading {
+    grid-template-columns: 50px minmax(118px, 180px) minmax(260px, 1fr);
+  }
+
+  .bbg-game-console .bbg-broadcast-heading > div:first-child {
+    min-width: 0;
+  }
+
+  .bbg-game-console .bbg-broadcast-heading h1 {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    padding: 0;
+    overflow: hidden;
+    clip: rect(0 0 0 0);
+    white-space: nowrap;
+  }
+}
+
+@media (max-width: 680px) {
+  .bbg-game-console .bbg-broadcast-stage {
+    grid-template-rows: 58px minmax(0, 1fr) 62px;
+  }
+
+  .bbg-game-console .bbg-broadcast-heading {
+    grid-template-columns: 42px minmax(96px, 0.7fr) minmax(170px, 1.3fr);
+    gap: 5px;
+    min-height: 58px;
+    padding: 5px 6px;
+  }
+
+  .bbg-game-console .bbg-game-length {
+    display: none;
+  }
+
+  .bbg-broadcast-heading > .bbg-offense-indicator {
+    top: auto;
+    left: auto;
+    max-width: none;
+    gap: 4px;
+    padding: 5px 6px 5px 9px;
+  }
+
+  .bbg-broadcast-heading > .bbg-offense-indicator > span {
+    font-size: 5px;
+  }
+
+  .bbg-broadcast-heading > .bbg-offense-indicator > strong {
+    max-width: 70px;
+    font-size: 9px;
+  }
+
+  .bbg-broadcast-heading > .bbg-scoreboard {
+    top: auto;
+    right: auto;
+    width: auto;
+    grid-template-columns: minmax(88px, 1fr) 38px 55px;
+    grid-template-areas: "teams inning counts";
+  }
+
+  .bbg-broadcast-heading > .bbg-scoreboard .bbg-team-score {
+    grid-template-columns: minmax(0, 1fr) 13px;
+    min-height: 46px;
+    padding: 2px 4px;
+  }
+
+  .bbg-broadcast-heading > .bbg-scoreboard .bbg-team-score > span {
+    display: none;
+  }
+
+  .bbg-broadcast-heading > .bbg-scoreboard .bbg-inning-block {
+    min-height: 46px;
+  }
+
+  .bbg-broadcast-heading > .bbg-scoreboard .bbg-broadcast-counts {
+    display: grid;
+    padding: 0;
+  }
+
+  .bbg-broadcast-heading > .bbg-scoreboard .bbg-broadcast-counts em {
+    font-size: 11px;
+  }
+
+  .bbg-game-console .bbg-play-result {
+    grid-template-columns: 38px minmax(0, 1fr) 72px;
+    gap: 7px;
+    height: 62px;
+    padding: 6px 8px;
+  }
+
+  .bbg-game-console .bbg-result-die {
+    width: 36px;
+    height: 36px;
+  }
+
+  .bbg-game-console .bbg-result-copy h2 {
+    font-size: 13px;
+  }
+
+  .bbg-game-console .bbg-result-side {
+    padding-left: 7px;
+  }
+
+  .bbg-game-console .bbg-next-play strong {
+    font-size: 9px;
+  }
+}
