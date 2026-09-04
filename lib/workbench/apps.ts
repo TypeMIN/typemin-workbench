@@ -8,6 +8,14 @@ export const WORKBENCH_APPS = [
     accent: "meal",
   },
   {
+    name: "야구 게임",
+    emoji: "⚾",
+    keywords: ["D12 야구", "규칙 엔진"],
+    href: "/baseball-game",
+    status: "available",
+    accent: "baseball",
+  },
+  {
     name: "월드컵 예측 내기",
     emoji: "⚽",
     keywords: ["예측 결과", "점수판"],

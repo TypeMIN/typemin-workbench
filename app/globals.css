@@ -512,6 +512,11 @@ a {
   --app-accent-soft: #fff0e6;
 }
 
+.workbench-card--baseball {
+  --app-accent: #08795b;
+  --app-accent-soft: #e6f8f1;
+}
+
 .workbench-card--worldcup {
   --app-accent: #315acb;
   --app-accent-soft: #edf2ff;

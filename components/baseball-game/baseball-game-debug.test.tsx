@@ -1,0 +1,108 @@
+import { fireEvent, render, screen, within } from "@testing-library/react";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+
+import BaseballGameDebug from "./baseball-game-debug";
+
+describe("BaseballGameDebug", () => {
+  beforeEach(() => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(() => new Promise(() => undefined)),
+    );
+  });
+
+  afterEach(() => {
+    vi.restoreAllMocks();
+    vi.unstubAllGlobals();
+  });
+
+  it("renders the initial local game state and forced D12 faces", () => {
+    const { container } = render(<BaseballGameDebug />);
+
+    expect(
+      screen.getByRole("heading", { name: "야구 게임 라이브" }),
+    ).toBeVisible();
+    expect(screen.getByText(/투구 결과를 정합니다/)).toBeVisible();
+    expect(
+      screen.getByRole("region", {
+        name: /경기 점수판, 1회초, 무사, 주자 없음/,
+      }),
+    ).toBeVisible();
+    expect(screen.getByText("NOW AT BAT")).toBeVisible();
+    expect(screen.getByText("볼 0")).toBeVisible();
+    expect(screen.getByText("스트라이크 0")).toBeVisible();
+    expect(
+      screen.getByRole("heading", { name: "첫 투구를 준비하세요" }),
+    ).toBeVisible();
+    expect(
+      screen.getByRole("button", { name: "투구 주사위 굴리기" }),
+    ).toBeVisible();
+    expect(screen.getAllByRole("button", { name: /번 면/ })).toHaveLength(12);
+    expect(screen.getByRole("img", { name: "주자 없음" })).toBeVisible();
+    expect(container.querySelectorAll(".bbg-team-score")).toHaveLength(2);
+    expect(
+      container.querySelectorAll(".bbg-team-score.is-batting"),
+    ).toHaveLength(1);
+  });
+
+  it("supports random rolls and exact forced-result phase changes", () => {
+    vi.spyOn(Math, "random").mockReturnValue(0);
+    render(<BaseballGameDebug />);
+
+    fireEvent.click(screen.getByRole("button", { name: "투구 주사위 굴리기" }));
+    expect(screen.getAllByText("스트라이크 1").length).toBeGreaterThan(0);
+    expect(screen.getByText("같은 타자에게 다음 투구")).toBeVisible();
+
+    fireEvent.click(screen.getByRole("button", { name: /9번 면 C 컨택/ }));
+    expect(
+      screen.getByRole("button", { name: "타격 주사위 굴리기" }),
+    ).toBeVisible();
+    expect(screen.getByText(/공이 배트에 맞았습니다/)).toBeVisible();
+
+    fireEvent.click(screen.getByRole("button", { name: /9번 면 HIT 안타/ }));
+    expect(
+      screen.getByRole("button", { name: "안타 주사위 굴리기" }),
+    ).toBeVisible();
+    expect(screen.getByText(/타구 방향과 모든 주자의 진루/)).toBeVisible();
+
+    fireEvent.click(
+      screen.getByRole("button", { name: /1번 면 IH 내야 안타/ }),
+    );
+    expect(screen.getByRole("img", { name: "1루 주자 있음" })).toBeVisible();
+    const result = screen.getByTestId("play-result");
+    expect(
+      within(result).getByRole("heading", { name: "IH 단타" }),
+    ).toBeVisible();
+    expect(within(result).getByText("타자")).toBeVisible();
+    expect(within(result).getByText("1루")).toBeVisible();
+    expect(
+      screen.getByRole("button", { name: "투구 주사위 굴리기" }),
+    ).toBeVisible();
+  });
+
+  it("creates a new game from edited team names and innings", () => {
+    render(<BaseballGameDebug />);
+    const setup = screen
+      .getByRole("heading", { name: "경기 다시 만들기" })
+      .closest("section");
+    if (!setup) throw new Error("새 경기 패널을 찾지 못했습니다.");
+    const form = within(setup);
+
+    fireEvent.change(form.getByLabelText("원정팀"), {
+      target: { value: "블루" },
+    });
+    fireEvent.change(form.getByLabelText("홈팀"), {
+      target: { value: "레드" },
+    });
+    fireEvent.change(form.getByLabelText("경기 길이"), {
+      target: { value: "5" },
+    });
+    fireEvent.click(form.getByRole("button", { name: /새 경기 시작/ }));
+
+    const scoreboard = screen.getByRole("region", { name: /경기 점수판/ });
+    expect(within(scoreboard).getByText("블루")).toBeVisible();
+    expect(within(scoreboard).getByText("레드")).toBeVisible();
+    expect(screen.getByText("5이닝 경기")).toBeVisible();
+    expect(screen.getByText(/REV 0/)).toBeVisible();
+  });
+});
