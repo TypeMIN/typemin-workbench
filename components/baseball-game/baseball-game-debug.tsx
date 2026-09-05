@@ -28,7 +28,6 @@ import {
 import type {
   BattingFace,
   CardAvailability,
-  CardInstance,
   CardRole,
   DieFace,
   DieKind,
@@ -77,7 +76,6 @@ export default function BaseballGameDebug() {
   const [draft, setDraft] = useState<GameConfig>(DEFAULT_CONFIG);
   const [game, setGame] = useState(() => createGame(DEFAULT_CONFIG));
   const [error, setError] = useState<string | null>(null);
-  const [selectedCard, setSelectedCard] = useState<CardInstance | null>(null);
   const currentDie = PHASE_DIE[game.phase] ?? null;
   const currentFaces = currentDie ? DIE_FACES[currentDie] : [];
   const currentRevisionEvents = game.eventLog.filter(
@@ -100,7 +98,6 @@ export default function BaseballGameDebug() {
     }
     setError(null);
     setGame(result.state);
-    setSelectedCard(null);
   }
 
   function dispatchAction(action: GameAction) {
@@ -111,7 +108,6 @@ export default function BaseballGameDebug() {
     }
     setError(null);
     setGame(result.state);
-    setSelectedCard(null);
   }
 
   function rollCurrentDie() {
@@ -123,7 +119,6 @@ export default function BaseballGameDebug() {
     event.preventDefault();
     setGame(createGame(draft, { seed: createRandomSeed() }));
     setError(null);
-    setSelectedCard(null);
     setupDetailsRef.current?.removeAttribute("open");
   }
 
@@ -226,16 +221,7 @@ export default function BaseballGameDebug() {
             ) : game.phase === "awaiting_card" ? (
               <CardDecision
                 game={game}
-                onConfirm={() => {
-                  if (selectedCard) {
-                    dispatchAction({
-                      type: "PLAY_CARD",
-                      cardInstanceId: selectedCard.instanceId,
-                    });
-                  }
-                }}
                 onPass={() => dispatchAction({ type: "PASS_CARD_WINDOW" })}
-                selectedCard={selectedCard}
               />
             ) : currentDie ? (
               <QuickRollButton
@@ -251,8 +237,9 @@ export default function BaseballGameDebug() {
 
             <CardHands
               game={game}
-              onSelect={setSelectedCard}
-              selectedCard={selectedCard}
+              onPlay={(cardInstanceId) =>
+                dispatchAction({ type: "PLAY_CARD", cardInstanceId })
+              }
             />
 
             {game.phase !== "finished" ? (
@@ -377,20 +364,13 @@ export default function BaseballGameDebug() {
 
 function CardDecision({
   game,
-  onConfirm,
   onPass,
-  selectedCard,
 }: {
   game: GameState;
-  onConfirm: () => void;
   onPass: () => void;
-  selectedCard: CardInstance | null;
 }) {
   const role = currentCardRole(game);
   const respondingTo = game.cardWindow?.respondingTo;
-  const definition = selectedCard
-    ? CARD_DEFINITIONS[selectedCard.cardId]
-    : null;
   return (
     <div className="bbg-card-decision" aria-live="polite">
       <div>
@@ -404,14 +384,11 @@ function CardDecision({
             : `${role === "offense" ? "공격" : "수비"} 카드 선택`}
         </strong>
         <p>
-          {definition?.description ??
-            "사용할 카드를 고르거나 카드 없이 경기를 계속하세요."}
+          사용할 카드를 누르면 즉시 적용됩니다. 사용하지 않으려면 카드 없이
+          진행하세요.
         </p>
       </div>
       <div className="bbg-card-decision-actions">
-        <button disabled={!selectedCard} onClick={onConfirm} type="button">
-          {definition ? `${definition.id} 사용` : "카드 선택"}
-        </button>
         <button onClick={onPass} type="button">
           카드 없이 진행
         </button>
@@ -422,12 +399,10 @@ function CardDecision({
 
 function CardHands({
   game,
-  onSelect,
-  selectedCard,
+  onPlay,
 }: {
   game: GameState;
-  onSelect: (card: CardInstance) => void;
-  selectedCard: CardInstance | null;
+  onPlay: (cardInstanceId: string) => void;
 }) {
   const activeRole =
     game.phase === "awaiting_card" ? currentCardRole(game) : null;
@@ -439,9 +414,8 @@ function CardHands({
           availability={getLegalCards(game, role)}
           game={game}
           key={role}
-          onSelect={onSelect}
+          onPlay={onPlay}
           role={role}
-          selectedCard={selectedCard}
         />
       ))}
     </div>
@@ -452,16 +426,14 @@ function CardHand({
   active,
   availability,
   game,
-  onSelect,
+  onPlay,
   role,
-  selectedCard,
 }: {
   active: boolean;
   availability: CardAvailability[];
   game: GameState;
-  onSelect: (card: CardInstance) => void;
+  onPlay: (cardInstanceId: string) => void;
   role: CardRole;
-  selectedCard: CardInstance | null;
 }) {
   const team =
     role === "offense"
@@ -491,16 +463,11 @@ function CardHand({
           const definition = CARD_DEFINITIONS[instance.cardId];
           return (
             <button
-              aria-label={`${definition.id} ${definition.name}${playable ? " 사용 가능" : ` 사용 불가: ${reason}`}`}
-              className={
-                selectedCard?.instanceId === instance.instanceId
-                  ? "is-selected"
-                  : undefined
-              }
+              aria-label={`${definition.id} ${definition.name}${playable ? " 사용 가능, 누르면 즉시 사용" : ` 사용 불가: ${reason}`}`}
               data-playable={playable}
               disabled={!playable}
               key={instance.instanceId}
-              onClick={() => onSelect(instance)}
+              onClick={() => onPlay(instance.instanceId)}
               title={reason ?? definition.description}
               type="button"
             >
@@ -562,21 +529,41 @@ function BroadcastScoreboard({ game }: { game: GameState }) {
         {game.inning > game.config.innings ? <em>연장</em> : null}
       </div>
       <div className="bbg-counts bbg-broadcast-counts" aria-label="현재 카운트">
-        <span aria-label={`볼 ${game.balls}`} data-tone="ball">
-          <b>B</b>
-          <em>{game.balls}</em>
-        </span>
-        <span aria-label={`스트라이크 ${game.strikes}`} data-tone="strike">
-          <b>S</b>
-          <em>{game.strikes}</em>
-        </span>
-        <span aria-label={`아웃 ${game.outs}`} data-tone="out">
-          <b>O</b>
-          <em>{game.outs}</em>
-        </span>
+        <CountLights count={game.balls} label="B" tone="ball" total={3} />
+        <CountLights count={game.strikes} label="S" tone="strike" total={2} />
+        <CountLights count={game.outs} label="O" tone="out" total={2} />
       </div>
       <BroadcastBases game={game} />
     </section>
+  );
+}
+
+function CountLights({
+  count,
+  label,
+  tone,
+  total,
+}: {
+  count: number;
+  label: "B" | "S" | "O";
+  tone: "ball" | "strike" | "out";
+  total: number;
+}) {
+  const accessibleLabel =
+    label === "B" ? "볼" : label === "S" ? "스트라이크" : "아웃";
+  return (
+    <span
+      aria-label={`${accessibleLabel} ${count}`}
+      className="bbg-count-line"
+      data-tone={tone}
+    >
+      <b aria-hidden="true">{label}</b>
+      <span aria-hidden="true" className="bbg-count-lights">
+        {Array.from({ length: total }, (_, index) => (
+          <i data-active={index < count} key={index} />
+        ))}
+      </span>
+    </span>
   );
 }
 
@@ -601,7 +588,7 @@ function TeamScore({ game, side }: { game: GameState; side: "away" | "home" }) {
         .filter(Boolean)
         .join(" ")}
     >
-      <span>{side === "away" ? "A" : "H"}</span>
+      <span>{side === "away" ? "원정" : "홈"}</span>
       <strong>
         {game.config[side === "away" ? "awayTeamName" : "homeTeamName"]}
       </strong>

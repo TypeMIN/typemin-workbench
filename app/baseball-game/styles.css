@@ -3902,3 +3902,268 @@
     animation: none;
   }
 }
+
+/* Broadcast scoreboard v2: two-line score, base diamond and B/S/O lamps. */
+.bbg-game-console .bbg-broadcast-stage {
+  grid-template-rows: 72px minmax(0, 1fr) 72px;
+}
+
+.bbg-game-console .bbg-broadcast-heading {
+  grid-template-columns: 50px minmax(126px, 0.42fr) minmax(0, 1fr);
+  min-height: 72px;
+  padding: 6px 10px;
+}
+
+.bbg-broadcast-heading > .bbg-scoreboard {
+  grid-template-columns: minmax(116px, 1fr) 48px 76px 110px;
+  grid-template-areas: "teams inning bases counts";
+}
+
+.bbg-broadcast-heading > .bbg-scoreboard .bbg-score-teams {
+  display: grid;
+  grid-area: teams;
+  grid-template-columns: 1fr;
+}
+
+.bbg-broadcast-heading > .bbg-scoreboard .bbg-team-score {
+  grid-template-columns: 28px minmax(0, 1fr) 22px;
+  min-height: 30px;
+  gap: 5px;
+  padding: 3px 7px;
+}
+
+.bbg-broadcast-heading > .bbg-scoreboard .bbg-team-score + .bbg-team-score {
+  border-top: 1px solid rgba(210, 226, 243, 0.12);
+  border-left: 0;
+}
+
+.bbg-broadcast-heading > .bbg-scoreboard .bbg-team-score > span {
+  display: block;
+  color: var(--bbg-muted);
+  font-size: 7px;
+  font-weight: 900;
+}
+
+.bbg-broadcast-heading > .bbg-scoreboard .bbg-team-score > strong {
+  font-size: 10px;
+}
+
+.bbg-broadcast-heading > .bbg-scoreboard .bbg-team-score > b {
+  font-size: 16px;
+}
+
+.bbg-broadcast-heading > .bbg-scoreboard .bbg-inning-block {
+  min-height: 60px;
+}
+
+.bbg-broadcast-heading > .bbg-scoreboard .bbg-broadcast-bases {
+  display: grid;
+  grid-area: bases;
+  place-content: center;
+  gap: 3px;
+  padding: 5px;
+  border-right: 1px solid rgba(210, 226, 243, 0.12);
+  background: #080f19;
+}
+
+.bbg-broadcast-heading > .bbg-scoreboard .bbg-broadcast-bases > div {
+  width: 42px;
+  height: 32px;
+}
+
+.bbg-broadcast-heading > .bbg-scoreboard .bbg-broadcast-bases i {
+  width: 11px;
+  height: 11px;
+}
+
+.bbg-broadcast-heading > .bbg-scoreboard .bbg-broadcast-bases .is-second {
+  left: 16px;
+}
+
+.bbg-broadcast-heading > .bbg-scoreboard .bbg-broadcast-bases .is-third {
+  top: 15px;
+}
+
+.bbg-broadcast-heading > .bbg-scoreboard .bbg-broadcast-bases .is-first {
+  top: 15px;
+}
+
+.bbg-broadcast-heading > .bbg-scoreboard .bbg-broadcast-bases small {
+  font-size: 6px;
+}
+
+.bbg-broadcast-heading > .bbg-scoreboard .bbg-broadcast-counts {
+  display: grid;
+  grid-area: counts;
+  grid-template-columns: 1fr;
+  align-content: center;
+  gap: 4px;
+  padding: 7px 9px;
+  background: #080f19;
+}
+
+.bbg-broadcast-heading > .bbg-scoreboard .bbg-count-line {
+  display: grid;
+  grid-template-columns: 12px minmax(0, 1fr);
+  align-items: center;
+  gap: 6px;
+  background: transparent;
+}
+
+.bbg-broadcast-heading > .bbg-scoreboard .bbg-count-line > b {
+  color: var(--bbg-muted);
+  font-size: 8px;
+  line-height: 1;
+}
+
+.bbg-broadcast-heading > .bbg-scoreboard .bbg-count-lights {
+  display: flex;
+  gap: 4px;
+}
+
+.bbg-broadcast-heading > .bbg-scoreboard .bbg-count-lights i {
+  width: 8px;
+  height: 8px;
+  border: 1px solid rgba(210, 226, 243, 0.22);
+  border-radius: 50%;
+  background: #172231;
+}
+
+.bbg-broadcast-heading
+  > .bbg-scoreboard
+  .bbg-count-line[data-tone="ball"]
+  i[data-active="true"] {
+  border-color: #6ff2b7;
+  background: #31d998;
+  box-shadow: 0 0 7px rgba(49, 217, 152, 0.75);
+}
+
+.bbg-broadcast-heading
+  > .bbg-scoreboard
+  .bbg-count-line[data-tone="strike"]
+  i[data-active="true"] {
+  border-color: #ffe08b;
+  background: var(--bbg-yellow);
+  box-shadow: 0 0 7px rgba(255, 209, 102, 0.72);
+}
+
+.bbg-broadcast-heading
+  > .bbg-scoreboard
+  .bbg-count-line[data-tone="out"]
+  i[data-active="true"] {
+  border-color: #ff8792;
+  background: #f04f5e;
+  box-shadow: 0 0 7px rgba(240, 79, 94, 0.72);
+}
+
+.bbg-card-decision {
+  min-height: 78px;
+}
+
+.bbg-card-decision-actions button:only-child {
+  border-color: rgba(210, 226, 243, 0.24);
+  color: var(--bbg-text);
+  background: rgba(4, 11, 18, 0.75);
+}
+
+@media (max-width: 680px) {
+  .bbg-game-console .bbg-broadcast-stage {
+    grid-template-rows: 68px minmax(0, 1fr) 62px;
+  }
+
+  .bbg-game-console .bbg-broadcast-heading {
+    grid-template-columns: 36px minmax(80px, 0.34fr) minmax(0, 1fr);
+    min-height: 68px;
+    gap: 4px;
+    padding: 5px;
+  }
+
+  .bbg-broadcast-heading > .bbg-scoreboard {
+    grid-template-columns: minmax(68px, 1fr) 31px 42px 49px;
+  }
+
+  .bbg-broadcast-heading > .bbg-scoreboard .bbg-team-score {
+    grid-template-columns: minmax(0, 1fr) 12px;
+    min-height: 28px;
+    gap: 2px;
+    padding: 2px 3px;
+  }
+
+  .bbg-broadcast-heading > .bbg-scoreboard .bbg-team-score > span {
+    display: none;
+  }
+
+  .bbg-broadcast-heading > .bbg-scoreboard .bbg-team-score > strong {
+    font-size: 7px;
+  }
+
+  .bbg-broadcast-heading > .bbg-scoreboard .bbg-team-score > b {
+    font-size: 11px;
+  }
+
+  .bbg-broadcast-heading > .bbg-scoreboard .bbg-inning-block {
+    min-height: 56px;
+  }
+
+  .bbg-broadcast-heading > .bbg-scoreboard .bbg-inning-block strong {
+    font-size: 14px;
+  }
+
+  .bbg-broadcast-heading > .bbg-scoreboard .bbg-inning-block small,
+  .bbg-broadcast-heading > .bbg-scoreboard .bbg-inning-block b {
+    font-size: 6px;
+  }
+
+  .bbg-broadcast-heading > .bbg-scoreboard .bbg-broadcast-bases {
+    padding: 4px 2px;
+  }
+
+  .bbg-broadcast-heading > .bbg-scoreboard .bbg-broadcast-bases > div {
+    width: 31px;
+    height: 25px;
+  }
+
+  .bbg-broadcast-heading > .bbg-scoreboard .bbg-broadcast-bases i {
+    width: 8px;
+    height: 8px;
+  }
+
+  .bbg-broadcast-heading > .bbg-scoreboard .bbg-broadcast-bases .is-second {
+    left: 11px;
+  }
+
+  .bbg-broadcast-heading > .bbg-scoreboard .bbg-broadcast-bases .is-third {
+    top: 12px;
+  }
+
+  .bbg-broadcast-heading > .bbg-scoreboard .bbg-broadcast-bases .is-first {
+    top: 12px;
+  }
+
+  .bbg-broadcast-heading > .bbg-scoreboard .bbg-broadcast-bases small {
+    display: none;
+  }
+
+  .bbg-broadcast-heading > .bbg-scoreboard .bbg-broadcast-counts {
+    gap: 3px;
+    padding: 5px 4px;
+  }
+
+  .bbg-broadcast-heading > .bbg-scoreboard .bbg-count-line {
+    grid-template-columns: 7px minmax(0, 1fr);
+    gap: 2px;
+  }
+
+  .bbg-broadcast-heading > .bbg-scoreboard .bbg-count-line > b {
+    font-size: 6px;
+  }
+
+  .bbg-broadcast-heading > .bbg-scoreboard .bbg-count-lights {
+    gap: 2px;
+  }
+
+  .bbg-broadcast-heading > .bbg-scoreboard .bbg-count-lights i {
+    width: 5px;
+    height: 5px;
+  }
+}

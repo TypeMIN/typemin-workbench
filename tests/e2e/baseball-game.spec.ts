@@ -49,6 +49,15 @@ test("야구 게임에서 강제 주사위 판정과 새 경기를 진행한다"
     "0 0 900 700",
   );
   await expect(page.getByRole("img", { name: /주자 없음/ })).toBeVisible();
+  await expect(
+    page.locator('.bbg-count-line[data-tone="ball"] .bbg-count-lights i'),
+  ).toHaveCount(3);
+  await expect(
+    page.locator('.bbg-count-line[data-tone="strike"] .bbg-count-lights i'),
+  ).toHaveCount(2);
+  await expect(
+    page.locator('.bbg-count-line[data-tone="out"] .bbg-count-lights i'),
+  ).toHaveCount(2);
   await expect(page.locator("[data-nextjs-dialog]")).toHaveCount(0);
 
   const baseLayout = await page.locator(".bbg-diamond").evaluate((diamond) => {
@@ -99,6 +108,13 @@ test("야구 게임에서 강제 주사위 판정과 새 경기를 진행한다"
   expect(broadcastFit.resultSide.bottom).toBeLessThanOrEqual(
     broadcastFit.result.bottom + 1,
   );
+  const scoreRows = await page.locator(".bbg-team-score").evaluateAll((rows) =>
+    rows.map((row) => {
+      const rect = row.getBoundingClientRect();
+      return { top: rect.top, bottom: rect.bottom };
+    }),
+  );
+  expect(scoreRows[1].top).toBeGreaterThanOrEqual(scoreRows[0].bottom - 1);
 
   await page.getByText("특정 면 강제 입력").click();
   await page.getByRole("button", { name: /9번 면 C 컨택/ }).click();
@@ -136,9 +152,8 @@ test("야구 게임에서 강제 주사위 판정과 새 경기를 진행한다"
       getComputedStyle(element).boxShadow.includes("rgba"),
     ),
   ).toBe(true);
+  await expect(page.getByRole("button", { name: "BK 사용" })).toHaveCount(0);
   await playableCard.click();
-  await expect(page.getByText(/투구 전에 모든 주자가/)).toBeVisible();
-  await page.getByRole("button", { name: "BK 사용" }).click();
   await expect(page.getByRole("img", { name: /2루 주자 있음/ })).toBeVisible();
   while (
     await page

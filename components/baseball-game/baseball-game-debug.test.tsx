@@ -49,6 +49,21 @@ describe("BaseballGameDebug", () => {
     ).not.toBeInTheDocument();
     expect(container.querySelectorAll(".bbg-team-score")).toHaveLength(2);
     expect(
+      container.querySelectorAll(
+        '.bbg-count-line[data-tone="ball"] .bbg-count-lights i',
+      ),
+    ).toHaveLength(3);
+    expect(
+      container.querySelectorAll(
+        '.bbg-count-line[data-tone="strike"] .bbg-count-lights i',
+      ),
+    ).toHaveLength(2);
+    expect(
+      container.querySelectorAll(
+        '.bbg-count-line[data-tone="out"] .bbg-count-lights i',
+      ),
+    ).toHaveLength(2);
+    expect(
       container.querySelectorAll(".bbg-team-score.is-batting"),
     ).toHaveLength(1);
     expect(
@@ -69,6 +84,11 @@ describe("BaseballGameDebug", () => {
 
     fireEvent.click(screen.getByRole("button", { name: "투구 주사위 굴리기" }));
     expect(screen.getByLabelText("스트라이크 1")).toBeVisible();
+    expect(
+      document.querySelectorAll(
+        '.bbg-count-line[data-tone="strike"] i[data-active="true"]',
+      ),
+    ).toHaveLength(1);
     expect(screen.getByText("같은 타자에게 다음 투구")).toBeVisible();
 
     fireEvent.click(screen.getByRole("button", { name: /9번 면 C 컨택/ }));
@@ -104,9 +124,10 @@ describe("BaseballGameDebug", () => {
       "data-active",
       "true",
     );
+    expect(
+      screen.queryByRole("button", { name: "BK 사용" }),
+    ).not.toBeInTheDocument();
     fireEvent.click(playableCard);
-    expect(screen.getByText(/투구 전에 모든 주자가/)).toBeVisible();
-    fireEvent.click(screen.getByRole("button", { name: "BK 사용" }));
     expect(screen.getByRole("img", { name: /2루 주자 있음/ })).toBeVisible();
     expect(document.querySelectorAll(".bbg-card-hand button")).toHaveLength(8);
     while (screen.queryByRole("button", { name: "카드 없이 진행" })) {
