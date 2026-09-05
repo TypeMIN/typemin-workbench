@@ -12,6 +12,7 @@ test("야구 게임에서 강제 주사위 판정과 새 경기를 진행한다"
     route.fulfill({ status: 200, json: { account: null } }),
   );
 
+  await page.setViewportSize({ width: 1600, height: 900 });
   await page.goto("/baseball-game");
 
   await expect(
@@ -90,6 +91,7 @@ test("야구 게임에서 강제 주사위 판정과 새 경기를 진행한다"
       viewportBottom: window.innerHeight,
       console: bounds(".bbg-game-console"),
       heading: bounds(".bbg-broadcast-heading"),
+      scoreboard: bounds(".bbg-scoreboard"),
       field: bounds(".bbg-field-content"),
       result: bounds(".bbg-play-result"),
       resultCopy: bounds(".bbg-result-copy"),
@@ -101,6 +103,12 @@ test("야구 게임에서 강제 주사위 판정과 새 경기를 진행한다"
   );
   expect(broadcastFit.heading.bottom).toBeLessThanOrEqual(
     broadcastFit.field.top + 1,
+  );
+  expect(broadcastFit.scoreboard.top).toBeGreaterThanOrEqual(
+    broadcastFit.heading.top,
+  );
+  expect(broadcastFit.scoreboard.bottom).toBeLessThanOrEqual(
+    broadcastFit.heading.bottom,
   );
   expect(broadcastFit.resultCopy.bottom).toBeLessThanOrEqual(
     broadcastFit.result.bottom + 1,
