@@ -3654,8 +3654,10 @@
 }
 
 .bbg-card-hand.is-active {
-  border-color: rgba(255, 209, 102, 0.62);
-  box-shadow: inset 3px 0 var(--bbg-yellow);
+  border-color: rgba(255, 209, 102, 0.82);
+  box-shadow:
+    inset 3px 0 var(--bbg-yellow),
+    0 0 18px rgba(255, 209, 102, 0.1);
 }
 
 .bbg-card-hand > header {
@@ -3714,19 +3716,42 @@
 }
 
 .bbg-card-hand button[data-playable="true"] {
-  border-color: rgba(112, 240, 186, 0.48);
-  background: linear-gradient(135deg, rgba(38, 224, 155, 0.2), #0c1b2b 70%);
+  position: relative;
+  z-index: 1;
+  border-color: #8cffcf;
+  background: linear-gradient(135deg, rgba(38, 224, 155, 0.34), #0c1b2b 72%);
+  box-shadow:
+    inset 0 0 0 1px rgba(140, 255, 207, 0.28),
+    0 0 13px rgba(38, 224, 155, 0.42);
   cursor: pointer;
+  animation: bbg-card-ready 1.8s ease-in-out infinite;
 }
 
 .bbg-card-hand:nth-child(2) button[data-playable="true"] {
-  border-color: rgba(112, 168, 240, 0.55);
-  background: linear-gradient(135deg, rgba(75, 139, 225, 0.22), #0c1b2b 70%);
+  border-color: #9dc9ff;
+  background: linear-gradient(135deg, rgba(75, 139, 225, 0.36), #0c1b2b 72%);
+  box-shadow:
+    inset 0 0 0 1px rgba(157, 201, 255, 0.3),
+    0 0 13px rgba(75, 139, 225, 0.46);
 }
 
 .bbg-card-hand button.is-selected {
   border-color: var(--bbg-yellow);
-  box-shadow: 0 0 0 2px rgba(255, 209, 102, 0.2);
+  box-shadow:
+    inset 0 0 0 1px rgba(255, 209, 102, 0.38),
+    0 0 16px rgba(255, 209, 102, 0.52);
+  animation: none;
+}
+
+@keyframes bbg-card-ready {
+  0%,
+  100% {
+    filter: brightness(0.94);
+  }
+
+  50% {
+    filter: brightness(1.14);
+  }
 }
 
 .bbg-card-hand button:disabled {
@@ -3841,6 +3866,18 @@
     text-align: center;
   }
 
+  .bbg-card-hand button[data-playable="true"] {
+    box-shadow:
+      inset 0 0 0 1px rgba(140, 255, 207, 0.24),
+      0 0 7px rgba(38, 224, 155, 0.34);
+  }
+
+  .bbg-card-hand:nth-child(2) button[data-playable="true"] {
+    box-shadow:
+      inset 0 0 0 1px rgba(157, 201, 255, 0.24),
+      0 0 7px rgba(75, 139, 225, 0.38);
+  }
+
   .bbg-card-hand button b {
     font-size: 8px;
   }
@@ -3857,5 +3894,11 @@
   .bbg-control-panel--broadcast .bbg-force-panel {
     grid-column: 1 / -1;
     grid-row: 4;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .bbg-card-hand button[data-playable="true"] {
+    animation: none;
   }
 }

@@ -451,6 +451,18 @@ const PRIMARY_CARD_SCENARIOS = [
 ] as const;
 
 describe("cards-v1 strategy cards", () => {
+  it("automatically resolves a card window when neither side has a legal card", () => {
+    const state = pitch(game(), "B");
+
+    expect(state.phase).toBe("awaiting_pitch");
+    expect(state.balls).toBe(1);
+    expect(state.cardWindow).toBeNull();
+    expect(state.pendingResolution).toBeNull();
+    expect(state.eventLog.some((event) => event.kind === "card_pass")).toBe(
+      false,
+    );
+  });
+
   it("builds the exact starter decks and deterministic four-card hands", () => {
     const first = createGame(CONFIG, { seed: 20260904 });
     const replay = createGame(CONFIG, { seed: 20260904 });

@@ -58,6 +58,9 @@ describe("BaseballGameDebug", () => {
       screen.getByRole("region", { name: "홈팀 수비 손패" }),
     ).toBeVisible();
     expect(container.querySelectorAll(".bbg-card-hand button")).toHaveLength(8);
+    expect(
+      screen.queryByRole("button", { name: "카드 없이 진행" }),
+    ).not.toBeInTheDocument();
   });
 
   it("supports random rolls and exact forced-result phase changes", () => {
@@ -93,7 +96,15 @@ describe("BaseballGameDebug", () => {
     ).toBeVisible();
     expect(within(result).getByText("타자")).toBeVisible();
     expect(within(result).getByText("1루")).toBeVisible();
-    fireEvent.click(screen.getByRole("button", { name: /BK 보크 사용 가능/ }));
+    const playableCard = screen.getByRole("button", {
+      name: /BK 보크 사용 가능/,
+    });
+    expect(playableCard).toHaveAttribute("data-playable", "true");
+    expect(playableCard.closest(".bbg-card-hand")).toHaveAttribute(
+      "data-active",
+      "true",
+    );
+    fireEvent.click(playableCard);
     expect(screen.getByText(/투구 전에 모든 주자가/)).toBeVisible();
     fireEvent.click(screen.getByRole("button", { name: "BK 사용" }));
     expect(screen.getByRole("img", { name: /2루 주자 있음/ })).toBeVisible();

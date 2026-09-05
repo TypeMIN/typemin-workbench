@@ -33,6 +33,9 @@ test("야구 게임에서 강제 주사위 판정과 새 경기를 진행한다"
     page.getByRole("region", { name: "홈팀 수비 손패" }),
   ).toBeVisible();
   await expect(page.locator(".bbg-card-hand button")).toHaveCount(8);
+  await expect(
+    page.getByRole("button", { name: "카드 없이 진행" }),
+  ).toHaveCount(0);
   await expect(page.getByLabel("원정팀 공격 중")).toContainText("원정팀 공격");
   await expect(page.locator(".bbg-fence")).toBeVisible();
   await expect(page.locator(".bbg-fielders")).toHaveCount(0);
@@ -118,7 +121,22 @@ test("야구 게임에서 강제 주사위 판정과 새 경기를 진행한다"
   await expect(page.getByTestId("play-result")).toContainText("타자");
   await expect(page.getByTestId("play-result")).toContainText("1루");
 
-  await page.getByRole("button", { name: /BK 보크 사용 가능/ }).click();
+  const playableCard = page.getByRole("button", {
+    name: /BK 보크 사용 가능/,
+  });
+  await expect(playableCard).toHaveAttribute("data-playable", "true");
+  await expect(playableCard.locator("xpath=ancestor::section[1]")).toHaveClass(
+    /is-active/,
+  );
+  await expect(
+    playableCard.locator("xpath=ancestor::section[1]").getByText("선택 가능"),
+  ).toBeVisible();
+  expect(
+    await playableCard.evaluate((element) =>
+      getComputedStyle(element).boxShadow.includes("rgba"),
+    ),
+  ).toBe(true);
+  await playableCard.click();
   await expect(page.getByText(/투구 전에 모든 주자가/)).toBeVisible();
   await page.getByRole("button", { name: "BK 사용" }).click();
   await expect(page.getByRole("img", { name: /2루 주자 있음/ })).toBeVisible();

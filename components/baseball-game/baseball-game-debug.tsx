@@ -473,13 +473,18 @@ function CardHand({
     game.config[team === "away" ? "awayTeamName" : "homeTeamName"];
   return (
     <section
-      className={`bbg-card-hand${active ? "is-active" : ""}`}
+      className={["bbg-card-hand", active ? "is-active" : null]
+        .filter(Boolean)
+        .join(" ")}
+      data-active={active}
       aria-label={`${teamName} ${role === "offense" ? "공격" : "수비"} 손패`}
     >
       <header>
         <span>{role === "offense" ? "OFFENSE" : "DEFENSE"}</span>
         <strong>{teamName}</strong>
-        <small>덱 {game.cards[role].drawPile.length}</small>
+        <small>
+          {active ? "선택 가능" : `덱 ${game.cards[role].drawPile.length}`}
+        </small>
       </header>
       <div>
         {availability.map(({ instance, playable, reason }) => {
