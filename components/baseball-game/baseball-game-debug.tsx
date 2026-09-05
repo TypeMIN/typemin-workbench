@@ -1,13 +1,6 @@
 "use client";
 
-import {
-  ArrowRight,
-  Dices,
-  House,
-  Layers3,
-  Radio,
-  RotateCcw,
-} from "lucide-react";
+import { ArrowRight, Dices, House, Layers3, RotateCcw } from "lucide-react";
 import Link from "next/link";
 import { useRef, useState, type FormEvent } from "react";
 
@@ -82,8 +75,6 @@ export default function BaseballGameDebug() {
     (event) => event.revision === game.revision,
   );
   const lastRoll = game.eventLog.findLast((event) => event.kind === "die_roll");
-  const battingTeamName =
-    game.config[game.battingTeam === "away" ? "awayTeamName" : "homeTeamName"];
   const actionOwner = getActionOwner(game);
   const actionOwnerLabel = actionOwner
     ? `${game.config[actionOwner === "away" ? "awayTeamName" : "homeTeamName"]} ${actionOwner === game.battingTeam ? "공격" : "수비"}`
@@ -152,20 +143,7 @@ export default function BaseballGameDebug() {
           >
             <div className="bbg-broadcast-stage">
               <div className="bbg-broadcast-heading">
-                <div>
-                  <span>
-                    <Radio aria-hidden="true" size={13} /> LIVE
-                  </span>
-                  <h1 id="field-heading">야구 게임 라이브</h1>
-                  <small className="bbg-game-length">
-                    {game.config.innings}이닝
-                  </small>
-                </div>
-                <OffenseIndicator
-                  battingTeamName={battingTeamName}
-                  game={game}
-                  key={`${game.inning}-${game.half}-${game.battingTeam}`}
-                />
+                <h1 id="field-heading">야구 게임 라이브</h1>
                 <BroadcastScoreboard game={game} />
               </div>
 
@@ -509,6 +487,7 @@ function BroadcastScoreboard({ game }: { game: GameState }) {
   return (
     <section
       className="bbg-scoreboard"
+      data-scheduled-innings={game.config.innings}
       aria-label={`경기 점수판, ${game.inning}회${game.half === "top" ? "초" : "말"}, ${formatOuts(game.outs)}, ${formatBases(game)}`}
     >
       <div className="bbg-live-channel">
@@ -521,19 +500,27 @@ function BroadcastScoreboard({ game }: { game: GameState }) {
         <TeamScore game={game} side="away" />
         <TeamScore game={game} side="home" />
       </div>
-      <div className="bbg-inning-block" aria-label="현재 이닝">
-        <span aria-hidden="true">{game.half === "top" ? "▲" : "▼"}</span>
-        <strong>{game.inning}</strong>
-        <small>회</small>
-        <b>{game.half === "top" ? "초" : "말"}</b>
-        {game.inning > game.config.innings ? <em>연장</em> : null}
+      <div className="bbg-score-status">
+        <div
+          className="bbg-inning-block"
+          aria-label={`${game.inning}회${game.half === "top" ? "초" : "말"}`}
+        >
+          <span aria-hidden="true">{game.half === "top" ? "▲" : "▼"}</span>
+          <strong>
+            {game.inning}회{game.half === "top" ? "초" : "말"}
+          </strong>
+          {game.inning > game.config.innings ? <em>연장</em> : null}
+        </div>
+        <BroadcastBases game={game} />
+        <div
+          className="bbg-counts bbg-broadcast-counts"
+          aria-label="현재 카운트"
+        >
+          <CountLights count={game.balls} label="B" tone="ball" total={3} />
+          <CountLights count={game.strikes} label="S" tone="strike" total={2} />
+          <CountLights count={game.outs} label="O" tone="out" total={2} />
+        </div>
       </div>
-      <div className="bbg-counts bbg-broadcast-counts" aria-label="현재 카운트">
-        <CountLights count={game.balls} label="B" tone="ball" total={3} />
-        <CountLights count={game.strikes} label="S" tone="strike" total={2} />
-        <CountLights count={game.outs} label="O" tone="out" total={2} />
-      </div>
-      <BroadcastBases game={game} />
     </section>
   );
 }
@@ -575,7 +562,6 @@ function BroadcastBases({ game }: { game: GameState }) {
         <i className="is-third" data-occupied={game.bases.third} />
         <i className="is-first" data-occupied={game.bases.first} />
       </div>
-      <small>{formatBases(game)}</small>
     </div>
   );
 }
@@ -593,28 +579,6 @@ function TeamScore({ game, side }: { game: GameState; side: "away" | "home" }) {
         {game.config[side === "away" ? "awayTeamName" : "homeTeamName"]}
       </strong>
       <b key={game.score[side]}>{game.score[side]}</b>
-    </div>
-  );
-}
-
-function OffenseIndicator({
-  battingTeamName,
-  game,
-}: {
-  battingTeamName: string;
-  game: GameState;
-}) {
-  return (
-    <div
-      aria-label={`${battingTeamName} 공격 중`}
-      className="bbg-offense-indicator"
-      data-team={game.battingTeam}
-    >
-      <span>
-        {game.half === "top" ? "▲" : "▼"} {game.inning}회
-        {game.half === "top" ? "초" : "말"}
-      </span>
-      <strong>{battingTeamName} 공격</strong>
     </div>
   );
 }

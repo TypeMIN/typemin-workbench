@@ -39,9 +39,9 @@ describe("BaseballGameDebug", () => {
     expect(container.querySelector(".bbg-d12")).toBeVisible();
     expect(screen.getAllByRole("button", { name: /번 면/ })).toHaveLength(12);
     expect(screen.getByRole("img", { name: /주자 없음/ })).toBeVisible();
-    expect(screen.getByLabelText("원정팀 공격 중")).toHaveTextContent(
-      "원정팀 공격",
-    );
+    expect(
+      container.querySelector(".bbg-team-score.is-batting"),
+    ).toHaveTextContent("원정팀");
     expect(container.querySelector(".bbg-fence")).toBeVisible();
     expect(container.querySelector(".bbg-fielders")).not.toBeInTheDocument();
     expect(
@@ -63,6 +63,9 @@ describe("BaseballGameDebug", () => {
         '.bbg-count-line[data-tone="out"] .bbg-count-lights i',
       ),
     ).toHaveLength(2);
+    expect(
+      screen.getByLabelText("주자 없음").querySelector("small"),
+    ).not.toBeInTheDocument();
     expect(
       container.querySelectorAll(".bbg-team-score.is-batting"),
     ).toHaveLength(1);
@@ -161,8 +164,6 @@ describe("BaseballGameDebug", () => {
     const scoreboard = screen.getByRole("region", { name: /경기 점수판/ });
     expect(within(scoreboard).getByText("블루")).toBeVisible();
     expect(within(scoreboard).getByText("레드")).toBeVisible();
-    expect(document.querySelector(".bbg-game-length")).toHaveTextContent(
-      "5이닝",
-    );
+    expect(scoreboard).toHaveAttribute("data-scheduled-innings", "5");
   });
 });

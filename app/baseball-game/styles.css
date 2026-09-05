@@ -4191,3 +4191,235 @@
     height: 5px;
   }
 }
+
+/* Broadcast bug v3: reserve the field center and use only the empty corners. */
+.bbg-game-console .bbg-broadcast-stage {
+  grid-template-rows: minmax(0, 1fr) 86px;
+}
+
+.bbg-game-console .bbg-broadcast-heading {
+  position: absolute;
+  inset: 0 0 auto;
+  z-index: 6;
+  display: block;
+  width: 100%;
+  height: auto;
+  min-height: 0;
+  padding: 12px 14px;
+  overflow: visible;
+  border: 0;
+  background: transparent;
+  pointer-events: none;
+}
+
+.bbg-broadcast-heading > .bbg-scoreboard {
+  display: flex;
+  position: static;
+  width: 100%;
+  height: auto;
+  max-height: none;
+  align-items: flex-start;
+  justify-content: space-between;
+  overflow: visible;
+  border: 0;
+  background: transparent;
+  box-shadow: none;
+}
+
+.bbg-broadcast-heading > .bbg-scoreboard .bbg-score-teams {
+  width: clamp(142px, 15vw, 172px);
+  height: 56px;
+  flex: 0 0 auto;
+  overflow: hidden;
+  border: 1px solid rgba(210, 226, 243, 0.2);
+  border-radius: 8px;
+  background: rgba(5, 12, 20, 0.88);
+  box-shadow: 0 8px 22px rgba(0, 0, 0, 0.22);
+}
+
+.bbg-broadcast-heading > .bbg-scoreboard .bbg-team-score {
+  grid-template-columns: 25px minmax(0, 1fr) 18px;
+  min-height: 27px;
+  gap: 4px;
+  padding: 3px 6px;
+}
+
+.bbg-broadcast-heading > .bbg-scoreboard .bbg-team-score > strong {
+  font-size: 9px;
+}
+
+.bbg-broadcast-heading > .bbg-scoreboard .bbg-team-score > b {
+  font-size: 14px;
+}
+
+.bbg-score-status {
+  display: grid;
+  width: auto;
+  height: 56px;
+  flex: 0 0 auto;
+  grid-template-columns: 64px 50px 92px;
+  overflow: hidden;
+  border: 1px solid rgba(210, 226, 243, 0.2);
+  border-radius: 8px;
+  background: rgba(5, 12, 20, 0.88);
+  box-shadow: 0 8px 22px rgba(0, 0, 0, 0.22);
+}
+
+.bbg-broadcast-heading > .bbg-scoreboard .bbg-score-status > .bbg-inning-block,
+.bbg-broadcast-heading
+  > .bbg-scoreboard
+  .bbg-score-status
+  > .bbg-broadcast-bases,
+.bbg-broadcast-heading
+  > .bbg-scoreboard
+  .bbg-score-status
+  > .bbg-broadcast-counts {
+  grid-area: auto;
+}
+
+.bbg-broadcast-heading > .bbg-scoreboard .bbg-inning-block {
+  display: flex;
+  min-height: 0;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  padding: 0 6px;
+  border-right: 1px solid rgba(210, 226, 243, 0.12);
+  background: transparent;
+}
+
+.bbg-broadcast-heading > .bbg-scoreboard .bbg-inning-block span {
+  color: var(--bbg-yellow);
+  font-size: 8px;
+}
+
+.bbg-broadcast-heading > .bbg-scoreboard .bbg-inning-block strong {
+  font-size: 11px;
+  line-height: 1;
+  white-space: nowrap;
+}
+
+.bbg-broadcast-heading > .bbg-scoreboard .bbg-inning-block em {
+  display: none;
+}
+
+.bbg-broadcast-heading > .bbg-scoreboard .bbg-broadcast-bases {
+  min-width: 0;
+  gap: 0;
+  padding: 8px 4px;
+  border-right: 1px solid rgba(210, 226, 243, 0.12);
+  background: transparent;
+}
+
+.bbg-broadcast-heading > .bbg-scoreboard .bbg-broadcast-bases > div {
+  width: 34px;
+  height: 27px;
+}
+
+.bbg-broadcast-heading > .bbg-scoreboard .bbg-broadcast-bases i {
+  width: 9px;
+  height: 9px;
+}
+
+.bbg-broadcast-heading > .bbg-scoreboard .bbg-broadcast-bases .is-second {
+  left: 12px;
+}
+
+.bbg-broadcast-heading > .bbg-scoreboard .bbg-broadcast-bases .is-first,
+.bbg-broadcast-heading > .bbg-scoreboard .bbg-broadcast-bases .is-third {
+  top: 13px;
+}
+
+.bbg-broadcast-heading > .bbg-scoreboard .bbg-broadcast-counts {
+  min-width: 0;
+  gap: 3px;
+  padding: 7px 8px;
+  background: transparent;
+}
+
+.bbg-game-console .bbg-play-result {
+  height: 86px;
+  padding: 12px 16px;
+}
+
+@media (max-width: 680px) {
+  .bbg-game-console .bbg-broadcast-stage {
+    grid-template-rows: minmax(0, 1fr) 76px;
+  }
+
+  .bbg-game-console .bbg-broadcast-heading {
+    height: auto;
+    min-height: 0;
+    padding: 7px;
+  }
+
+  .bbg-broadcast-heading > .bbg-scoreboard .bbg-score-teams {
+    width: 106px;
+    height: 48px;
+  }
+
+  .bbg-broadcast-heading > .bbg-scoreboard .bbg-team-score {
+    grid-template-columns: minmax(0, 1fr) 12px;
+    min-height: 23px;
+    padding: 2px 4px;
+  }
+
+  .bbg-broadcast-heading > .bbg-scoreboard .bbg-team-score > strong {
+    font-size: 7px;
+  }
+
+  .bbg-broadcast-heading > .bbg-scoreboard .bbg-team-score > b {
+    font-size: 11px;
+  }
+
+  .bbg-score-status {
+    height: 48px;
+    grid-template-columns: 42px 36px 60px;
+  }
+
+  .bbg-broadcast-heading > .bbg-scoreboard .bbg-inning-block {
+    gap: 2px;
+    padding: 0 3px;
+  }
+
+  .bbg-broadcast-heading > .bbg-scoreboard .bbg-inning-block span {
+    font-size: 6px;
+  }
+
+  .bbg-broadcast-heading > .bbg-scoreboard .bbg-inning-block strong {
+    font-size: 8px;
+  }
+
+  .bbg-broadcast-heading > .bbg-scoreboard .bbg-broadcast-bases {
+    padding: 7px 2px;
+  }
+
+  .bbg-broadcast-heading > .bbg-scoreboard .bbg-broadcast-bases > div {
+    width: 28px;
+    height: 23px;
+  }
+
+  .bbg-broadcast-heading > .bbg-scoreboard .bbg-broadcast-bases i {
+    width: 7px;
+    height: 7px;
+  }
+
+  .bbg-broadcast-heading > .bbg-scoreboard .bbg-broadcast-bases .is-second {
+    left: 10px;
+  }
+
+  .bbg-broadcast-heading > .bbg-scoreboard .bbg-broadcast-bases .is-first,
+  .bbg-broadcast-heading > .bbg-scoreboard .bbg-broadcast-bases .is-third {
+    top: 11px;
+  }
+
+  .bbg-broadcast-heading > .bbg-scoreboard .bbg-broadcast-counts {
+    gap: 2px;
+    padding: 5px;
+  }
+
+  .bbg-game-console .bbg-play-result {
+    height: 76px;
+    padding: 10px;
+  }
+}

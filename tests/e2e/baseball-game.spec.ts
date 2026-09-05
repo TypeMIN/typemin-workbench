@@ -37,7 +37,9 @@ test("야구 게임에서 강제 주사위 판정과 새 경기를 진행한다"
   await expect(
     page.getByRole("button", { name: "카드 없이 진행" }),
   ).toHaveCount(0);
-  await expect(page.getByLabel("원정팀 공격 중")).toContainText("원정팀 공격");
+  await expect(page.locator(".bbg-team-score.is-batting")).toContainText(
+    "원정팀",
+  );
   await expect(page.locator(".bbg-fence")).toBeVisible();
   await expect(page.locator(".bbg-fielders")).toHaveCount(0);
   await expect(page.locator(".bbg-distance-marks")).toHaveCount(0);
@@ -85,13 +87,22 @@ test("야구 게임에서 강제 주사위 판정과 새 경기를 진행한다"
       const element = document.querySelector(selector);
       if (!element) throw new Error(`${selector} 영역을 찾지 못했습니다.`);
       const rect = element.getBoundingClientRect();
-      return { top: rect.top, bottom: rect.bottom };
+      return {
+        top: rect.top,
+        right: rect.right,
+        bottom: rect.bottom,
+        left: rect.left,
+        height: rect.height,
+        width: rect.width,
+      };
     };
     return {
       viewportBottom: window.innerHeight,
       console: bounds(".bbg-game-console"),
       heading: bounds(".bbg-broadcast-heading"),
       scoreboard: bounds(".bbg-scoreboard"),
+      scoreTeams: bounds(".bbg-score-teams"),
+      scoreStatus: bounds(".bbg-score-status"),
       field: bounds(".bbg-field-content"),
       result: bounds(".bbg-play-result"),
       resultCopy: bounds(".bbg-result-copy"),
@@ -101,15 +112,20 @@ test("야구 게임에서 강제 주사위 판정과 새 경기를 진행한다"
   expect(broadcastFit.console.bottom).toBeLessThanOrEqual(
     broadcastFit.viewportBottom,
   );
-  expect(broadcastFit.heading.bottom).toBeLessThanOrEqual(
-    broadcastFit.field.top + 1,
+  expect(broadcastFit.heading.top).toBeGreaterThanOrEqual(
+    broadcastFit.field.top - 1,
   );
-  expect(broadcastFit.scoreboard.top).toBeGreaterThanOrEqual(
-    broadcastFit.heading.top,
+  expect(broadcastFit.scoreTeams.bottom).toBeLessThanOrEqual(
+    broadcastFit.field.top + 70,
   );
-  expect(broadcastFit.scoreboard.bottom).toBeLessThanOrEqual(
-    broadcastFit.heading.bottom,
+  expect(broadcastFit.scoreStatus.bottom).toBeLessThanOrEqual(
+    broadcastFit.field.top + 70,
   );
+  expect(broadcastFit.scoreTeams.right).toBeLessThan(
+    broadcastFit.scoreStatus.left,
+  );
+  expect(broadcastFit.scoreTeams.width).toBeLessThanOrEqual(172);
+  expect(broadcastFit.scoreStatus.width).toBeLessThanOrEqual(210);
   expect(broadcastFit.resultCopy.bottom).toBeLessThanOrEqual(
     broadcastFit.result.bottom + 1,
   );
@@ -177,7 +193,10 @@ test("야구 게임에서 강제 주사위 판정과 새 경기를 진행한다"
   await page.getByRole("textbox", { name: "홈팀" }).fill("레드");
   await page.getByLabel("경기 길이").selectOption("5");
   await page.getByRole("button", { name: /새 경기 시작/ }).click();
-  await expect(page.locator(".bbg-game-length")).toHaveText("5이닝");
+  await expect(page.locator(".bbg-scoreboard")).toHaveAttribute(
+    "data-scheduled-innings",
+    "5",
+  );
 
   await page.setViewportSize({ width: 390, height: 844 });
   await expect(page.getByRole("heading", { name: "현재 판정" })).toBeVisible();
@@ -234,7 +253,9 @@ test("중계 화면에서 득점부터 공수교대와 경기 종료까지 이�
   await expect(
     page.getByRole("region", { name: /경기 점수판, 1회말/ }),
   ).toBeVisible();
-  await expect(page.getByLabel("홈팀 공격 중")).toContainText("홈팀 공격");
+  await expect(page.locator(".bbg-team-score.is-batting")).toContainText(
+    "홈팀",
+  );
   await expect(page.getByTestId("play-result")).toContainText(
     "홈팀 첫 타자에게 투구",
   );
