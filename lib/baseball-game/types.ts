@@ -22,7 +22,16 @@ export type CardId =
   | "SB3"
   | "SBH"
   | "SB"
+  | "SQ1"
+  | "SQ2"
   | "E"
+  | "1H1E"
+  | "HRC"
+  | "HNR"
+  | "RNH"
+  | "SNO"
+  | "CIB"
+  | "IOB"
   | "CS2"
   | "CS3"
   | "CSH"
@@ -30,10 +39,28 @@ export type CardId =
   | "PO1"
   | "PO2"
   | "BD"
-  | "GBH";
+  | "GBH"
+  | "GTP"
+  | "LDP"
+  | "A2"
+  | "A3H"
+  | "AHH"
+  | "A3F"
+  | "AHF"
+  | "IFD"
+  | "CO1"
+  | "CO3"
+  | "FFO"
+  | "RHB";
+
+export type CardTier = "basic" | "intermediate" | "advanced";
 
 export type CardTiming =
-  "before_pitch" | "after_pitch" | "after_contact" | "after_batting";
+  | "before_pitch"
+  | "after_pitch"
+  | "after_contact"
+  | "after_batting"
+  | "after_hit";
 
 export type CardInstance = {
   instanceId: string;
@@ -60,7 +87,18 @@ export type CardWindow = {
 export type PendingResolution =
   | { kind: "pitch"; face: PitchFace }
   | { kind: "contact" }
-  | { kind: "batting"; face: Exclude<BattingFace, "HIT"> };
+  | { kind: "batting"; face: BattingFace }
+  | { kind: "hit"; face: HitFace }
+  | {
+      kind: "run_hit_pitch";
+      face: Exclude<PitchFace, "F" | "C">;
+      runners: Array<"first" | "second">;
+    };
+
+export type ActiveStrategy = {
+  cardId: "HNR" | "RNH";
+  cardInstanceId: string;
+} | null;
 
 export type CardAvailability = {
   instance: CardInstance;
@@ -107,6 +145,7 @@ export type GameEventKind =
   | "card_play"
   | "card_resolve"
   | "card_pass"
+  | "rule"
   | "half_inning"
   | "game_end";
 
@@ -127,8 +166,8 @@ export type GameEvent = {
 };
 
 export type GameState = {
-  schemaVersion: 2;
-  rulesetVersion: "cards-v1";
+  schemaVersion: 3;
+  rulesetVersion: "pro-cards-v1";
   revision: number;
   config: GameConfig;
   phase: GamePhase;
@@ -148,6 +187,7 @@ export type GameState = {
   cards: Record<CardRole, CardZone>;
   cardWindow: CardWindow | null;
   pendingResolution: PendingResolution | null;
+  activeStrategy: ActiveStrategy;
   eventLog: GameEvent[];
 };
 

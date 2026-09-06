@@ -7,6 +7,7 @@ export {
   transition,
 } from "./engine";
 export { CARD_DECK_COUNTS, CARD_DEFINITIONS } from "./cards";
+export { chooseAiAction } from "./ai";
 export {
   BATTING_DIE_FACES,
   DIE_FACES,

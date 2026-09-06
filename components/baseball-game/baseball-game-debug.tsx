@@ -2,9 +2,11 @@
 
 import { ArrowRight, Dices, House, Layers3, RotateCcw } from "lucide-react";
 import Link from "next/link";
-import { useRef, useState, type FormEvent } from "react";
+import { useRouter } from "next/navigation";
+import { useEffect, useRef, useState, type FormEvent } from "react";
 
 import { WorkbenchAccountControl } from "@/components/workbench-account-control";
+import { chooseAiAction } from "@/lib/baseball-game/ai";
 import { CARD_DEFINITIONS } from "@/lib/baseball-game/cards";
 import {
   createGame,
@@ -32,6 +34,7 @@ import type {
   HitFace,
   PitchFace,
   ScheduledInnings,
+  TeamSide,
 } from "@/lib/baseball-game/types";
 
 const DEFAULT_CONFIG: GameConfig = {
@@ -39,6 +42,20 @@ const DEFAULT_CONFIG: GameConfig = {
   awayTeamName: "원정팀",
   homeTeamName: "홈팀",
 };
+
+type PlayMode = "solo_ai" | "local_two_player" | "multiplayer";
+
+type SessionConfig = {
+  mode: PlayMode;
+  humanTeam: TeamSide;
+};
+
+const DEFAULT_SESSION: SessionConfig = {
+  mode: "local_two_player",
+  humanTeam: "away",
+};
+
+const AI_TURN_DELAY_MS = 650;
 
 const PHASE_DIE: Partial<Record<GamePhase, DieKind>> = {
   awaiting_pitch: "pitch",
@@ -65,10 +82,19 @@ const PHASE_TITLE: Record<GamePhase, string> = {
 };
 
 export default function BaseballGameDebug() {
+  const router = useRouter();
   const setupDetailsRef = useRef<HTMLDetailsElement>(null);
   const [draft, setDraft] = useState<GameConfig>(DEFAULT_CONFIG);
+  const [draftSession, setDraftSession] =
+    useState<SessionConfig>(DEFAULT_SESSION);
   const [game, setGame] = useState(() => createGame(DEFAULT_CONFIG));
+  const [session, setSession] = useState<SessionConfig>(DEFAULT_SESSION);
+  const [multiplayerCode, setMultiplayerCode] = useState("");
+  const [creatingRoom, setCreatingRoom] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [acknowledgedInterlude, setAcknowledgedInterlude] = useState<
+    number | null
+  >(null);
   const currentDie = PHASE_DIE[game.phase] ?? null;
   const currentFaces = currentDie ? DIE_FACES[currentDie] : [];
   const currentRevisionEvents = game.eventLog.filter(
@@ -76,9 +102,39 @@ export default function BaseballGameDebug() {
   );
   const lastRoll = game.eventLog.findLast((event) => event.kind === "die_roll");
   const actionOwner = getActionOwner(game);
+  const aiTeam =
+    session.mode === "solo_ai" ? oppositeTeam(session.humanTeam) : null;
   const actionOwnerLabel = actionOwner
     ? `${game.config[actionOwner === "away" ? "awayTeamName" : "homeTeamName"]} ${actionOwner === game.battingTeam ? "공격" : "수비"}`
     : "경기 종료";
+  const interludeKind = getInterludeKind(
+    currentRevisionEvents,
+    acknowledgedInterlude === game.revision,
+  );
+  const modalOpen = Boolean(interludeKind);
+  const isAiTurn = Boolean(
+    aiTeam && actionOwner === aiTeam && game.phase !== "finished",
+  );
+  const cardViewer =
+    session.mode === "solo_ai" ? session.humanTeam : actionOwner;
+
+  useEffect(() => {
+    if (!isAiTurn || !aiTeam || modalOpen) return;
+    const action = chooseAiAction(game, aiTeam);
+    if (!action) return;
+
+    const timer = window.setTimeout(() => {
+      const result = transition(game, action);
+      if (!result.ok) {
+        setError(result.error.message);
+        return;
+      }
+      setError(null);
+      setGame(result.state);
+    }, AI_TURN_DELAY_MS);
+
+    return () => window.clearTimeout(timer);
+  }, [aiTeam, game, isAiTurn, modalOpen]);
 
   function dispatchResult(kind: DieKind, face: DieFace) {
     const action = actionFor(kind, face);
@@ -106,11 +162,62 @@ export default function BaseballGameDebug() {
     dispatchResult(currentDie, rollDie(currentDie));
   }
 
-  function startGame(event: FormEvent<HTMLFormElement>) {
+  async function startGame(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
+    if (draftSession.mode === "multiplayer") {
+      const roomCode = multiplayerCode.trim().toUpperCase();
+      if (roomCode) {
+        if (!/^[A-Z2-9]{6}$/.test(roomCode)) {
+          setError("방 코드는 영문과 숫자 6자리입니다.");
+          return;
+        }
+        router.push(`/baseball-game/rooms/${roomCode}`);
+        return;
+      }
+
+      setCreatingRoom(true);
+      setError(null);
+      try {
+        const response = await fetch("/api/baseball-game/rooms", {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({ config: draft }),
+        });
+        const payload = (await response.json()) as {
+          roomUrl?: string;
+          error?: string;
+        };
+        if (!response.ok || !payload.roomUrl) {
+          setError(payload.error ?? "멀티플레이 방을 만들지 못했습니다.");
+          return;
+        }
+        router.push(payload.roomUrl);
+      } catch {
+        setError("멀티플레이 서버에 연결하지 못했습니다.");
+      } finally {
+        setCreatingRoom(false);
+      }
+      return;
+    }
+
     setGame(createGame(draft, { seed: createRandomSeed() }));
+    setSession(draftSession);
     setError(null);
+    setAcknowledgedInterlude(null);
     setupDetailsRef.current?.removeAttribute("open");
+  }
+
+  function restartGame() {
+    setGame(createGame(game.config, { seed: createRandomSeed() }));
+    setDraft(game.config);
+    setDraftSession(session);
+    setError(null);
+    setAcknowledgedInterlude(null);
+  }
+
+  function openGameSetup() {
+    setAcknowledgedInterlude(game.revision);
+    setupDetailsRef.current?.setAttribute("open", "");
   }
 
   return (
@@ -126,16 +233,36 @@ export default function BaseballGameDebug() {
           </span>
           <span>
             <strong>야구 게임</strong>
-            <small>CARDS-V1 · OPEN HANDS</small>
+            <small>
+              PRO-CARDS-V1 ·{" "}
+              {session.mode === "solo_ai" ? "SOLO AI" : "LOCAL 2P"}
+            </small>
           </span>
         </Link>
         <div className="bbg-topbar-side">
-          <span className="bbg-local-badge">브라우저에서만 진행</span>
+          <button
+            aria-label={`게임 모드 변경, 현재 ${
+              session.mode === "solo_ai"
+                ? `AI 대전 ${teamNameFor(game, session.humanTeam)}`
+                : "로컬 2인"
+            }`}
+            className="bbg-local-badge"
+            onClick={openGameSetup}
+            type="button"
+          >
+            {session.mode === "solo_ai"
+              ? `AI 대전 · ${teamNameFor(game, session.humanTeam)}`
+              : "로컬 2인"}
+          </button>
           <WorkbenchAccountControl />
         </div>
       </header>
 
-      <main className="bbg-main">
+      <main
+        aria-hidden={modalOpen ? true : undefined}
+        className="bbg-main"
+        inert={modalOpen ? true : undefined}
+      >
         <div className="bbg-game-console">
           <section
             className="bbg-field-panel bbg-broadcast-field"
@@ -152,6 +279,10 @@ export default function BaseballGameDebug() {
                   face={lastRoll?.face}
                   game={game}
                   key={`field-${game.revision}`}
+                />
+                <StadiumHighlight
+                  events={currentRevisionEvents}
+                  key={`highlight-${game.revision}`}
                 />
               </div>
 
@@ -184,6 +315,8 @@ export default function BaseballGameDebug() {
               <p>{PHASE_TITLE[game.phase]}</p>
             </div>
 
+            <GameProgress game={game} />
+
             {game.phase === "finished" ? (
               <div className="bbg-winner-card">
                 <span>FINAL</span>
@@ -196,6 +329,8 @@ export default function BaseballGameDebug() {
                   {game.score.away} : {game.score.home} 승리
                 </p>
               </div>
+            ) : isAiTurn && aiTeam ? (
+              <AiTurnIndicator game={game} team={aiTeam} />
             ) : game.phase === "awaiting_card" ? (
               <CardDecision
                 game={game}
@@ -215,12 +350,13 @@ export default function BaseballGameDebug() {
 
             <CardHands
               game={game}
+              viewer={cardViewer}
               onPlay={(cardInstanceId) =>
                 dispatchAction({ type: "PLAY_CARD", cardInstanceId })
               }
             />
 
-            {game.phase !== "finished" ? (
+            {game.phase !== "finished" && !isAiTurn ? (
               <details className="bbg-force-panel">
                 <summary>특정 면 강제 입력</summary>
                 <div className="bbg-face-grid">
@@ -285,6 +421,62 @@ export default function BaseballGameDebug() {
               <House aria-hidden="true" size={16} />
             </summary>
             <form className="bbg-setup-form" onSubmit={startGame}>
+              <label className="bbg-setup-mode">
+                게임 모드
+                <select
+                  aria-label="게임 모드"
+                  onChange={(event) =>
+                    setDraftSession((current) => ({
+                      ...current,
+                      mode: event.target.value as PlayMode,
+                    }))
+                  }
+                  value={draftSession.mode}
+                >
+                  <option value="solo_ai">싱글플레이 · AI 대전</option>
+                  <option value="local_two_player">로컬 2인 · 한 기기</option>
+                  <option value="multiplayer">멀티플레이 · 두 기기</option>
+                  <option disabled>파티플레이 · 준비 중</option>
+                </select>
+              </label>
+              {draftSession.mode === "solo_ai" ? (
+                <label className="bbg-setup-team">
+                  내 팀
+                  <select
+                    aria-label="내 팀"
+                    onChange={(event) =>
+                      setDraftSession((current) => ({
+                        ...current,
+                        humanTeam: event.target.value as TeamSide,
+                      }))
+                    }
+                    value={draftSession.humanTeam}
+                  >
+                    <option value="away">{draft.awayTeamName} · 원정</option>
+                    <option value="home">{draft.homeTeamName} · 홈</option>
+                  </select>
+                </label>
+              ) : null}
+              {draftSession.mode === "multiplayer" ? (
+                <label className="bbg-setup-room">
+                  참가할 방 코드
+                  <input
+                    aria-label="참가할 방 코드"
+                    autoCapitalize="characters"
+                    inputMode="text"
+                    maxLength={6}
+                    onChange={(event) =>
+                      setMultiplayerCode(
+                        event.target.value
+                          .toUpperCase()
+                          .replace(/[^A-Z2-9]/g, ""),
+                      )
+                    }
+                    placeholder="비우면 새 방 생성"
+                    value={multiplayerCode}
+                  />
+                </label>
+              ) : null}
               <label>
                 원정팀
                 <input
@@ -329,13 +521,195 @@ export default function BaseballGameDebug() {
                   ))}
                 </select>
               </label>
-              <button type="submit">
-                <RotateCcw aria-hidden="true" size={17} />새 경기 시작
+              <button disabled={creatingRoom} type="submit">
+                <RotateCcw aria-hidden="true" size={17} />
+                {draftSession.mode === "multiplayer"
+                  ? creatingRoom
+                    ? "방 만드는 중"
+                    : multiplayerCode
+                      ? "방 참가하기"
+                      : "멀티플레이 방 만들기"
+                  : "새 경기 시작"}
               </button>
             </form>
           </details>
         </div>
       </main>
+
+      {interludeKind ? (
+        <GameInterlude
+          game={game}
+          kind={interludeKind}
+          onContinue={() => {
+            setAcknowledgedInterlude(game.revision);
+          }}
+          onOpenSetup={openGameSetup}
+          onRestart={restartGame}
+        />
+      ) : null}
+    </div>
+  );
+}
+
+type InterludeKind = "side_change" | "game_end";
+
+function getInterludeKind(
+  events: GameEvent[],
+  acknowledged: boolean,
+): InterludeKind | null {
+  if (acknowledged) return null;
+  if (events.some((event) => event.kind === "game_end")) return "game_end";
+  if (events.some((event) => event.kind === "half_inning")) {
+    return "side_change";
+  }
+  return null;
+}
+
+function GameInterlude({
+  game,
+  kind,
+  onContinue,
+  onOpenSetup,
+  onRestart,
+}: {
+  game: GameState;
+  kind: InterludeKind;
+  onContinue: () => void;
+  onOpenSetup: () => void;
+  onRestart: () => void;
+}) {
+  const nextTeamName = teamNameFor(game, game.battingTeam);
+  const winnerName = game.winner ? teamNameFor(game, game.winner) : null;
+  return (
+    <section
+      aria-labelledby="interlude-title"
+      aria-modal="true"
+      className={`bbg-takeover bbg-interlude is-${kind}`}
+      role="dialog"
+    >
+      <div className="bbg-takeover-card">
+        <span className="bbg-takeover-kicker">
+          {kind === "game_end" ? "FINAL" : "3 OUT"}
+        </span>
+        <p className="bbg-takeover-inning">
+          {kind === "game_end"
+            ? `${game.inning}회 경기 종료`
+            : `${game.inning}회${game.half === "top" ? "초" : "말"} 시작`}
+        </p>
+        <h2 id="interlude-title">
+          {kind === "game_end" ? `${winnerName} 승리` : "공수 교대"}
+        </h2>
+        <p className="bbg-takeover-copy">
+          {kind === "game_end"
+            ? `${game.config.awayTeamName} ${game.score.away} : ${game.score.home} ${game.config.homeTeamName}`
+            : `${nextTeamName} 공격이 시작됩니다. 이닝이 바뀌며 양쪽 손패도 새로 배분됐습니다.`}
+        </p>
+        <MiniScore game={game} />
+        {kind === "game_end" ? (
+          <div className="bbg-final-actions">
+            <button onClick={onRestart} type="button">
+              <RotateCcw aria-hidden="true" size={17} /> 같은 설정으로 재경기
+            </button>
+            <button onClick={onOpenSetup} type="button">
+              새 경기 설정
+            </button>
+          </div>
+        ) : (
+          <div className="bbg-handoff-action">
+            <small>{nextTeamName} 공격 준비</small>
+            <button onClick={onContinue} type="button">
+              다음 공격 준비
+              <ArrowRight aria-hidden="true" size={18} />
+            </button>
+          </div>
+        )}
+      </div>
+    </section>
+  );
+}
+
+function MiniScore({ game }: { game: GameState }) {
+  return (
+    <div className="bbg-mini-score" aria-label="인계 화면 점수">
+      <span>
+        <small>원정</small>
+        <strong>{game.config.awayTeamName}</strong>
+        <b>{game.score.away}</b>
+      </span>
+      <i aria-hidden="true">:</i>
+      <span>
+        <small>홈</small>
+        <strong>{game.config.homeTeamName}</strong>
+        <b>{game.score.home}</b>
+      </span>
+    </div>
+  );
+}
+
+type Highlight = {
+  label: string;
+  summary: string;
+  tone: "score" | "out" | "special";
+};
+
+function StadiumHighlight({ events }: { events: GameEvent[] }) {
+  const highlight = getStadiumHighlight(events);
+  if (!highlight) return null;
+  return (
+    <div
+      aria-live="polite"
+      className="bbg-stadium-highlight"
+      data-tone={highlight.tone}
+      role="status"
+    >
+      <strong>{highlight.label}</strong>
+      <span>{highlight.summary}</span>
+    </div>
+  );
+}
+
+function getStadiumHighlight(events: GameEvent[]): Highlight | null {
+  const event =
+    events.findLast((item) => item.kind === "plate_appearance") ??
+    events.findLast((item) => item.kind === "card_resolve");
+  if (!event) return null;
+  if (event.summary.includes("홈런")) {
+    return { label: "HOME RUN", summary: event.summary, tone: "score" };
+  }
+  if (event.summary.includes("삼중살")) {
+    return { label: "TRIPLE PLAY", summary: event.summary, tone: "special" };
+  }
+  if (event.summary.includes("병살")) {
+    return { label: "DOUBLE PLAY", summary: event.summary, tone: "special" };
+  }
+  if (event.summary.includes("삼진")) {
+    return { label: "STRIKE OUT", summary: event.summary, tone: "out" };
+  }
+  if (event.runs > 0) {
+    return {
+      label: `SCORE +${event.runs}`,
+      summary: event.summary,
+      tone: "score",
+    };
+  }
+  return null;
+}
+
+function AiTurnIndicator({ game, team }: { game: GameState; team: TeamSide }) {
+  const role = roleForTeam(game, team);
+  const isCardDecision = game.phase === "awaiting_card";
+  return (
+    <div className="bbg-ai-turn" role="status" aria-live="polite">
+      <span>AI</span>
+      <div>
+        <strong>{teamNameFor(game, team)} 판단 중</strong>
+        <p>
+          {isCardDecision
+            ? `${role === "offense" ? "공격" : "수비"} 전략카드를 검토하고 있습니다.`
+            : `${DIE_LABELS[PHASE_DIE[game.phase] ?? "pitch"]} 주사위를 굴립니다.`}
+        </p>
+      </div>
+      <i aria-hidden="true" />
     </div>
   );
 }
@@ -361,10 +735,7 @@ function CardDecision({
             ? `${CARD_DEFINITIONS[respondingTo.cardId].name} 대응`
             : `${role === "offense" ? "공격" : "수비"} 카드 선택`}
         </strong>
-        <p>
-          사용할 카드를 누르면 즉시 적용됩니다. 사용하지 않으려면 카드 없이
-          진행하세요.
-        </p>
+        <p>{describeCardWindow(game)} 사용할 카드를 누르면 즉시 적용됩니다.</p>
       </div>
       <div className="bbg-card-decision-actions">
         <button onClick={onPass} type="button">
@@ -378,21 +749,25 @@ function CardDecision({
 function CardHands({
   game,
   onPlay,
+  viewer,
 }: {
   game: GameState;
   onPlay: (cardInstanceId: string) => void;
+  viewer: TeamSide | null;
 }) {
   const activeRole =
     game.phase === "awaiting_card" ? currentCardRole(game) : null;
+  const visibleRole = viewer ? roleForTeam(game, viewer) : null;
   return (
-    <div className="bbg-card-hands" aria-label="공개 전략카드 손패">
+    <div className="bbg-card-hands" aria-label="한 기기 전략카드 손패">
       {(["offense", "defense"] as const).map((role) => (
         <CardHand
-          active={activeRole === role}
-          availability={getLegalCards(game, role)}
+          active={activeRole === role && visibleRole === role}
+          availability={visibleRole === role ? getLegalCards(game, role) : []}
           game={game}
           key={role}
           onPlay={onPlay}
+          revealed={visibleRole === role}
           role={role}
         />
       ))}
@@ -405,12 +780,14 @@ function CardHand({
   availability,
   game,
   onPlay,
+  revealed,
   role,
 }: {
   active: boolean;
   availability: CardAvailability[];
   game: GameState;
   onPlay: (cardInstanceId: string) => void;
+  revealed: boolean;
   role: CardRole;
 }) {
   const team =
@@ -427,37 +804,118 @@ function CardHand({
         .filter(Boolean)
         .join(" ")}
       data-active={active}
-      aria-label={`${teamName} ${role === "offense" ? "공격" : "수비"} 손패`}
+      aria-label={`${teamName} ${role === "offense" ? "공격" : "수비"} ${revealed ? "손패" : "비공개 손패"}`}
     >
       <header>
         <span>{role === "offense" ? "OFFENSE" : "DEFENSE"}</span>
         <strong>{teamName}</strong>
         <small>
-          {active ? "선택 가능" : `덱 ${game.cards[role].drawPile.length}`}
+          {revealed
+            ? active
+              ? "선택 가능"
+              : `덱 ${game.cards[role].drawPile.length}`
+            : `패 ${game.cards[role].hand.length}장`}
         </small>
       </header>
-      <div>
-        {availability.map(({ instance, playable, reason }) => {
-          const definition = CARD_DEFINITIONS[instance.cardId];
-          return (
-            <button
-              aria-label={`${definition.id} ${definition.name}${playable ? " 사용 가능, 누르면 즉시 사용" : ` 사용 불가: ${reason}`}`}
-              data-playable={playable}
-              disabled={!playable}
-              key={instance.instanceId}
-              onClick={() => onPlay(instance.instanceId)}
-              title={reason ?? definition.description}
-              type="button"
-            >
-              <b>{definition.id}</b>
-              <span>{definition.name}</span>
-              <small>{playable ? "사용 가능" : reason}</small>
-            </button>
-          );
-        })}
+      <div data-concealed={!revealed}>
+        {revealed
+          ? availability.map(({ instance, playable, reason }) => {
+              const definition = CARD_DEFINITIONS[instance.cardId];
+              return (
+                <button
+                  aria-label={`${definition.id} ${definition.name}${playable ? " 사용 가능, 누르면 즉시 사용" : ` 사용 불가: ${reason}`}`}
+                  data-playable={playable}
+                  data-tier={definition.tier}
+                  disabled={!playable}
+                  key={instance.instanceId}
+                  onClick={() => onPlay(instance.instanceId)}
+                  title={reason ?? definition.description}
+                  type="button"
+                >
+                  <i aria-hidden="true">
+                    {definition.tier === "advanced"
+                      ? "PRO"
+                      : definition.tier === "intermediate"
+                        ? "MID"
+                        : "BASIC"}
+                  </i>
+                  <b>{definition.id}</b>
+                  <span>{definition.name}</span>
+                  <small>{playable ? "사용 가능" : reason}</small>
+                </button>
+              );
+            })
+          : game.cards[role].hand.map((card) => (
+              <span
+                aria-hidden="true"
+                className="bbg-card-back"
+                key={card.instanceId}
+              >
+                <i>BB</i>
+              </span>
+            ))}
       </div>
     </section>
   );
+}
+
+function GameProgress({ game }: { game: GameState }) {
+  const active =
+    game.phase === "awaiting_card"
+      ? game.pendingResolution?.kind === "hit"
+        ? "hit"
+        : game.pendingResolution?.kind === "batting"
+          ? "batting"
+          : game.pendingResolution?.kind === "contact"
+            ? "batting"
+            : "pitch"
+      : game.phase === "awaiting_hit"
+        ? "hit"
+        : game.phase === "awaiting_batting"
+          ? "batting"
+          : game.phase === "finished"
+            ? "finished"
+            : "pitch";
+  const steps = [
+    ["pitch", "투구"],
+    ["batting", "타구"],
+    ["hit", "안타"],
+    ["finished", "종료"],
+  ] as const;
+  return (
+    <div
+      className="bbg-game-progress"
+      aria-label={`현재 진행 단계 ${steps.find(([key]) => key === active)?.[1]}`}
+    >
+      {steps.map(([key, label], index) => (
+        <span data-active={key === active} key={key}>
+          <b>{index + 1}</b>
+          {label}
+        </span>
+      ))}
+      {game.activeStrategy ? (
+        <strong>{game.activeStrategy.cardId} 진행 중</strong>
+      ) : null}
+    </div>
+  );
+}
+
+function describeCardWindow(game: GameState) {
+  const respondingTo = game.cardWindow?.respondingTo;
+  if (respondingTo) {
+    return `${CARD_DEFINITIONS[respondingTo.cardId].name}에 대응할 차례입니다.`;
+  }
+  const timing = game.cardWindow?.timing;
+  const copy: Partial<Record<NonNullable<typeof timing>, string>> = {
+    before_pitch: "투구 전에 작전을 결정합니다.",
+    after_pitch: "방금 투구 결과에 개입할 수 있습니다.",
+    after_contact: "컨택 뒤 번트 작전을 결정합니다.",
+    after_batting: "타구 판정을 바꿀 수 있습니다.",
+    after_hit: "안타와 주자 진루 판정을 바꿀 수 있습니다.",
+  };
+  return timing
+    ? (copy[timing] ?? "전략카드를 결정합니다.")
+    : "전략카드를 결정합니다.";
 }
 
 function currentCardRole(game: GameState): CardRole {
@@ -467,6 +925,18 @@ function currentCardRole(game: GameState): CardRole {
     return window.respondingTo.role === "offense" ? "defense" : "offense";
   }
   return window.priorityOrder[window.priorityIndex] ?? "offense";
+}
+
+function roleForTeam(game: GameState, team: TeamSide): CardRole {
+  return team === game.battingTeam ? "offense" : "defense";
+}
+
+function teamNameFor(game: GameState, team: TeamSide) {
+  return game.config[team === "away" ? "awayTeamName" : "homeTeamName"];
+}
+
+function oppositeTeam(team: TeamSide): TeamSide {
+  return team === "away" ? "home" : "away";
 }
 
 function createRandomSeed() {
@@ -948,6 +1418,13 @@ function PlayResult({
     .slice(lastDieIndex + 1)
     .filter((item) => item.kind === "card_play")
     .slice(-4);
+  const resolutionChain = events
+    .filter((item) =>
+      ["card_play", "card_resolve", "rule", "plate_appearance"].includes(
+        item.kind,
+      ),
+    )
+    .slice(-4);
   const displayToken = event?.cardId ?? face;
   const tone = !event
     ? "ready"
@@ -1001,6 +1478,16 @@ function PlayResult({
             ) : null,
           )}
         </div>
+        {resolutionChain.length > 1 ? (
+          <ol className="bbg-resolution-chain" aria-label="이번 판정 진행 순서">
+            {resolutionChain.map((item, index) => (
+              <li key={item.sequence}>
+                <b>{index + 1}</b>
+                <span>{item.summary}</span>
+              </li>
+            ))}
+          </ol>
+        ) : null}
       </div>
       <div className="bbg-result-side">
         <div className="bbg-move-list">

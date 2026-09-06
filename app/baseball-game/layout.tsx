@@ -5,7 +5,7 @@ import "./styles.css";
 export const metadata: Metadata = {
   title: { absolute: "야구 게임" },
   description:
-    "세 종류의 12면체 주사위와 공격·수비 전략카드로 진행하는 로컬 야구 경기",
+    "세 종류의 12면체 주사위와 전략카드로 즐기는 AI·로컬·멀티플레이 야구 경기",
 };
 
 export default function BaseballGameLayout({

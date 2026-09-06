@@ -1,7 +1,124 @@
+export type Json =
+  | string
+  | number
+  | boolean
+  | null
+  | { [key: string]: Json | undefined }
+  | Json[];
+
 export type Database = {
   __InternalSupabase: { PostgrestVersion: "14.15" };
   public: {
     Tables: {
+      baseball_games: {
+        Row: {
+          created_at: string;
+          expires_at: string;
+          id: string;
+          revision: number;
+          room_code: string;
+          state: Json;
+          status: string;
+          updated_at: string;
+        };
+        Insert: {
+          created_at?: string;
+          expires_at?: string;
+          id?: string;
+          revision?: number;
+          room_code: string;
+          state: Json;
+          status?: string;
+          updated_at?: string;
+        };
+        Update: {
+          created_at?: string;
+          expires_at?: string;
+          id?: string;
+          revision?: number;
+          room_code?: string;
+          state?: Json;
+          status?: string;
+          updated_at?: string;
+        };
+        Relationships: [];
+      };
+      baseball_game_seats: {
+        Row: {
+          game_id: string;
+          joined_at: string;
+          last_seen_at: string;
+          team: string;
+          token_hash: string;
+        };
+        Insert: {
+          game_id: string;
+          joined_at?: string;
+          last_seen_at?: string;
+          team: string;
+          token_hash: string;
+        };
+        Update: {
+          game_id?: string;
+          joined_at?: string;
+          last_seen_at?: string;
+          team?: string;
+          token_hash?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "baseball_game_seats_game_id_fkey";
+            columns: ["game_id"];
+            isOneToOne: false;
+            referencedRelation: "baseball_games";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
+      baseball_game_actions: {
+        Row: {
+          action: Json;
+          actor_team: string;
+          created_at: string;
+          events: Json;
+          expected_revision: number;
+          game_id: string;
+          idempotency_key: string;
+          result_revision: number;
+          sequence: number;
+        };
+        Insert: {
+          action: Json;
+          actor_team: string;
+          created_at?: string;
+          events: Json;
+          expected_revision: number;
+          game_id: string;
+          idempotency_key: string;
+          result_revision: number;
+          sequence: number;
+        };
+        Update: {
+          action?: Json;
+          actor_team?: string;
+          created_at?: string;
+          events?: Json;
+          expected_revision?: number;
+          game_id?: string;
+          idempotency_key?: string;
+          result_revision?: number;
+          sequence?: number;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "baseball_game_actions_game_id_fkey";
+            columns: ["game_id"];
+            isOneToOne: false;
+            referencedRelation: "baseball_games";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
       workbench_sessions: {
         Row: {
           created_at: string;
@@ -332,6 +449,22 @@ export type Database = {
     };
     Views: { [_ in never]: never };
     Functions: {
+      baseball_claim_home_seat: {
+        Args: { p_room_code: string; p_token_hash: string };
+        Returns: Json;
+      };
+      baseball_commit_action: {
+        Args: {
+          p_action: Json;
+          p_actor_team: string;
+          p_events: Json;
+          p_expected_revision: number;
+          p_game_id: string;
+          p_idempotency_key: string;
+          p_new_state: Json;
+        };
+        Returns: Json;
+      };
       workbench_record_login_failure: {
         Args: { p_account_id: number };
         Returns: string | null;

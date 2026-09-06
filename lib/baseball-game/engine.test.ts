@@ -450,7 +450,7 @@ const PRIMARY_CARD_SCENARIOS = [
   ["GBH", "defense", "after_batting", { kind: "batting", face: "GA" }],
 ] as const;
 
-describe("cards-v1 strategy cards", () => {
+describe("pro-cards-v1 strategy cards", () => {
   it("automatically resolves a card window when neither side has a legal card", () => {
     const state = pitch(game(), "B");
 
@@ -475,8 +475,8 @@ describe("cards-v1 strategy cards", () => {
     expect(first).toEqual(replay);
     expect(first.cards.offense.hand).toHaveLength(4);
     expect(first.cards.defense.hand).toHaveLength(4);
-    expect(total("offense")).toHaveLength(25);
-    expect(total("defense")).toHaveLength(21);
+    expect(total("offense")).toHaveLength(40);
+    expect(total("defense")).toHaveLength(40);
     for (const role of ["offense", "defense"] as const) {
       for (const cardId of CARD_DECK_COUNTS[role]) {
         expect(
@@ -778,5 +778,240 @@ describe("cards-v1 strategy cards", () => {
     expect(state.phase).toBe("finished");
     expect(state.winner).toBe("home");
     expect(state.pendingResolution).toBeNull();
+  });
+});
+
+describe("advanced strategy and automatic pro rules", () => {
+  it("contains all 40 offense and 40 defense cards across three tiers", () => {
+    const state = createGame(CONFIG, { seed: 314159 });
+    for (const role of ["offense", "defense"] as const) {
+      const all = [
+        ...state.cards[role].drawPile,
+        ...state.cards[role].hand,
+        ...state.cards[role].discardPile,
+      ];
+      expect(all).toHaveLength(40);
+      expect(new Set(all.map((card) => card.instanceId))).toHaveLength(40);
+    }
+    expect(
+      new Set(Object.values(CARD_DEFINITIONS).map((card) => card.tier)),
+    ).toEqual(new Set(["basic", "intermediate", "advanced"]));
+  });
+
+  it("resolves both squeeze plays and lets bunt defense answer them", () => {
+    let squeeze = cardState({
+      bases: { first: false, second: false, third: true },
+      offense: ["SQ1"],
+      timing: "after_contact",
+      pendingResolution: { kind: "contact" },
+      priorityOrder: ["offense"],
+    });
+    squeeze = playCardId(squeeze, "SQ1");
+    expect(squeeze.score.away).toBe(1);
+    expect(squeeze.outs).toBe(1);
+
+    let safe = cardState({
+      bases: { first: true, second: false, third: true },
+      offense: ["SQ2"],
+      timing: "after_contact",
+      pendingResolution: { kind: "contact" },
+      priorityOrder: ["offense"],
+    });
+    safe = playCardId(safe, "SQ2");
+    expect(safe.score.away).toBe(1);
+    expect(safe.bases).toEqual({ first: true, second: true, third: false });
+
+    let defended = cardState({
+      bases: { first: false, second: false, third: true },
+      offense: ["SQ2"],
+      defense: ["BD"],
+      timing: "after_contact",
+      pendingResolution: { kind: "contact" },
+      priorityOrder: ["offense"],
+    });
+    defended = playCardId(defended, "SQ2");
+    defended = playCardId(defended, "BD");
+    expect(defended.score.away).toBe(0);
+    expect(defended.outs).toBe(1);
+    expect(defended.bases.first).toBe(true);
+  });
+
+  it("resolves triple play, line-drive double play, and hit-by-ball defense", () => {
+    let triple = cardState({
+      bases: { first: true, second: true, third: false },
+      defense: ["GTP"],
+      timing: "after_batting",
+      pendingResolution: { kind: "batting", face: "GF" },
+      priorityOrder: ["defense"],
+    });
+    triple = playCardId(triple, "GTP");
+    expect(triple.half).toBe("bottom");
+
+    let line = cardState({
+      bases: { first: false, second: true, third: true },
+      defense: ["LDP"],
+      timing: "after_batting",
+      pendingResolution: { kind: "batting", face: "HIT" },
+      priorityOrder: ["defense"],
+    });
+    line = playCardId(line, "LDP");
+    expect(line.outs).toBe(2);
+    expect(line.bases).toEqual({ first: false, second: true, third: false });
+
+    let runner = cardState({
+      bases: { first: true, second: true, third: false },
+      defense: ["RHB"],
+      timing: "after_batting",
+      pendingResolution: { kind: "batting", face: "GA" },
+      priorityOrder: ["defense"],
+    });
+    runner = playCardId(runner, "RHB");
+    expect(runner.outs).toBe(1);
+    expect(runner.bases).toEqual({ first: true, second: true, third: false });
+  });
+
+  it("applies hit assists and one-hit-one-error after the hit die", () => {
+    let assist = cardState({
+      bases: { first: true, second: true, third: false },
+      defense: ["AHH"],
+      timing: "after_hit",
+      pendingResolution: { kind: "hit", face: "R2" },
+      priorityOrder: ["defense"],
+    });
+    assist = playCardId(assist, "AHH");
+    expect(assist.outs).toBe(1);
+    expect(assist.score.away).toBe(0);
+    expect(assist.bases).toEqual({ first: true, second: false, third: true });
+
+    let error = cardState({
+      bases: { first: true, second: true, third: false },
+      offense: ["1H1E"],
+      timing: "after_hit",
+      pendingResolution: { kind: "hit", face: "L2" },
+      priorityOrder: ["offense"],
+    });
+    error = playCardId(error, "1H1E");
+    expect(error.score.away).toBe(1);
+    expect(error.bases).toEqual({ first: true, second: false, third: true });
+  });
+
+  it("runs hit-and-run special batting outcomes and extra hit advancement", () => {
+    let ground = cardState({
+      bases: { first: true, second: false, third: false },
+      offense: ["HNR"],
+      timing: "before_pitch",
+      priorityOrder: ["offense"],
+    });
+    ground = playCardId(ground, "HNR");
+    expect(ground.phase).toBe("awaiting_batting");
+    ground = apply(ground, { type: "BATTING_RESULT", face: "GF" });
+    expect(ground.outs).toBe(1);
+    expect(ground.bases.second).toBe(true);
+
+    let extra = game({
+      phase: "awaiting_hit",
+      bases: { first: true, second: false, third: false },
+      activeStrategy: { cardId: "HNR", cardInstanceId: "hnr-test" },
+    });
+    extra = apply(extra, { type: "HIT_RESULT", face: "R2" });
+    expect(extra.score.away).toBe(1);
+    expect(extra.bases).toEqual({ first: true, second: false, third: false });
+  });
+
+  it("runs and defends run-and-hit, and returns the card on a foul", () => {
+    let run = cardState({
+      bases: { first: true, second: false, third: false },
+      offense: ["RNH"],
+      defense: ["CS2"],
+      timing: "before_pitch",
+      priorityOrder: ["offense"],
+      overrides: { balls: 3 },
+    });
+    run = playCardId(run, "RNH");
+    run = apply(run, { type: "PITCH_RESULT", face: "S" });
+    expect(getLegalCards(run, "defense")[0]).toMatchObject({ playable: true });
+    run = playCardId(run, "CS2");
+    expect(run.outs).toBe(1);
+    expect(run.bases.first).toBe(false);
+    expect(run.balls).toBe(3);
+
+    let foul = cardState({
+      bases: { first: true, second: false, third: false },
+      offense: ["RNH"],
+      timing: "before_pitch",
+      priorityOrder: ["offense"],
+      overrides: { balls: 3 },
+    });
+    foul = playCardId(foul, "RNH");
+    foul = apply(foul, { type: "PITCH_RESULT", face: "F" });
+    expect(foul.activeStrategy).toBeNull();
+    expect(foul.cards.offense.hand.some((card) => card.cardId === "RNH")).toBe(
+      true,
+    );
+    expect(foul.strikes).toBe(1);
+  });
+
+  it("handles dropped third strike, interference, catcher pickoff, and foul fly", () => {
+    for (const cardId of ["SNO", "CIB"] as const) {
+      let state = cardState({
+        offense: [cardId],
+        timing: "after_pitch",
+        pendingResolution: { kind: "pitch", face: "SM" },
+        priorityOrder: ["offense"],
+        overrides: { strikes: 2 },
+      });
+      state = playCardId(state, cardId);
+      expect(state.bases.first).toBe(true);
+      expect(state.outs).toBe(0);
+    }
+
+    let catcher = cardState({
+      bases: { first: true, second: false, third: false },
+      offense: ["POE"],
+      defense: ["CO1"],
+      timing: "after_pitch",
+      pendingResolution: { kind: "pitch", face: "B" },
+      priorityOrder: ["defense"],
+    });
+    catcher = playCardId(catcher, "CO1");
+    catcher = playCardId(catcher, "POE");
+    expect(catcher.bases.second).toBe(true);
+
+    let foulFly = cardState({
+      defense: ["FFO"],
+      timing: "after_pitch",
+      pendingResolution: { kind: "pitch", face: "F" },
+      priorityOrder: ["defense"],
+    });
+    foulFly = playCardId(foulFly, "FFO");
+    expect(foulFly.outs).toBe(1);
+  });
+
+  it("automatically protects an infield-fly situation and allows IFD otherwise", () => {
+    const protectedPlay = batting(
+      game({ bases: { first: true, second: true, third: false } }),
+      "PO",
+    );
+    expect(protectedPlay.outs).toBe(1);
+    expect(protectedPlay.bases).toEqual({
+      first: true,
+      second: true,
+      third: false,
+    });
+    expect(
+      protectedPlay.eventLog.some((event) =>
+        event.summary.includes("인필드플라이"),
+      ),
+    ).toBe(true);
+
+    let dropped = cardState({
+      bases: { first: true, second: false, third: true },
+      defense: ["IFD"],
+      timing: "after_batting",
+      pendingResolution: { kind: "batting", face: "PO" },
+      priorityOrder: ["defense"],
+    });
+    dropped = playCardId(dropped, "IFD");
+    expect(dropped.outs).toBe(2);
   });
 });

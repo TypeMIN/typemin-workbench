@@ -66,9 +66,9 @@ export function createGame(
   drawToFour(cards.offense, rng);
   drawToFour(cards.defense, rng);
 
-  return {
-    schemaVersion: 2,
-    rulesetVersion: "cards-v1",
+  const state: GameState = {
+    schemaVersion: 3,
+    rulesetVersion: "pro-cards-v1",
     revision: 0,
     config: {
       innings: config.innings,
@@ -89,8 +89,11 @@ export function createGame(
     cards,
     cardWindow: null,
     pendingResolution: null,
+    activeStrategy: null,
     eventLog: [],
   };
+  openCardWindow(state, "before_pitch", ["offense", "defense"]);
+  return state;
 }
 
 export function getLegalActions(state: GameState): GameAction["type"][] {
@@ -282,8 +285,14 @@ function cloneState(state: GameState): GameState {
         }
       : null,
     pendingResolution: state.pendingResolution
-      ? { ...state.pendingResolution }
+      ? state.pendingResolution.kind === "run_hit_pitch"
+        ? {
+            ...state.pendingResolution,
+            runners: [...state.pendingResolution.runners],
+          }
+        : { ...state.pendingResolution }
       : null,
+    activeStrategy: state.activeStrategy ? { ...state.activeStrategy } : null,
     eventLog: [...state.eventLog],
   };
 }
@@ -321,6 +330,11 @@ function emit(
 }
 
 function resolvePitch(state: GameState, face: PitchFace, events: GameEvent[]) {
+  if (state.activeStrategy?.cardId === "RNH") {
+    resolveRunAndHitPitch(state, face, events);
+    return;
+  }
+
   if (face === "C") {
     state.pendingResolution = { kind: "contact" };
     if (openCardWindow(state, "after_contact", ["offense"])) return;
@@ -328,14 +342,66 @@ function resolvePitch(state: GameState, face: PitchFace, events: GameEvent[]) {
     return;
   }
 
-  if (face === "S" || face === "SM" || face === "B") {
+  if (face === "S" || face === "SM" || face === "B" || face === "F") {
     state.pendingResolution = { kind: "pitch", face };
-    if (openCardWindow(state, "after_pitch", ["offense"])) return;
+    if (openCardWindow(state, "after_pitch", ["offense", "defense"])) return;
     resolvePending(state, events);
     return;
   }
 
   resolvePitchFace(state, face, events);
+}
+
+function resolveRunAndHitPitch(
+  state: GameState,
+  face: PitchFace,
+  events: GameEvent[],
+) {
+  if (face === "F") {
+    returnRunAndHitCard(state);
+    state.activeStrategy = null;
+    emit(state, events, {
+      kind: "rule",
+      summary: "런 앤드 히트 · 파울로 카드 반환, 주자 원위치",
+      cardId: "RNH",
+      cardRole: "offense",
+    });
+    resolvePitchFace(state, face, events);
+    return;
+  }
+
+  if (face === "C") {
+    state.pendingResolution = null;
+    state.phase = "awaiting_batting";
+    emit(state, events, {
+      kind: "rule",
+      summary: "런 앤드 히트 · 컨택, 특수 타구 규칙 적용",
+      cardId: "RNH",
+      cardRole: "offense",
+    });
+    return;
+  }
+
+  const runners: Array<"first" | "second"> = [];
+  if (state.bases.second) runners.push("second");
+  if (state.bases.first) runners.push("first");
+  state.pendingResolution = { kind: "run_hit_pitch", face, runners };
+  if (openCardWindow(state, "after_pitch", ["defense"])) return;
+  resolvePending(state, events);
+}
+
+function returnRunAndHitCard(state: GameState) {
+  const instanceId = state.activeStrategy?.cardInstanceId;
+  if (!instanceId) return;
+  const zone = state.cards.offense;
+  const card = zone.discardPile.find((item) => item.instanceId === instanceId);
+  if (!card) return;
+  zone.discardPile = zone.discardPile.filter(
+    (item) => item.instanceId !== instanceId,
+  );
+  const replacement = zone.hand.pop();
+  if (replacement) zone.drawPile.push(replacement);
+  zone.hand.push(card);
 }
 
 function resolvePitchFace(
@@ -424,15 +490,6 @@ function resolveBatting(
   face: BattingFace,
   events: GameEvent[],
 ) {
-  if (face === "HIT") {
-    state.phase = "awaiting_hit";
-    emit(state, events, {
-      kind: "count",
-      summary: "안타 판정 · 안타 주사위를 굴립니다.",
-    });
-    return;
-  }
-
   state.pendingResolution = { kind: "batting", face };
   if (openCardWindow(state, "after_batting", ["defense", "offense"])) {
     return;
@@ -442,9 +499,42 @@ function resolveBatting(
 
 function resolveBattingFace(
   state: GameState,
-  face: Exclude<BattingFace, "HIT">,
+  face: BattingFace,
   events: GameEvent[],
 ) {
+  if (face === "HIT") {
+    state.phase = "awaiting_hit";
+    emit(state, events, {
+      kind: "count",
+      summary: "안타 판정 · 안타 주사위를 굴립니다.",
+    });
+    return;
+  }
+
+  const strategy = state.activeStrategy?.cardId;
+  if (strategy && (face === "GF" || face === "G3")) {
+    finishPlateAppearance(state, events, {
+      ...resolveGroundAdvance(state.bases),
+      summary: `${strategy} · 땅볼 진루타`,
+    });
+    return;
+  }
+  if (strategy && (face === "PO" || face === "FO")) {
+    finishPlateAppearance(
+      state,
+      events,
+      lineDriveDoublePlayOutcome(state.bases, `${strategy} · 뜬공 병살`),
+    );
+    return;
+  }
+  if (strategy && (face === "F2" || face === "F3" || face === "FA")) {
+    finishPlateAppearance(state, events, {
+      ...resolveFlyHold(state.bases, "FO"),
+      summary: `${strategy} · 주자 복귀, 타자 아웃`,
+    });
+    return;
+  }
+
   const outcome =
     face === "GF"
       ? resolveGroundForce(state.bases, "선행주자 땅볼")
@@ -603,7 +693,9 @@ function resolveHomeRun(bases: Bases): PlateAppearanceOutcome {
 }
 
 function resolveHit(state: GameState, face: HitFace, events: GameEvent[]) {
-  finishPlateAppearance(state, events, hitOutcome(state.bases, face));
+  state.pendingResolution = { kind: "hit", face };
+  if (openCardWindow(state, "after_hit", ["defense", "offense"])) return;
+  resolvePending(state, events);
 }
 
 function hitOutcome(bases: Bases, face: HitFace): PlateAppearanceOutcome {
@@ -711,6 +803,7 @@ function finishPlateAppearance(
   }
 
   resetCount(state);
+  state.activeStrategy = null;
   state.phase = "awaiting_pitch";
   emit(state, events, {
     kind: "plate_appearance",
@@ -741,6 +834,7 @@ function resetCount(state: GameState) {
 }
 
 function advanceHalfInning(state: GameState, events: GameEvent[]) {
+  state.activeStrategy = null;
   state.outs = 0;
   state.bases = { ...EMPTY_BASES };
   resetCount(state);
@@ -833,7 +927,10 @@ function seekPlayablePriority(state: GameState, startIndex: number) {
 function phaseForPending(pending: GameState["pendingResolution"]): GamePhase {
   if (!pending) return "awaiting_pitch";
   if (pending.kind === "contact") return "awaiting_batting";
-  return pending.kind === "pitch" ? "awaiting_pitch" : "awaiting_batting";
+  if (pending.kind === "pitch" || pending.kind === "run_hit_pitch") {
+    return "awaiting_pitch";
+  }
+  return pending.kind === "hit" ? "awaiting_hit" : "awaiting_batting";
 }
 
 function currentCardRole(state: GameState): CardRole {
@@ -863,34 +960,81 @@ function cardUnavailableReason(
     return timingReason(window.timing);
   }
 
-  if (cardId === "BK") {
-    return occupiedBaseCount(state.bases) > 0 ? null : "주자가 없습니다.";
-  }
-  if (cardId === "PO1") {
-    return state.bases.first && !state.bases.second
-      ? null
-      : "1루 또는 1·3루 상황이 필요합니다.";
-  }
-  if (cardId === "PO2") {
-    return state.bases.second && !state.bases.third
-      ? null
-      : "2루 또는 1·2루 상황이 필요합니다.";
-  }
-  if (cardId === "POE" || cardId.startsWith("CS") || cardId === "BD") {
-    return "대응할 상대 카드가 필요합니다.";
+  const pending = state.pendingResolution;
+  const pitchFace = pending?.kind === "pitch" ? pending.face : null;
+  const battingFace = pending?.kind === "batting" ? pending.face : null;
+  const hitFace = pending?.kind === "hit" ? pending.face : null;
+
+  if (window.timing === "before_pitch") {
+    if (cardId === "BK") {
+      return occupiedBaseCount(state.bases) > 0 ? null : "주자가 없습니다.";
+    }
+    if (cardId === "PO1") {
+      return state.bases.first && !state.bases.second
+        ? null
+        : "1루 또는 1·3루 상황이 필요합니다.";
+    }
+    if (cardId === "PO2") {
+      return state.bases.second && !state.bases.third
+        ? null
+        : "2루 또는 1·2루 상황이 필요합니다.";
+    }
+    if (cardId === "HNR" || cardId === "RNH") {
+      if (!state.bases.first || state.bases.third) {
+        return "1루 또는 1·2루 상황이 필요합니다.";
+      }
+      if (cardId === "RNH" && state.balls !== 3)
+        return "3볼 상황이 필요합니다.";
+      return state.activeStrategy ? "이미 주루 작전이 진행 중입니다." : null;
+    }
   }
 
   if (window.timing === "after_pitch") {
-    const face =
-      state.pendingResolution?.kind === "pitch"
-        ? state.pendingResolution.face
-        : null;
-    if (cardId === "HBP") return face === "B" ? null : "볼 결과가 필요합니다.";
+    if (pending?.kind === "run_hit_pitch") {
+      if (cardId === "CS2") {
+        return pending.runners.includes("first")
+          ? null
+          : "2루 도루 주자가 없습니다.";
+      }
+      if (cardId === "CS3") {
+        return pending.runners.includes("second")
+          ? null
+          : "3루 도루 주자가 없습니다.";
+      }
+      return "런 앤드 히트 도루저지 카드만 사용할 수 있습니다.";
+    }
+    if (cardId === "HBP")
+      return pitchFace === "B" ? null : "볼 결과가 필요합니다.";
     if (cardId === "WP") {
-      if (face !== "B") return "볼 결과가 필요합니다.";
+      if (pitchFace !== "B") return "볼 결과가 필요합니다.";
       return occupiedBaseCount(state.bases) > 0 ? null : "주자가 없습니다.";
     }
-    if (!face || !["S", "SM", "B"].includes(face)) {
+    if (cardId === "SNO") {
+      return pitchFace === "SM" &&
+        state.strikes === 2 &&
+        (!state.bases.first || state.outs === 2)
+        ? null
+        : "세 번째 헛스윙과 낫아웃 조건이 필요합니다.";
+    }
+    if (cardId === "CIB")
+      return pitchFace === "SM" ? null : "헛스윙 결과가 필요합니다.";
+    if (cardId === "CO1") {
+      return pitchFace &&
+        ["S", "SM", "B"].includes(pitchFace) &&
+        state.bases.first
+        ? null
+        : "투구 직후 1루 주자가 필요합니다.";
+    }
+    if (cardId === "CO3") {
+      return pitchFace &&
+        ["S", "SM", "B"].includes(pitchFace) &&
+        state.bases.third
+        ? null
+        : "투구 직후 3루 주자가 필요합니다.";
+    }
+    if (cardId === "FFO")
+      return pitchFace === "F" ? null : "파울 결과가 필요합니다.";
+    if (!pitchFace || !["S", "SM", "B"].includes(pitchFace)) {
       return "스트라이크·헛스윙·볼 결과가 필요합니다.";
     }
     if (cardId === "SB2") {
@@ -903,58 +1047,142 @@ function cardUnavailableReason(
         ? null
         : "2루 주자와 빈 3루가 필요합니다.";
     }
-    if (cardId === "SBH") {
+    if (cardId === "SBH")
+      return state.bases.third ? null : "3루 주자가 필요합니다.";
+  }
+
+  if (window.timing === "after_contact") {
+    if (cardId === "SB") {
+      return !state.bases.third && (state.bases.first || state.bases.second)
+        ? null
+        : "1루·2루 또는 1·2루 주자 상황이 필요합니다.";
+    }
+    if (cardId === "SQ1" || cardId === "SQ2") {
       return state.bases.third ? null : "3루 주자가 필요합니다.";
     }
   }
 
-  if (cardId === "SB") {
-    return !state.bases.third && (state.bases.first || state.bases.second)
-      ? null
-      : "1루·2루 또는 1·2루 주자 상황이 필요합니다.";
+  if (window.timing === "after_batting") {
+    if (cardId === "GDP") {
+      const supportedBases =
+        state.bases.first && (!state.bases.third || state.bases.second);
+      return !state.activeStrategy &&
+        state.outs < 2 &&
+        supportedBases &&
+        (battingFace === "GF" || battingFace === "GA")
+        ? null
+        : "0·1아웃의 지정된 강제 상황과 GF·GA가 필요합니다.";
+    }
+    if (cardId === "GTP") {
+      return !state.activeStrategy &&
+        state.outs === 0 &&
+        state.bases.first &&
+        state.bases.second &&
+        battingFace === "GF"
+        ? null
+        : "무사 1·2루 또는 만루의 GF가 필요합니다.";
+    }
+    if (cardId === "LDP") {
+      return state.outs < 2 &&
+        occupiedBaseCount(state.bases) > 0 &&
+        battingFace === "HIT"
+        ? null
+        : "0·1아웃, 주자가 있는 안타성 타구가 필요합니다.";
+    }
+    if (cardId === "GBH") {
+      return battingFace === "GA" &&
+        !state.bases.first &&
+        (state.bases.second || state.bases.third)
+        ? null
+        : "1루 주자 없이 2·3루 주자와 GA가 필요합니다.";
+    }
+    if (cardId === "A3F") {
+      return (battingFace === "F2" || battingFace === "FA") &&
+        state.bases.second
+        ? null
+        : "2루 주자의 3루 태그업이 필요합니다.";
+    }
+    if (cardId === "AHF") {
+      return (battingFace === "F3" || battingFace === "FA") && state.bases.third
+        ? null
+        : "3루 주자의 홈 태그업이 필요합니다.";
+    }
+    if (cardId === "IFD") {
+      return battingFace === "PO" &&
+        state.outs < 2 &&
+        state.bases.first &&
+        !isInfieldFlySituation(state)
+        ? null
+        : "인필드플라이가 아닌 0·1아웃 1루 강제 상황이 필요합니다.";
+    }
+    if (cardId === "RHB") {
+      return (battingFace === "GF" || battingFace === "GA") &&
+        (state.bases.first || state.bases.second)
+        ? null
+        : "1·2루 주자가 있는 GF 또는 GA가 필요합니다.";
+    }
+    if (cardId === "E") {
+      return battingFace &&
+        ["GF", "G3", "GA", "PO", "FO", "F2", "F3", "FA"].includes(battingFace)
+        ? null
+        : "땅볼 또는 플라이 결과가 필요합니다.";
+    }
+    if (cardId === "HRC")
+      return battingFace === "HR" ? null : "홈런 결과가 필요합니다.";
+    if (cardId === "IOB") {
+      return battingFace &&
+        ["GF", "GA", "PO"].includes(battingFace) &&
+        occupiedBaseCount(state.bases) > 0
+        ? null
+        : "주자가 있는 GF·GA·PO 결과가 필요합니다.";
+    }
   }
 
-  const battingFace =
-    state.pendingResolution?.kind === "batting"
-      ? state.pendingResolution.face
-      : null;
-  if (cardId === "GDP") {
-    const supportedBases =
-      state.bases.first && (!state.bases.third || state.bases.second);
-    return state.outs < 2 &&
-      supportedBases &&
-      (battingFace === "GF" || battingFace === "GA")
-      ? null
-      : "0·1아웃의 지정된 강제 상황과 GF·GA가 필요합니다.";
+  if (window.timing === "after_hit") {
+    if (cardId === "1H1E") return hitFace ? null : "안타 결과가 필요합니다.";
+    if (cardId === "A2")
+      return hitFace === "D2" || hitFace === "D3"
+        ? null
+        : "D2 또는 D3 2루타가 필요합니다.";
+    if (cardId === "A3H") {
+      return state.bases.first &&
+        hitFace &&
+        ["L2", "C2", "R2", "D2"].includes(hitFace)
+        ? null
+        : "1루 주자가 3루를 노리는 안타가 필요합니다.";
+    }
+    if (cardId === "AHH") {
+      return state.bases.second &&
+        hitFace &&
+        ["L2", "C2", "R2"].includes(hitFace)
+        ? null
+        : "2루 주자가 홈을 노리는 안타가 필요합니다.";
+    }
   }
-  if (cardId === "GBH") {
-    return battingFace === "GA" &&
-      !state.bases.first &&
-      (state.bases.second || state.bases.third)
-      ? null
-      : "1루 주자 없이 2·3루 주자와 GA가 필요합니다.";
-  }
-  if (cardId === "E") {
-    return battingFace &&
-      ["GF", "G3", "GA", "PO", "FO", "F2", "F3", "FA"].includes(battingFace)
-      ? null
-      : "땅볼 또는 플라이 결과가 필요합니다.";
+
+  if (cardId === "POE" || cardId.startsWith("CS") || cardId === "BD") {
+    return "대응할 상대 카드가 필요합니다.";
   }
   return "현재 상황에서 사용할 수 없습니다.";
 }
 
 function responseUnavailableReason(cardId: CardId, primary: CardId) {
-  const matchingResponse: Partial<Record<CardId, CardId>> = {
-    PO1: "POE",
-    PO2: "POE",
-    SB2: "CS2",
-    SB3: "CS3",
-    SBH: "CSH",
-    SB: "BD",
-    GDP: "E",
-    GBH: "E",
+  const matchingResponse: Partial<Record<CardId, CardId[]>> = {
+    PO1: ["POE"],
+    PO2: ["POE"],
+    CO1: ["POE"],
+    CO3: ["POE"],
+    SB2: ["CS2"],
+    SB3: ["CS3"],
+    SBH: ["CSH"],
+    SB: ["BD"],
+    SQ1: ["BD"],
+    SQ2: ["BD"],
+    GDP: ["E"],
+    GBH: ["E"],
+    GTP: ["E"],
   };
-  return matchingResponse[primary] === cardId
+  return matchingResponse[primary]?.includes(cardId)
     ? null
     : `${primary}에 대응할 수 없는 카드입니다.`;
 }
@@ -965,6 +1193,7 @@ function timingReason(timing: CardTiming) {
     after_pitch: "현재 투구 결과에 맞는 카드만 사용할 수 있습니다.",
     after_contact: "컨택 이후 카드만 사용할 수 있습니다.",
     after_batting: "현재 타구 결과에 맞는 카드만 사용할 수 있습니다.",
+    after_hit: "현재 안타와 주자 이동에 맞는 카드만 사용할 수 있습니다.",
   };
   return labels[timing];
 }
@@ -1026,6 +1255,24 @@ function resolvePrimaryCard(
 ) {
   if (!played) return;
   const { cardId } = played;
+  if (cardId === "HNR" || cardId === "RNH") {
+    state.activeStrategy = {
+      cardId,
+      cardInstanceId: played.instanceId,
+    };
+    state.cardWindow = null;
+    state.pendingResolution = null;
+    state.phase = cardId === "HNR" ? "awaiting_batting" : "awaiting_pitch";
+    emitCardResolution(
+      state,
+      events,
+      cardId,
+      cardId === "HNR"
+        ? "히트 앤드 런 · 컨택 확정"
+        : "런 앤드 히트 · 다음 투구에 주자 출발",
+    );
+    return;
+  }
   if (cardId === "BK" || cardId === "WP") {
     applyAllRunnerAdvance(
       state,
@@ -1036,10 +1283,19 @@ function resolvePrimaryCard(
     continueCardWindow(state, events);
     return;
   }
-  if (cardId === "PO1" || cardId === "PO2") {
+  if (
+    cardId === "PO1" ||
+    cardId === "PO2" ||
+    cardId === "CO1" ||
+    cardId === "CO3"
+  ) {
     recordRunnerOut(
       state,
-      cardId === "PO1" ? "first" : "second",
+      cardId === "PO1" || cardId === "CO1"
+        ? "first"
+        : cardId === "CO3"
+          ? "third"
+          : "second",
       events,
       `${CARD_DEFINITIONS[cardId].name} 성공`,
       cardId,
@@ -1055,14 +1311,62 @@ function resolvePrimaryCard(
     });
     return;
   }
+  if (cardId === "SNO" || cardId === "CIB") {
+    emitCardResolution(
+      state,
+      events,
+      cardId,
+      `${CARD_DEFINITIONS[cardId].name} 적용`,
+    );
+    finishPlateAppearance(state, events, {
+      ...errorOutcome(state.bases),
+      summary: CARD_DEFINITIONS[cardId].name,
+    });
+    return;
+  }
+  if (
+    (cardId === "CS2" || cardId === "CS3") &&
+    state.pendingResolution?.kind === "run_hit_pitch"
+  ) {
+    const base = cardId === "CS2" ? "first" : "second";
+    state.pendingResolution.runners = state.pendingResolution.runners.filter(
+      (runner) => runner !== base,
+    );
+    recordRunnerOut(
+      state,
+      base,
+      events,
+      `${CARD_DEFINITIONS[cardId].name} 성공`,
+      cardId,
+    );
+    continueCardWindow(state, events);
+    return;
+  }
+  if (cardId === "FFO") {
+    emitCardResolution(state, events, cardId, "파울 플라이 아웃 적용");
+    finishPlateAppearance(state, events, {
+      ...resolveFlyHold(state.bases, "PO"),
+      summary: "파울 플라이 아웃",
+    });
+    return;
+  }
   if (cardId === "SB2" || cardId === "SB3" || cardId === "SBH") {
     resolveSuccessfulSteal(state, cardId, events);
     continueCardWindow(state, events);
     return;
   }
-  if (cardId === "SB") {
-    emitCardResolution(state, events, cardId, "희생번트 적용");
-    finishPlateAppearance(state, events, sacrificeBuntOutcome(state.bases));
+  if (cardId === "SB" || cardId === "SQ1" || cardId === "SQ2") {
+    emitCardResolution(
+      state,
+      events,
+      cardId,
+      `${CARD_DEFINITIONS[cardId].name} 적용`,
+    );
+    const outcome =
+      cardId === "SB"
+        ? sacrificeBuntOutcome(state.bases)
+        : squeezeOutcome(state.bases, cardId === "SQ2");
+    finishPlateAppearance(state, events, outcome);
     return;
   }
   if (cardId === "E") {
@@ -1070,9 +1374,98 @@ function resolvePrimaryCard(
     finishPlateAppearance(state, events, errorOutcome(state.bases));
     return;
   }
-  if (cardId === "GDP") {
-    emitCardResolution(state, events, cardId, "땅볼 병살 적용");
+  if (cardId === "GDP" || cardId === "IFD") {
+    emitCardResolution(
+      state,
+      events,
+      cardId,
+      `${CARD_DEFINITIONS[cardId].name} 적용`,
+    );
     finishPlateAppearance(state, events, doublePlayOutcome(state.bases));
+    return;
+  }
+  if (cardId === "GTP") {
+    emitCardResolution(state, events, cardId, "땅볼 삼중살 적용");
+    finishPlateAppearance(state, events, triplePlayOutcome(state.bases));
+    return;
+  }
+  if (cardId === "LDP") {
+    emitCardResolution(state, events, cardId, "직선타 병살 적용");
+    finishPlateAppearance(
+      state,
+      events,
+      lineDriveDoublePlayOutcome(state.bases),
+    );
+    return;
+  }
+  if (cardId === "RHB") {
+    emitCardResolution(state, events, cardId, "타구에 맞은 주자 아웃");
+    finishPlateAppearance(state, events, runnerHitByBallOutcome(state.bases));
+    return;
+  }
+  if (cardId === "A3F" || cardId === "AHF") {
+    const face =
+      state.pendingResolution?.kind === "batting"
+        ? state.pendingResolution.face
+        : null;
+    if (face !== "F2" && face !== "F3" && face !== "FA") return;
+    emitCardResolution(
+      state,
+      events,
+      cardId,
+      `${CARD_DEFINITIONS[cardId].name} 적용`,
+    );
+    finishPlateAppearance(
+      state,
+      events,
+      flyAssistOutcome(state.bases, face, cardId),
+    );
+    return;
+  }
+  if (cardId === "HRC") {
+    emitCardResolution(state, events, cardId, "중월 홈런 확정");
+    finishPlateAppearance(state, events, resolveHomeRun(state.bases));
+    return;
+  }
+  if (cardId === "IOB") {
+    emitCardResolution(state, events, cardId, "야수 주루방해 적용");
+    finishPlateAppearance(state, events, {
+      ...errorOutcome(state.bases),
+      summary: "야수 주루방해 · 안전진루",
+    });
+    return;
+  }
+  if (cardId === "1H1E") {
+    const face =
+      state.pendingResolution?.kind === "hit"
+        ? state.pendingResolution.face
+        : null;
+    if (!face) return;
+    emitCardResolution(state, events, cardId, "원히트 원에러 적용");
+    finishPlateAppearance(
+      state,
+      events,
+      oneHitOneErrorOutcome(state.bases, face),
+    );
+    return;
+  }
+  if (cardId === "A2" || cardId === "A3H" || cardId === "AHH") {
+    const face =
+      state.pendingResolution?.kind === "hit"
+        ? state.pendingResolution.face
+        : null;
+    if (!face) return;
+    emitCardResolution(
+      state,
+      events,
+      cardId,
+      `${CARD_DEFINITIONS[cardId].name} 적용`,
+    );
+    finishPlateAppearance(
+      state,
+      events,
+      hitAssistOutcome(state.bases, face, cardId),
+    );
     return;
   }
   if (cardId === "GBH") {
@@ -1185,8 +1578,59 @@ function resolvePending(state: GameState, events: GameEvent[]) {
     });
     return;
   }
+  if (pending.kind === "run_hit_pitch") {
+    resolveRunAndHitRunners(state, pending.runners, events);
+    if (state.phase === "finished") return;
+    state.phase = "awaiting_pitch";
+    resolvePitchFace(state, pending.face, events);
+    return;
+  }
+  if (pending.kind === "hit") {
+    state.phase = "awaiting_hit";
+    const outcome = hitOutcome(state.bases, pending.face);
+    finishPlateAppearance(
+      state,
+      events,
+      state.activeStrategy ? addStrategyHitAdvance(outcome) : outcome,
+    );
+    return;
+  }
   state.phase = "awaiting_batting";
+  if (pending.face === "PO" && isInfieldFlySituation(state)) {
+    emit(state, events, {
+      kind: "rule",
+      summary: "인필드플라이 선언 · 타자만 아웃",
+    });
+  }
   resolveBattingFace(state, pending.face, events);
+}
+
+function resolveRunAndHitRunners(
+  state: GameState,
+  runners: Array<"first" | "second">,
+  events: GameEvent[],
+) {
+  const moves: RunnerMove[] = [];
+  if (runners.includes("second") && state.bases.second) {
+    state.bases.second = false;
+    state.bases.third = true;
+    moves.push({ runner: "second", from: "second", to: "third" });
+  }
+  if (runners.includes("first") && state.bases.first) {
+    state.bases.first = false;
+    state.bases.second = true;
+    moves.push({ runner: "first", from: "first", to: "second" });
+  }
+  emit(state, events, {
+    kind: "card_resolve",
+    summary: moves.length
+      ? "런 앤드 히트 · 주자 출발 성공"
+      : "런 앤드 히트 · 주자 저지",
+    cardId: "RNH",
+    cardRole: "offense",
+    moves,
+  });
+  state.activeStrategy = null;
 }
 
 function applyAllRunnerAdvance(
@@ -1265,6 +1709,30 @@ function sacrificeBuntOutcome(bases: Bases): PlateAppearanceOutcome {
   };
 }
 
+function squeezeOutcome(
+  bases: Bases,
+  allSafe: boolean,
+): PlateAppearanceOutcome {
+  if (allSafe) {
+    return {
+      ...errorOutcome(bases),
+      summary: "기습 스퀴즈 · 올 세이프",
+    };
+  }
+  return {
+    summary: "스퀴즈 번트 · 득점",
+    bases: { ...bases, third: false },
+    runs: bases.third ? 1 : 0,
+    outsRecorded: 1,
+    moves: [
+      ...(bases.third
+        ? ([{ runner: "third", from: "third", to: "home" }] as RunnerMove[])
+        : []),
+      { runner: "batter", from: "batter", to: "out" },
+    ],
+  };
+}
+
 function errorOutcome(bases: Bases): PlateAppearanceOutcome {
   return {
     summary: "수비 실책 · 전원 세이프",
@@ -1290,16 +1758,207 @@ function doublePlayOutcome(bases: Bases): PlateAppearanceOutcome {
   };
 }
 
+function triplePlayOutcome(bases: Bases): PlateAppearanceOutcome {
+  const runners = (["third", "second", "first"] as const)
+    .filter((base) => bases[base])
+    .slice(0, 2);
+  return {
+    summary: "땅볼 삼중살",
+    bases: { ...EMPTY_BASES },
+    outsRecorded: 3,
+    moves: [
+      ...runners.map((runner) => ({
+        runner,
+        from: runner,
+        to: "out" as const,
+      })),
+      { runner: "batter", from: "batter", to: "out" },
+    ],
+  };
+}
+
+function lineDriveDoublePlayOutcome(
+  bases: Bases,
+  summary = "직선타 병살",
+): PlateAppearanceOutcome {
+  const runner = bases.third ? "third" : bases.second ? "second" : "first";
+  return {
+    summary,
+    bases: { ...bases, [runner]: false },
+    outsRecorded: 2,
+    moves: [
+      { runner: "batter", from: "batter", to: "out" },
+      { runner, from: runner, to: "out" },
+    ],
+  };
+}
+
+function runnerHitByBallOutcome(bases: Bases): PlateAppearanceOutcome {
+  const runner = bases.second ? "second" : "first";
+  const firstForced = runner === "second" && bases.first;
+  const nextBases = {
+    ...bases,
+    [runner]: false,
+    first: true,
+    second: firstForced,
+  };
+  return {
+    summary: "타구에 맞은 주자 아웃 · 타자 세이프",
+    bases: nextBases,
+    outsRecorded: 1,
+    moves: [
+      { runner, from: runner, to: "out" },
+      ...(firstForced
+        ? ([{ runner: "first", from: "first", to: "second" }] as RunnerMove[])
+        : []),
+      { runner: "batter", from: "batter", to: "first" },
+    ],
+  };
+}
+
+function flyAssistOutcome(
+  bases: Bases,
+  face: "F2" | "F3" | "FA",
+  cardId: "A3F" | "AHF",
+): PlateAppearanceOutcome {
+  const outcome = resolveTagUp(bases, face);
+  const runner = cardId === "A3F" ? "second" : "third";
+  const destination = cardId === "A3F" ? "third" : "home";
+  const moves = (outcome.moves ?? []).filter((move) => move.runner !== runner);
+  moves.push({ runner, from: runner, to: "out" });
+  return {
+    ...outcome,
+    summary: CARD_DEFINITIONS[cardId].name,
+    bases:
+      cardId === "A3F" ? { ...outcome.bases, third: false } : outcome.bases,
+    runs: Math.max(0, (outcome.runs ?? 0) - Number(destination === "home")),
+    outsRecorded: 2,
+    moves,
+  };
+}
+
+function hitAssistOutcome(
+  bases: Bases,
+  face: HitFace,
+  cardId: "A2" | "A3H" | "AHH",
+): PlateAppearanceOutcome {
+  const outcome = hitOutcome(bases, face);
+  const runner =
+    cardId === "A2" ? "batter" : cardId === "A3H" ? "first" : "second";
+  const safeMove = (outcome.moves ?? []).find((move) => move.runner === runner);
+  const nextBases = { ...outcome.bases };
+  let runs = outcome.runs ?? 0;
+  if (
+    safeMove?.to === "first" ||
+    safeMove?.to === "second" ||
+    safeMove?.to === "third"
+  ) {
+    nextBases[safeMove.to] = false;
+  }
+  if (safeMove?.to === "home") runs = Math.max(0, runs - 1);
+  return {
+    ...outcome,
+    summary: CARD_DEFINITIONS[cardId].name,
+    bases: nextBases,
+    runs,
+    outsRecorded: 1,
+    moves: [
+      ...(outcome.moves ?? []).filter((move) => move.runner !== runner),
+      { runner, from: runner, to: "out" },
+    ],
+  };
+}
+
+function oneHitOneErrorOutcome(
+  bases: Bases,
+  face: HitFace,
+): PlateAppearanceOutcome {
+  const outcome = hitOutcome(bases, face);
+  const batterMove = (outcome.moves ?? []).find(
+    (move) => move.runner === "batter",
+  );
+  const nextBases: Bases = { first: false, second: false, third: false };
+  const moves: RunnerMove[] = [];
+  let runs = 0;
+
+  if (batterMove) {
+    moves.push(batterMove);
+    if (
+      batterMove.to === "first" ||
+      batterMove.to === "second" ||
+      batterMove.to === "third"
+    ) {
+      nextBases[batterMove.to] = true;
+    } else if (batterMove.to === "home") runs += 1;
+  }
+
+  for (const runner of ["third", "second", "first"] as const) {
+    if (!bases[runner]) continue;
+    const normalMove = (outcome.moves ?? []).find(
+      (move) => move.runner === runner,
+    );
+    const destination = advanceDestination(normalMove?.to ?? runner);
+    moves.push({ runner, from: runner, to: destination });
+    if (destination === "home") runs += 1;
+    else if (destination !== "out") nextBases[destination] = true;
+  }
+
+  return {
+    summary: "원히트 원에러 · 추가 진루",
+    bases: nextBases,
+    runs,
+    moves,
+  };
+}
+
+function addStrategyHitAdvance(
+  outcome: PlateAppearanceOutcome,
+): PlateAppearanceOutcome {
+  const nextBases: Bases = { first: false, second: false, third: false };
+  const moves: RunnerMove[] = [];
+  let runs = outcome.runs ?? 0;
+  for (const move of outcome.moves ?? []) {
+    if (move.runner === "batter" || move.to === "out" || move.to === "home") {
+      moves.push(move);
+      if (move.to === "first" || move.to === "second" || move.to === "third")
+        nextBases[move.to] = true;
+      continue;
+    }
+    const destination = advanceDestination(move.to);
+    moves.push({ ...move, to: destination });
+    if (destination === "home") runs += 1;
+    else if (destination !== "out") nextBases[destination] = true;
+  }
+  return {
+    ...outcome,
+    summary: `${outcome.summary} · 주자 추가 진루`,
+    bases: nextBases,
+    runs,
+    moves,
+  };
+}
+
+function advanceDestination(destination: RunnerMove["to"]): RunnerMove["to"] {
+  if (destination === "first") return "second";
+  if (destination === "second") return "third";
+  if (destination === "third") return "home";
+  return destination;
+}
+
 function buntDefenseOutcome(bases: Bases): PlateAppearanceOutcome {
-  const lead = bases.second ? "second" : "first";
+  const lead = bases.third ? "third" : bases.second ? "second" : "first";
   const nextBases: Bases = { first: true, second: false, third: false };
   const moves: RunnerMove[] = [
     { runner: lead, from: lead, to: "out" },
     { runner: "batter", from: "batter", to: "first" },
   ];
-  if (lead === "second" && bases.first) {
+  if ((lead === "second" || lead === "third") && bases.first) {
     nextBases.second = true;
     moves.push({ runner: "first", from: "first", to: "second" });
+  }
+  if (lead === "third" && bases.second) {
+    nextBases.third = true;
+    moves.push({ runner: "second", from: "second", to: "third" });
   }
   return {
     summary: "번트 수비 성공",
@@ -1343,6 +2002,7 @@ function drawToFour(zone: CardZone, rng: GameState["rng"]) {
 function resetHandsForHalfInning(state: GameState) {
   state.cardWindow = null;
   state.pendingResolution = null;
+  state.activeStrategy = null;
   state.phase = "awaiting_pitch";
   for (const role of ["offense", "defense"] as const) {
     const zone = state.cards[role];
@@ -1415,11 +2075,16 @@ function finishGame(
   state.winner = winner;
   state.cardWindow = null;
   state.pendingResolution = null;
+  state.activeStrategy = null;
   emit(state, events, { kind: "game_end", summary });
 }
 
 function occupiedBaseCount(bases: Bases) {
   return Number(bases.first) + Number(bases.second) + Number(bases.third);
+}
+
+function isInfieldFlySituation(state: GameState) {
+  return state.outs < 2 && state.bases.first && state.bases.second;
 }
 
 function occupiedRunnerMoves(bases: Bases, to: RunnerMove["to"]): RunnerMove[] {
