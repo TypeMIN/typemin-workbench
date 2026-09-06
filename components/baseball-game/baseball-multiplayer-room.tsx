@@ -336,14 +336,16 @@ function MultiplayerBoard({
       </section>
 
       <section className="bbg-mp-field" aria-label="야구 경기장">
-        <div className="bbg-mp-fence" />
-        <div className="bbg-mp-grass" />
-        <div className="bbg-mp-infield">
-          <i data-base="second" data-occupied={game.bases.second} />
-          <i data-base="third" data-occupied={game.bases.third} />
-          <i data-base="first" data-occupied={game.bases.first} />
-          <i data-base="home" />
-          <span>투수</span>
+        <div className="bbg-mp-stadium" aria-hidden="true">
+          <div className="bbg-mp-fence" />
+          <div className="bbg-mp-grass" />
+          <div className="bbg-mp-infield">
+            <i data-base="second" data-occupied={game.bases.second} />
+            <i data-base="third" data-occupied={game.bases.third} />
+            <i data-base="first" data-occupied={game.bases.first} />
+            <i data-base="home" />
+            <span>투수</span>
+          </div>
         </div>
         <div className="bbg-mp-field-result" aria-live="polite">
           <small>LIVE RESULT</small>

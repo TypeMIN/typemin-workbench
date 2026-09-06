@@ -5260,17 +5260,27 @@
 .bbg-mp-field {
   position: relative;
   min-height: 0;
+  container-type: size;
   overflow: hidden;
   background: #0b1a29;
 }
 
+.bbg-mp-stadium {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: min(92cqw, calc((100cqh - 72px) * 1.34));
+  aspect-ratio: 1.34;
+  transform: translate(-50%, -54%);
+}
+
 .bbg-mp-fence {
   position: absolute;
-  top: 7%;
+  top: 4%;
   left: 50%;
-  width: min(88%, 880px);
-  height: 76%;
-  border: 16px solid #99633f;
+  width: 96%;
+  height: 86%;
+  border: clamp(7px, 1.5cqw, 16px) solid #99633f;
   border-bottom: 0;
   border-radius: 50% 50% 0 0;
   transform: translateX(-50%);
@@ -5278,10 +5288,10 @@
 
 .bbg-mp-grass {
   position: absolute;
-  top: 10%;
-  bottom: 4%;
+  top: 8%;
+  bottom: 0;
   left: 50%;
-  width: min(82%, 820px);
+  width: 88%;
   background:
     repeating-linear-gradient(
       90deg,
@@ -5295,14 +5305,14 @@
 
 .bbg-mp-infield {
   position: absolute;
-  bottom: 6%;
+  bottom: 2%;
   left: 50%;
-  width: clamp(190px, 31%, 300px);
+  width: clamp(132px, 35%, 280px);
   aspect-ratio: 1;
-  border: clamp(34px, 5vw, 58px) solid #a66d47;
+  border: clamp(25px, 4.6cqw, 52px) solid #a66d47;
   border-radius: 50%;
   background: #08704a;
-  transform: translateX(-50%) scaleY(0.62);
+  transform: translateX(-50%) scaleY(0.72);
 }
 
 .bbg-mp-infield::before {
