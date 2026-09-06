@@ -38,20 +38,19 @@ test("두 기기가 방을 만들고 비공개 손패로 같은 경기를 진행
 
   await host.setViewportSize({ width: 944, height: 1013 });
   const portraitField = await host.evaluate(() => {
-    const stadium = document
-      .querySelector(".bbg-mp-stadium")
-      ?.getBoundingClientRect();
+    const stadium = document.querySelector(".bbg-mp-field .bbg-stadium svg");
     return {
       pageWidthFits: document.documentElement.scrollWidth <= window.innerWidth,
       pageHeightFits:
         document.documentElement.scrollHeight <= window.innerHeight,
-      stadiumRatio: stadium ? stadium.width / stadium.height : 0,
+      usesBroadcastStadium:
+        stadium?.getAttribute("viewBox") === "0 0 900 700" &&
+        stadium?.getAttribute("preserveAspectRatio") === "xMidYMid meet",
     };
   });
   expect(portraitField.pageWidthFits).toBe(true);
   expect(portraitField.pageHeightFits).toBe(true);
-  expect(portraitField.stadiumRatio).toBeGreaterThan(1.3);
-  expect(portraitField.stadiumRatio).toBeLessThan(1.38);
+  expect(portraitField.usesBroadcastStadium).toBe(true);
   await host.setViewportSize({ width: 1280, height: 720 });
 
   const outsider = await outsiderContext.newPage();

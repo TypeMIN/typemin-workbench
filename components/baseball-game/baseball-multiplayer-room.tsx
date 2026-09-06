@@ -12,6 +12,7 @@ import {
 import Link from "next/link";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
+import { BaseballStadium } from "@/components/baseball-game/baseball-game-debug";
 import { CARD_DEFINITIONS } from "@/lib/baseball-game/cards";
 import type {
   MultiplayerCommand,
@@ -298,62 +299,75 @@ function MultiplayerBoard({
     [snapshot.legalCards],
   );
   const latestEvent = game.eventLog.at(-1);
+  const latestFace = game.eventLog.findLast(
+    (event) => event.kind === "die_roll",
+  )?.face;
   const seatName = teamName(game, snapshot.seat);
 
   return (
     <div className="bbg-mp-board" data-room-status={snapshot.status}>
-      <section
-        className="bbg-mp-broadcast"
-        aria-label={`멀티플레이 경기 점수판 ${inningLabel(game)}`}
-      >
-        <div className="bbg-mp-score">
-          <div className={game.battingTeam === "away" ? "is-batting" : ""}>
-            <small>원정</small>
-            <strong>{game.config.awayTeamName}</strong>
-            <b>{game.score.away}</b>
-          </div>
-          <div className={game.battingTeam === "home" ? "is-batting" : ""}>
-            <small>홈</small>
-            <strong>{game.config.homeTeamName}</strong>
-            <b>{game.score.home}</b>
-          </div>
-        </div>
-        <div className="bbg-mp-inning">
-          <strong>{inningLabel(game)}</strong>
-          <span>{teamName(game, game.battingTeam)} 공격</span>
-        </div>
-        <MiniDiamond game={game} />
-        <div className="bbg-mp-counts">
-          <CountLights label="B" active={game.balls} total={3} tone="ball" />
-          <CountLights
-            label="S"
-            active={game.strikes}
-            total={2}
-            tone="strike"
-          />
-          <CountLights label="O" active={game.outs} total={2} tone="out" />
-        </div>
-      </section>
-
       <section className="bbg-mp-field" aria-label="야구 경기장">
-        <div className="bbg-mp-stadium" aria-hidden="true">
-          <div className="bbg-mp-fence" />
-          <div className="bbg-mp-grass" />
-          <div className="bbg-mp-infield">
-            <i data-base="second" data-occupied={game.bases.second} />
-            <i data-base="third" data-occupied={game.bases.third} />
-            <i data-base="first" data-occupied={game.bases.first} />
-            <i data-base="home" />
-            <span>투수</span>
+        <section
+          className="bbg-mp-broadcast"
+          aria-label={`멀티플레이 경기 점수판 ${inningLabel(game)}`}
+        >
+          <div className="bbg-mp-score">
+            <div className={game.battingTeam === "away" ? "is-batting" : ""}>
+              <small>원정</small>
+              <strong>{game.config.awayTeamName}</strong>
+              <b>{game.score.away}</b>
+            </div>
+            <div className={game.battingTeam === "home" ? "is-batting" : ""}>
+              <small>홈</small>
+              <strong>{game.config.homeTeamName}</strong>
+              <b>{game.score.home}</b>
+            </div>
           </div>
-        </div>
+          <div className="bbg-mp-score-status">
+            <div className="bbg-mp-inning">
+              <strong>{inningLabel(game)}</strong>
+            </div>
+            <MiniDiamond game={game} />
+            <div className="bbg-mp-counts">
+              <CountLights
+                label="B"
+                active={game.balls}
+                total={3}
+                tone="ball"
+              />
+              <CountLights
+                label="S"
+                active={game.strikes}
+                total={2}
+                tone="strike"
+              />
+              <CountLights label="O" active={game.outs} total={2} tone="out" />
+            </div>
+          </div>
+        </section>
+        <BaseballStadium
+          face={latestFace}
+          game={game}
+          key={`multiplayer-field-${game.revision}`}
+        />
         <div className="bbg-mp-field-result" aria-live="polite">
-          <small>LIVE RESULT</small>
+          <span className="bbg-mp-result-token" aria-hidden="true">
+            <small>{latestFace ? "D12" : "NEXT"}</small>
+            <b>{latestFace ?? "▶"}</b>
+          </span>
+          <small>{latestEvent ? "방금 판정" : "PLAY BALL"}</small>
           <strong>{latestEvent?.summary ?? "첫 투구를 준비하세요"}</strong>
         </div>
       </section>
 
       <aside className="bbg-mp-controls" aria-label="멀티플레이 조작부">
+        <div className="bbg-panel-heading bbg-mp-panel-heading">
+          <div>
+            <p>ON DECK</p>
+            <h2>현재 판정</h2>
+          </div>
+          <span>D12 · {PHASE_LABEL[game.phase]}</span>
+        </div>
         <div className="bbg-mp-connection">
           <span data-online={snapshot.opponentConnected} />
           <div>
@@ -498,12 +512,23 @@ function TurnControl({
       <small>YOUR TURN · {PHASE_LABEL[game.phase]}</small>
       <strong>{PHASE_LABEL[game.phase]} 주사위를 굴리세요</strong>
       <button
+        className="bbg-mp-d12-button"
         disabled={disabled}
         onClick={() => onSubmit({ type: "ROLL_DIE" })}
         type="button"
       >
-        <Dices aria-hidden="true" size={18} /> {PHASE_LABEL[game.phase]} 주사위
-        굴리기
+        <span className="bbg-d12" aria-hidden="true">
+          <i className="bbg-d12-facet bbg-d12-facet--one" />
+          <i className="bbg-d12-facet bbg-d12-facet--two" />
+          <i className="bbg-d12-facet bbg-d12-facet--three" />
+          <i className="bbg-d12-facet bbg-d12-facet--four" />
+          <small>D12</small>
+          <b>?</b>
+        </span>
+        <span>
+          <Dices aria-hidden="true" size={16} /> {PHASE_LABEL[game.phase]}{" "}
+          주사위 굴리기
+        </span>
       </button>
     </div>
   );

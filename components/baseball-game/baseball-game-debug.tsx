@@ -1060,7 +1060,13 @@ type BallFlight = {
   target: { x: number; y: number };
 };
 
-function BaseballStadium({ face, game }: { face?: DieFace; game: GameState }) {
+export function BaseballStadium({
+  face,
+  game,
+}: {
+  face?: DieFace;
+  game: Pick<GameState, "bases" | "battingTeam" | "config">;
+}) {
   const occupied = [
     game.bases.first ? "1루" : null,
     game.bases.second ? "2루" : null,

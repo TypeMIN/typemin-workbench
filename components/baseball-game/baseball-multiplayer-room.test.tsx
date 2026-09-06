@@ -59,6 +59,9 @@ describe("BaseballMultiplayerRoom", () => {
     expect(screen.getAllByRole("button", { name: /사용 불가/ })).toHaveLength(
       4,
     );
+    expect(
+      container.querySelector(".bbg-mp-field .bbg-stadium svg"),
+    ).toHaveAttribute("viewBox", "0 0 900 700");
     for (const instanceId of hiddenIds) {
       expect(container).not.toHaveTextContent(instanceId);
     }
