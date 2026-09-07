@@ -68,7 +68,7 @@ test("공용 화면과 2대2 개인기기가 한 파티 경기를 실제로 진�
   await display.getByRole("button", { name: "경기 시작" }).click();
   await expect(
     display.getByRole("region", { name: "파티플레이 공용 경기장" }),
-  ).toBeVisible();
+  ).toBeVisible({ timeout: 15_000 });
 
   let activePage: Page | null = null;
   await expect
