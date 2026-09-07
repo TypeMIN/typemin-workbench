@@ -20,6 +20,7 @@ import {
   FACE_LABELS,
   rollDie,
 } from "@/lib/baseball-game/rules";
+import { partyInviteStorageKey } from "@/lib/baseball-game/multiplayer/types";
 import type {
   BattingFace,
   CardAvailability,
@@ -43,7 +44,7 @@ const DEFAULT_CONFIG: GameConfig = {
   homeTeamName: "홈팀",
 };
 
-type PlayMode = "solo_ai" | "local_two_player" | "multiplayer";
+type PlayMode = "solo_ai" | "local_two_player" | "multiplayer" | "party";
 
 type SessionConfig = {
   mode: PlayMode;
@@ -164,9 +165,9 @@ export default function BaseballGameDebug() {
 
   async function startGame(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    if (draftSession.mode === "multiplayer") {
+    if (draftSession.mode === "multiplayer" || draftSession.mode === "party") {
       const roomCode = multiplayerCode.trim().toUpperCase();
-      if (roomCode) {
+      if (draftSession.mode === "multiplayer" && roomCode) {
         if (!/^[A-Z2-9]{6}$/.test(roomCode)) {
           setError("방 코드는 영문과 숫자 6자리입니다.");
           return;
@@ -181,15 +182,32 @@ export default function BaseballGameDebug() {
         const response = await fetch("/api/baseball-game/rooms", {
           method: "POST",
           headers: { "content-type": "application/json" },
-          body: JSON.stringify({ config: draft }),
+          body: JSON.stringify({ config: draft, mode: draftSession.mode }),
         });
         const payload = (await response.json()) as {
+          roomCode?: string;
           roomUrl?: string;
+          awayControllerUrl?: string;
+          homeControllerUrl?: string;
           error?: string;
         };
         if (!response.ok || !payload.roomUrl) {
           setError(payload.error ?? "멀티플레이 방을 만들지 못했습니다.");
           return;
+        }
+        if (
+          draftSession.mode === "party" &&
+          payload.roomCode &&
+          payload.awayControllerUrl &&
+          payload.homeControllerUrl
+        ) {
+          window.sessionStorage.setItem(
+            partyInviteStorageKey(payload.roomCode),
+            JSON.stringify({
+              awayControllerUrl: payload.awayControllerUrl,
+              homeControllerUrl: payload.homeControllerUrl,
+            }),
+          );
         }
         router.push(payload.roomUrl);
       } catch {
@@ -235,7 +253,13 @@ export default function BaseballGameDebug() {
             <strong>야구 게임</strong>
             <small>
               PRO-CARDS-V1 ·{" "}
-              {session.mode === "solo_ai" ? "SOLO AI" : "LOCAL 2P"}
+              {session.mode === "solo_ai"
+                ? "SOLO AI"
+                : session.mode === "local_two_player"
+                  ? "LOCAL 2P"
+                  : session.mode === "multiplayer"
+                    ? "MULTIPLAYER"
+                    : "PARTY"}
             </small>
           </span>
         </Link>
@@ -244,7 +268,11 @@ export default function BaseballGameDebug() {
             aria-label={`게임 모드 변경, 현재 ${
               session.mode === "solo_ai"
                 ? `AI 대전 ${teamNameFor(game, session.humanTeam)}`
-                : "로컬 2인"
+                : session.mode === "local_two_player"
+                  ? "로컬 2인"
+                  : session.mode === "multiplayer"
+                    ? "멀티플레이"
+                    : "파티플레이"
             }`}
             className="bbg-local-badge"
             onClick={openGameSetup}
@@ -252,7 +280,11 @@ export default function BaseballGameDebug() {
           >
             {session.mode === "solo_ai"
               ? `AI 대전 · ${teamNameFor(game, session.humanTeam)}`
-              : "로컬 2인"}
+              : session.mode === "local_two_player"
+                ? "로컬 2인"
+                : session.mode === "multiplayer"
+                  ? "멀티플레이"
+                  : "파티플레이"}
           </button>
           <WorkbenchAccountControl />
         </div>
@@ -436,7 +468,9 @@ export default function BaseballGameDebug() {
                   <option value="solo_ai">싱글플레이 · AI 대전</option>
                   <option value="local_two_player">로컬 2인 · 한 기기</option>
                   <option value="multiplayer">멀티플레이 · 두 기기</option>
-                  <option disabled>파티플레이 · 준비 중</option>
+                  <option value="party">
+                    파티플레이 · 공용 화면 + 두 기기
+                  </option>
                 </select>
               </label>
               {draftSession.mode === "solo_ai" ? (
@@ -529,7 +563,11 @@ export default function BaseballGameDebug() {
                     : multiplayerCode
                       ? "방 참가하기"
                       : "멀티플레이 방 만들기"
-                  : "새 경기 시작"}
+                  : draftSession.mode === "party"
+                    ? creatingRoom
+                      ? "파티 경기 만드는 중"
+                      : "파티플레이 경기 만들기"
+                    : "새 경기 시작"}
               </button>
             </form>
           </details>

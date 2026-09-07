@@ -23,6 +23,7 @@ import type {
   MultiplayerCreateResult,
   MultiplayerRoomRecord,
   MultiplayerRoomSnapshot,
+  PartyRoomSnapshot,
 } from "./types";
 
 export class MultiplayerServiceError extends Error {
@@ -124,6 +125,24 @@ export async function getMultiplayerSnapshot(
   const room = await requireRoom(roomCode, storage);
   const seat = await requireSeat(room, seatToken, storage);
   return buildSnapshot(room, seat, storage);
+}
+
+export async function getPartyRoomSnapshot(
+  roomCode: string,
+  storage: MultiplayerStorage = getMultiplayerStorage(),
+): Promise<PartyRoomSnapshot> {
+  const room = await requireRoom(roomCode, storage);
+  const [awayConnected, homeConnected] = await Promise.all([
+    storage.hasSeat(room.id, "away"),
+    storage.hasSeat(room.id, "home"),
+  ]);
+  return {
+    roomCode: room.roomCode,
+    status: room.status,
+    actionOwner: getActionOwner(room.state),
+    seats: { away: awayConnected, home: homeConnected },
+    view: getGameView(room.state, "public"),
+  };
 }
 
 export async function submitMultiplayerCommand(

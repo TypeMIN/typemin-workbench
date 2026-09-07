@@ -5,7 +5,11 @@ import { describe, expect, it } from "vitest";
 import { createGame } from "../engine";
 import type { TeamSide } from "../types";
 import { seatTokenHash } from "./security";
-import { getMultiplayerSnapshot, submitMultiplayerCommand } from "./service";
+import {
+  getMultiplayerSnapshot,
+  getPartyRoomSnapshot,
+  submitMultiplayerCommand,
+} from "./service";
 import type { MultiplayerStorage } from "./storage";
 import type {
   MultiplayerCommitInput,
@@ -104,6 +108,17 @@ describe("baseball multiplayer service", () => {
     expect(home.view).not.toHaveProperty("rng");
     expect(away.isYourTurn).toBe(false);
     expect(home.isYourTurn).toBe(true);
+  });
+
+  it("returns a read-only party view with no hands or RNG state", async () => {
+    const storage = new TestStorage();
+    const snapshot = await getPartyRoomSnapshot("ABC234", storage);
+
+    expect(snapshot.seats).toEqual({ away: true, home: true });
+    expect(snapshot.view.cards.offense.hand).toBeNull();
+    expect(snapshot.view.cards.defense.hand).toBeNull();
+    expect(snapshot.view).not.toHaveProperty("rng");
+    expect(snapshot.actionOwner).toBe("home");
   });
 
   it("rejects a command from the team that does not own the turn", async () => {

@@ -27,6 +27,23 @@ export type MultiplayerRoomSnapshot = {
   view: GameView;
 };
 
+export type PartyRoomSnapshot = {
+  roomCode: string;
+  status: MultiplayerRoomStatus;
+  actionOwner: TeamSide | null;
+  seats: Record<TeamSide, boolean>;
+  view: GameView;
+};
+
+export type PartyInviteLinks = {
+  awayControllerUrl: string;
+  homeControllerUrl: string;
+};
+
+export function partyInviteStorageKey(roomCode: string) {
+  return `baseball-party:${roomCode.toUpperCase()}:invites`;
+}
+
 export type MultiplayerRoomRecord = {
   id: string;
   roomCode: string;

@@ -26,6 +26,7 @@ describe("BaseballGameDebug", () => {
   });
 
   afterEach(() => {
+    window.sessionStorage.clear();
     vi.useRealTimers();
     vi.restoreAllMocks();
     vi.unstubAllGlobals();
@@ -311,6 +312,58 @@ describe("BaseballGameDebug", () => {
       "/api/baseball-game/rooms",
       expect.objectContaining({ method: "POST" }),
     );
+  });
+
+  it("creates a party room and keeps private controller links in session storage", async () => {
+    const fetchMock = vi.fn((input: RequestInfo | URL) => {
+      if (String(input) !== "/api/baseball-game/rooms") {
+        return new Promise<Response>(() => undefined);
+      }
+      return Promise.resolve(
+        new Response(
+          JSON.stringify({
+            roomCode: "ABC234",
+            roomUrl: "/baseball-game/party/ABC234",
+            awayControllerUrl:
+              "/baseball-game/party/ABC234/away#token=private-token",
+            homeControllerUrl: "/baseball-game/party/ABC234/home",
+          }),
+          { status: 200, headers: { "content-type": "application/json" } },
+        ),
+      );
+    });
+    vi.stubGlobal("fetch", fetchMock);
+    render(<BaseballGameDebug />);
+
+    fireEvent.click(
+      screen.getByRole("button", {
+        name: "게임 모드 변경, 현재 로컬 2인",
+      }),
+    );
+    const setup = screen
+      .getByText("새 경기 설정", { exact: true })
+      .closest("details");
+    if (!setup) throw new Error("새 경기 패널을 찾지 못했습니다.");
+    const form = within(setup);
+    fireEvent.change(form.getByLabelText("게임 모드"), {
+      target: { value: "party" },
+    });
+    fireEvent.click(
+      form.getByRole("button", { name: "파티플레이 경기 만들기" }),
+    );
+
+    await waitFor(() =>
+      expect(routerPush).toHaveBeenCalledWith("/baseball-game/party/ABC234"),
+    );
+    expect(fetchMock).toHaveBeenCalledWith(
+      "/api/baseball-game/rooms",
+      expect.objectContaining({
+        body: expect.stringContaining('"mode":"party"'),
+      }),
+    );
+    expect(
+      window.sessionStorage.getItem("baseball-party:ABC234:invites"),
+    ).toContain("private-token");
   });
 
   it("shows strikeout emphasis and switches the visible hand after changing sides", () => {

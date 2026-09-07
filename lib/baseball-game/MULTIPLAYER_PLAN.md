@@ -1,14 +1,17 @@
 # 야구 게임 멀티플레이·파티플레이 구현 계획
 
-## 구현 현황 — 2026-09-06
+## 구현 현황 — 2026-09-07
 
 - 완료: 두 기기용 방 생성·홈팀 참가·HTTP 전용 좌석 쿠키
 - 완료: 서버 권위형 주사위·카드 행동과 revision 충돌·중복 요청 방지
 - 완료: 좌석별 `GameView`와 상대 손패·RNG 비노출
 - 완료: Supabase 경기·좌석·행동 로그 및 서버 전용 RLS
 - 완료: 0.9초 동기화와 재접속
+- 완료: 파티플레이 공용 경기장과 손패 없는 `public` GameView
+- 완료: 원정·홈 개인기기 링크와 HTTP 전용 좌석 쿠키 교환
+- 완료: 데스크톱·모바일 3기기 경기 진행 E2E
 - 다음: 폴링을 비공개 Realtime 알림으로 교체
-- 다음: 파티플레이 공용 화면과 개인기기 QR 참가
+- 다음: 개인기기 QR 표시와 접속 heartbeat
 
 ## 목표와 모드
 
@@ -40,10 +43,10 @@ Next.js Route Handler
 
 - 방 생성: `/baseball-game/rooms/new`
 - 멀티플레이 원정·홈 화면: `/baseball-game/rooms/[code]/play`
-- 파티플레이 공용 화면: `/baseball-game/rooms/[code]/board`
-- 개인 참가 QR: `/baseball-game/rooms/[code]/join?seat=away|home&token=...`
-- 6자리 방 코드는 탐색용이며 권한 증명이 아니다. 실제 참가 권한은 256비트 일회용 토큰의 해시로 확인한다.
-- 게스트는 Supabase Anonymous Sign-In을 사용하고, 계정 사용자는 기존 Workbench 계정과 연결한다.
+- 파티플레이 공용 화면: `/baseball-game/party/[code]`
+- 개인 화면 연결: `/baseball-game/party/[code]/away#token=...`, `/baseball-game/party/[code]/home`
+- 6자리 방 코드는 탐색용이며 권한 증명이 아니다. 실제 참가 권한은 256비트 좌석 토큰의 해시로 확인한다.
+- 현재 프로토타입은 HTTP 전용 좌석 쿠키를 사용한다. 계정 연결은 후속 단계다.
 
 ## 데이터 모델 초안
 
@@ -124,8 +127,8 @@ Supabase는 2026년 7월부터 `realtime` 스키마 자체 변경을 차단한�
 1. 방·좌석·행동 로그 스키마와 RLS 정책
 2. 서버 권위형 `actions` API와 revision 충돌 테스트
 3. 두 기기 멀티플레이와 비공개 `GameView`
-4. 비공개 Realtime 알림과 재접속
-5. 파티 공용 화면 및 좌석별 QR
+4. 파티 공용 화면 및 좌석별 개인 링크
+5. 좌석별 QR, heartbeat, 비공개 Realtime 알림
 6. 만료·퇴장·호스트 이관·리플레이
 7. 네트워크 단절, 중복 제출, 악성 카드 ID, 상대 좌석 접근 보안 테스트
 
