@@ -230,7 +230,14 @@ function PartyLobby({
           {copied ? <Check size={15} /> : <Copy size={15} />}
           {copied ? "복사됨" : "참가 링크 복사"}
         </button>
-        <p>{joinUrl.replace(/^https?:\/\//, "")}</p>
+        <div className="bbg-party-camera-fallback">
+          <small>카메라 없이 참가</small>
+          <p>
+            야구 게임에서 파티플레이를 선택하고 방 코드{" "}
+            <b>{snapshot.roomCode}</b>를 입력하세요.
+          </p>
+          <span>{joinUrl.replace(/^https?:\/\//, "")}</span>
+        </div>
       </section>
       <section className="bbg-party-lobby-board">
         <header>

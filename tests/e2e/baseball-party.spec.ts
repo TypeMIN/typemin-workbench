@@ -23,20 +23,34 @@ test("공용 화면과 2대2 개인기기가 한 파티 경기를 실제로 진�
   await expect(display).toHaveURL(/\/baseball-game\/party\/[A-Z2-9]{6}$/);
   const roomCode = display.url().split("/").at(-1)!;
   await expect(display.getByAltText("파티플레이 참가 QR 코드")).toBeVisible();
+  await expect(display.getByText("카메라 없이 참가")).toBeVisible();
+  await expect(
+    display.getByText(/파티플레이를 선택하고 방 코드/),
+  ).toContainText(roomCode);
 
   const players: Page[] = [];
-  for (const [nickname, team] of [
+  const entries = [
     ["원정하나", "away"],
     ["원정둘", "away"],
     ["홈하나", "home"],
     ["홈둘", "home"],
-  ] as const) {
+  ] as const;
+  for (const [index, [nickname, team]] of entries.entries()) {
     const context = await browser.newContext({
       viewport: { width: 390, height: 844 },
     });
     contexts.push(context);
     const page = await context.newPage();
-    await page.goto(`${baseURL}/baseball-game/party/${roomCode}/join`);
+    if (index === 0) {
+      await page.goto(`${baseURL}/baseball-game`);
+      await page.getByText("새 경기 설정", { exact: true }).click();
+      await page.getByLabel("게임 모드", { exact: true }).selectOption("party");
+      await page.getByLabel("참가할 방 코드").fill(roomCode);
+      await page.getByRole("button", { name: "파티 방 참가하기" }).click();
+      await expect(page).toHaveURL(new RegExp("/party/" + roomCode + "/join$"));
+    } else {
+      await page.goto(`${baseURL}/baseball-game/party/${roomCode}/join`);
+    }
     await page.getByLabel("닉네임").fill(nickname);
     if (team === "home")
       await page.getByRole("button", { name: /홈 홈팀/ }).click();

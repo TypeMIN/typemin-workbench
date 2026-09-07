@@ -7062,10 +7062,38 @@
   padding: 10px 16px;
 }
 
-.bbg-party-invite > p {
+.bbg-party-camera-fallback {
+  width: 100%;
+  margin-top: 12px;
+  padding-top: 11px;
+  border-top: 1px solid rgb(117 144 164 / 20%);
+}
+
+.bbg-party-camera-fallback small {
+  color: #73efc0;
+  font-size: 9px;
+  font-weight: 900;
+  letter-spacing: 0.08em;
+}
+
+.bbg-party-camera-fallback p {
+  margin-top: 5px;
+  color: #a9bdca;
+  font-size: 11px;
+  line-height: 1.45;
+}
+
+.bbg-party-camera-fallback b {
+  color: #fff0b3;
+  font-family: ui-monospace, monospace;
+  letter-spacing: 0.08em;
+}
+
+.bbg-party-camera-fallback span {
+  display: block;
   overflow: hidden;
   width: 100%;
-  margin-top: 9px;
+  margin-top: 6px;
   color: #7590a4;
   font-size: 10px;
   text-overflow: ellipsis;
@@ -7977,7 +8005,14 @@
   .bbg-party-invite > strong {
     font-size: 15px;
   }
-  .bbg-party-invite > p {
+  .bbg-party-camera-fallback {
+    margin-top: 8px;
+    padding-top: 7px;
+  }
+  .bbg-party-camera-fallback p {
+    font-size: 9px;
+  }
+  .bbg-party-camera-fallback span {
     display: none;
   }
   .bbg-party-lobby-board {

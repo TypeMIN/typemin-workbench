@@ -63,6 +63,10 @@ describe("BaseballPartyScreen", () => {
       await screen.findByRole("heading", { name: "선수를 초대하세요" }),
     ).toBeVisible();
     expect(screen.getByAltText("파티플레이 참가 QR 코드")).toBeVisible();
+    expect(screen.getByText("카메라 없이 참가")).toBeVisible();
+    expect(screen.getByText(/파티플레이를 선택하고 방 코드/)).toHaveTextContent(
+      "ABC234",
+    );
     expect(screen.getByRole("region", { name: "블루 참가자" })).toBeVisible();
     expect(screen.getByRole("region", { name: "레드 참가자" })).toBeVisible();
     expect(screen.getByRole("button", { name: "경기 시작" })).toBeEnabled();

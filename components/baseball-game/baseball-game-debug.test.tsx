@@ -362,6 +362,36 @@ describe("BaseballGameDebug", () => {
     expect(window.sessionStorage.length).toBe(0);
   });
 
+  it("joins a party room by code without using a camera or creating a room", () => {
+    const fetchMock = vi.fn(() => new Promise<Response>(() => undefined));
+    vi.stubGlobal("fetch", fetchMock);
+    render(<BaseballGameDebug />);
+
+    fireEvent.click(
+      screen.getByRole("button", {
+        name: "게임 모드 변경, 현재 로컬 2인",
+      }),
+    );
+    const setup = screen
+      .getByText("새 경기 설정", { exact: true })
+      .closest("details");
+    if (!setup) throw new Error("새 경기 패널을 찾지 못했습니다.");
+    const form = within(setup);
+    fireEvent.change(form.getByLabelText("게임 모드"), {
+      target: { value: "party" },
+    });
+    fireEvent.change(form.getByLabelText("참가할 방 코드"), {
+      target: { value: "abc234" },
+    });
+    fireEvent.click(form.getByRole("button", { name: "파티 방 참가하기" }));
+
+    expect(routerPush).toHaveBeenCalledWith("/baseball-game/party/ABC234/join");
+    expect(fetchMock).not.toHaveBeenCalledWith(
+      "/api/baseball-game/rooms",
+      expect.anything(),
+    );
+  });
+
   it("shows strikeout emphasis and switches the visible hand after changing sides", () => {
     render(<BaseballGameDebug />);
 

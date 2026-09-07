@@ -166,12 +166,16 @@ export default function BaseballGameDebug() {
     event.preventDefault();
     if (draftSession.mode === "multiplayer" || draftSession.mode === "party") {
       const roomCode = multiplayerCode.trim().toUpperCase();
-      if (draftSession.mode === "multiplayer" && roomCode) {
+      if (roomCode) {
         if (!/^[A-Z2-9]{6}$/.test(roomCode)) {
           setError("방 코드는 영문과 숫자 6자리입니다.");
           return;
         }
-        router.push(`/baseball-game/rooms/${roomCode}`);
+        router.push(
+          draftSession.mode === "party"
+            ? "/baseball-game/party/" + roomCode + "/join"
+            : "/baseball-game/rooms/" + roomCode,
+        );
         return;
       }
 
@@ -475,7 +479,8 @@ export default function BaseballGameDebug() {
                   </select>
                 </label>
               ) : null}
-              {draftSession.mode === "multiplayer" ? (
+              {draftSession.mode === "multiplayer" ||
+              draftSession.mode === "party" ? (
                 <label className="bbg-setup-room">
                   참가할 방 코드
                   <input
@@ -490,7 +495,7 @@ export default function BaseballGameDebug() {
                           .replace(/[^A-Z2-9]/g, ""),
                       )
                     }
-                    placeholder="비우면 새 방 생성"
+                    placeholder="6자리 코드 · 비우면 새 방"
                     value={multiplayerCode}
                   />
                 </label>
@@ -550,7 +555,9 @@ export default function BaseballGameDebug() {
                   : draftSession.mode === "party"
                     ? creatingRoom
                       ? "파티 경기 만드는 중"
-                      : "파티플레이 경기 만들기"
+                      : multiplayerCode
+                        ? "파티 방 참가하기"
+                        : "파티플레이 경기 만들기"
                     : "새 경기 시작"}
               </button>
             </form>
