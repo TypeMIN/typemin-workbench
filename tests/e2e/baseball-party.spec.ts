@@ -106,15 +106,28 @@ test("공용 화면과 2대2 개인기기가 한 파티 경기를 실제로 진�
     })
     .not.toBe(beforeSkip.snapshot.activeDefenderId);
 
+  const afterSkip = await display.evaluate(
+    async (code) =>
+      (await fetch(`/api/baseball-game/rooms/${code}/public-view`)).json(),
+    roomCode,
+  );
+
   activePage = null;
   await expect
     .poll(async () => {
       for (const page of players.slice(2)) {
+        const playerView = await page.evaluate(
+          async (code) =>
+            (await fetch(`/api/baseball-game/rooms/${code}/party/view`)).json(),
+          roomCode,
+        );
         if (
-          await page
+          playerView.snapshot?.me.id === afterSkip.snapshot.activeDefenderId &&
+          playerView.snapshot?.canAct === true &&
+          (await page
             .getByRole("button", { name: "주사위 굴리기" })
             .isVisible()
-            .catch(() => false)
+            .catch(() => false))
         ) {
           activePage = page;
           return true;
