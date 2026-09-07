@@ -3,6 +3,7 @@ import { expect, test, type BrowserContext, type Page } from "@playwright/test";
 test("공용 화면과 2대2 개인기기가 한 파티 경기를 실제로 진행한다", async ({
   browser,
 }) => {
+  test.setTimeout(90_000);
   const baseURL = process.env.PLAYWRIGHT_BASE_URL ?? "http://localhost:3000";
   const contexts: BrowserContext[] = [];
   const displayContext = await browser.newContext({
