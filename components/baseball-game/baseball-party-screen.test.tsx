@@ -2,12 +2,15 @@ import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { createGame, getGameView } from "@/lib/baseball-game/engine";
-import {
-  partyInviteStorageKey,
-  type PartyRoomSnapshot,
-} from "@/lib/baseball-game/multiplayer/types";
+import type { PartyPublicSnapshot } from "@/lib/baseball-game/party/types";
 
 import BaseballPartyScreen from "./baseball-party-screen";
+
+vi.mock("qrcode", () => ({
+  default: {
+    toDataURL: vi.fn().mockResolvedValue("data:image/png;base64,AA=="),
+  },
+}));
 
 function response(body: unknown, status = 200) {
   return new Response(JSON.stringify(body), {
@@ -16,7 +19,7 @@ function response(body: unknown, status = 200) {
   });
 }
 
-function partySnapshot() {
+function snapshot(): PartyPublicSnapshot {
   const state = createGame({
     innings: 3,
     awayTeamName: "블루",
@@ -25,60 +28,51 @@ function partySnapshot() {
   return {
     roomCode: "ABC234",
     status: "lobby",
+    roomRevision: 2,
     actionOwner: "home",
-    seats: { away: true, home: false },
+    players: {
+      away: [{ id: "away", nickname: "민수", team: "away", connected: true }],
+      home: [{ id: "home", nickname: "지수", team: "home", connected: true }],
+    },
+    activeBatterId: null,
+    activeDefenderId: null,
     view: getGameView(state, "public"),
-  } satisfies PartyRoomSnapshot;
+    isHost: true,
+  };
 }
 
 describe("BaseballPartyScreen", () => {
   afterEach(() => {
-    window.sessionStorage.clear();
     vi.restoreAllMocks();
     vi.unstubAllGlobals();
   });
 
-  it("renders a public broadcast without either team's cards", async () => {
-    const snapshot = partySnapshot();
-    window.sessionStorage.setItem(
-      partyInviteStorageKey("ABC234"),
-      JSON.stringify({
-        awayControllerUrl:
-          "/baseball-game/party/ABC234/away#token=private-away-token",
-        homeControllerUrl: "/baseball-game/party/ABC234/home",
-      }),
-    );
-    vi.stubGlobal("fetch", vi.fn().mockResolvedValue(response({ snapshot })));
+  it("renders one common QR, two rosters and host controls without private hands", async () => {
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValue(response({ snapshot: snapshot() }));
+    vi.stubGlobal("fetch", fetchMock);
     const writeText = vi.fn().mockResolvedValue(undefined);
     Object.defineProperty(navigator, "clipboard", {
       configurable: true,
       value: { writeText },
     });
-
     const { container } = render(<BaseballPartyScreen roomCode="ABC234" />);
 
     expect(
-      await screen.findByRole("region", { name: "개인 화면 연결" }),
+      await screen.findByRole("heading", { name: "선수를 초대하세요" }),
     ).toBeVisible();
-    expect(
-      screen.getByRole("region", { name: "공용 경기 점수판 1회초" }),
-    ).toBeVisible();
-    expect(screen.getByText("개인기기 연결 대기")).toBeVisible();
-    expect(screen.getAllByText("블루").length).toBeGreaterThan(0);
-    expect(screen.getAllByText("레드").length).toBeGreaterThan(0);
-    expect(screen.queryByText("공격 카드")).not.toBeInTheDocument();
-    expect(screen.queryByText("수비 카드")).not.toBeInTheDocument();
-    expect(container.textContent).not.toContain("private-away-token");
-    expect(
-      container.querySelector(".bbg-party-field .bbg-stadium svg"),
-    ).toHaveAttribute("viewBox", "0 0 900 700");
+    expect(screen.getByAltText("파티플레이 참가 QR 코드")).toBeVisible();
+    expect(screen.getByRole("region", { name: "블루 참가자" })).toBeVisible();
+    expect(screen.getByRole("region", { name: "레드 참가자" })).toBeVisible();
+    expect(screen.getByRole("button", { name: "경기 시작" })).toBeEnabled();
+    expect(container.textContent).not.toContain("instanceId");
+    expect(JSON.stringify(snapshot().view)).not.toContain('"rng"');
 
-    fireEvent.click(screen.getAllByRole("button", { name: "링크 복사" })[0]);
+    fireEvent.click(screen.getByRole("button", { name: "참가 링크 복사" }));
     await waitFor(() =>
       expect(writeText).toHaveBeenCalledWith(
-        expect.stringMatching(
-          /\/baseball-game\/party\/ABC234\/away#token=private-away-token$/,
-        ),
+        expect.stringMatching(/\/party\/ABC234\/join$/),
       ),
     );
   });

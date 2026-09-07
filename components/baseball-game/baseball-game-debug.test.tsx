@@ -314,7 +314,7 @@ describe("BaseballGameDebug", () => {
     );
   });
 
-  it("creates a party room and keeps private controller links in session storage", async () => {
+  it("creates a party room with one public join link and no browser-stored tokens", async () => {
     const fetchMock = vi.fn((input: RequestInfo | URL) => {
       if (String(input) !== "/api/baseball-game/rooms") {
         return new Promise<Response>(() => undefined);
@@ -324,9 +324,7 @@ describe("BaseballGameDebug", () => {
           JSON.stringify({
             roomCode: "ABC234",
             roomUrl: "/baseball-game/party/ABC234",
-            awayControllerUrl:
-              "/baseball-game/party/ABC234/away#token=private-token",
-            homeControllerUrl: "/baseball-game/party/ABC234/home",
+            joinUrl: "/baseball-game/party/ABC234/join",
           }),
           { status: 200, headers: { "content-type": "application/json" } },
         ),
@@ -361,9 +359,7 @@ describe("BaseballGameDebug", () => {
         body: expect.stringContaining('"mode":"party"'),
       }),
     );
-    expect(
-      window.sessionStorage.getItem("baseball-party:ABC234:invites"),
-    ).toContain("private-token");
+    expect(window.sessionStorage.length).toBe(0);
   });
 
   it("shows strikeout emphasis and switches the visible hand after changing sides", () => {

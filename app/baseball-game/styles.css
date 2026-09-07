@@ -6962,3 +6962,1119 @@
     animation: none;
   }
 }
+/* Party v2: shared display plus up to eight private players per team. */
+.bbg-party-v2-shell {
+  height: 100dvh;
+  min-height: 0;
+  overflow: hidden;
+  background: #07131f;
+}
+
+.bbg-party-v2-topbar {
+  height: 58px;
+  min-height: 58px;
+}
+
+.bbg-party-v2-main {
+  height: calc(100dvh - 58px);
+  padding: 12px 18px 16px;
+  overflow: hidden;
+}
+
+.bbg-party-lobby {
+  display: grid;
+  grid-template-columns: minmax(230px, 0.32fr) minmax(620px, 1fr);
+  gap: 14px;
+  width: min(1120px, 100%);
+  height: 100%;
+  margin: 0 auto;
+}
+
+.bbg-party-invite,
+.bbg-party-lobby-board,
+.bbg-party-mobile-shell > section {
+  border: 1px solid #263b4c;
+  border-radius: 18px;
+  background: linear-gradient(145deg, #0d1d2b, #091621);
+  box-shadow: 0 20px 50px rgb(0 0 0 / 24%);
+}
+
+.bbg-party-invite {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 22px;
+  text-align: center;
+}
+
+.bbg-party-invite > small,
+.bbg-party-lobby-board > header small,
+.bbg-party-player-status > small,
+.bbg-party-player-hand header small {
+  color: #73efc0;
+  font-size: 10px;
+  font-weight: 900;
+  letter-spacing: 0.18em;
+}
+
+.bbg-party-invite h1 {
+  margin: 5px 0 16px;
+  font-size: clamp(22px, 2.3vw, 32px);
+}
+
+.bbg-party-invite img,
+.bbg-party-qr-loading {
+  width: min(220px, 82%);
+  height: auto;
+  aspect-ratio: 1;
+  border-radius: 12px;
+  background: #f6fffa;
+}
+
+.bbg-party-invite > strong {
+  margin-top: 12px;
+  font:
+    900 25px/1 ui-monospace,
+    monospace;
+  letter-spacing: 0.18em;
+}
+
+.bbg-party-invite > button,
+.bbg-party-start,
+.bbg-party-settings button,
+.bbg-party-primary-link,
+.bbg-party-join-submit {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  border: 0;
+  border-radius: 10px;
+  background: #70edbd;
+  color: #052016;
+  font-weight: 900;
+}
+
+.bbg-party-invite > button {
+  margin-top: 12px;
+  padding: 10px 16px;
+}
+
+.bbg-party-invite > p {
+  overflow: hidden;
+  width: 100%;
+  margin-top: 9px;
+  color: #7590a4;
+  font-size: 10px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.bbg-party-lobby-board {
+  display: grid;
+  min-height: 0;
+  grid-template-rows: auto minmax(0, 1fr) auto auto;
+  gap: 12px;
+  padding: 18px;
+}
+
+.bbg-party-lobby-board > header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.bbg-party-lobby-board h2 {
+  margin-top: 3px;
+  font-size: 21px;
+}
+
+.bbg-party-lobby-board > header > span {
+  border: 1px solid #315365;
+  border-radius: 999px;
+  padding: 6px 10px;
+  color: #9cb2c2;
+  font-size: 11px;
+}
+
+.bbg-party-roster-grid {
+  display: grid;
+  min-height: 0;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.bbg-party-roster-card {
+  min-height: 0;
+  overflow: hidden;
+  border: 1px solid #263b4c;
+  border-radius: 13px;
+  background: #091722;
+}
+
+.bbg-party-roster-card > header {
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  gap: 8px;
+  align-items: center;
+  padding: 11px 12px;
+  border-bottom: 1px solid #203545;
+}
+
+.bbg-party-roster-card > header span,
+.bbg-party-roster-card > header b {
+  color: #74eec0;
+  font-size: 10px;
+}
+
+.bbg-party-roster-card ol {
+  display: grid;
+  align-content: start;
+  gap: 3px;
+  height: calc(100% - 42px);
+  padding: 6px;
+  overflow: auto;
+}
+
+.bbg-party-roster-card li {
+  display: grid;
+  min-height: 30px;
+  grid-template-columns: 22px 1fr auto;
+  gap: 7px;
+  align-items: center;
+  border-radius: 7px;
+  padding: 3px 6px;
+  background: #10212e;
+  font-size: 12px;
+}
+
+.bbg-party-roster-card li > i {
+  display: grid;
+  width: 20px;
+  height: 20px;
+  place-items: center;
+  border-radius: 50%;
+  background: #183446;
+  color: #8eabbd;
+  font-size: 9px;
+  font-style: normal;
+}
+
+.bbg-party-roster-card li > div {
+  display: flex;
+  gap: 3px;
+}
+.bbg-party-roster-card li button {
+  display: grid;
+  width: 25px;
+  height: 24px;
+  place-items: center;
+  border: 1px solid #2d4657;
+  border-radius: 6px;
+  background: transparent;
+  color: #9ab1c1;
+}
+.bbg-party-roster-card li.is-empty {
+  display: flex;
+  height: 100%;
+  min-height: 90px;
+  align-items: center;
+  justify-content: center;
+  color: #647d8e;
+}
+
+.bbg-party-settings {
+  display: grid;
+  grid-template-columns: 1fr 1fr 110px auto;
+  gap: 8px;
+}
+.bbg-party-settings label {
+  color: #7891a2;
+  font-size: 9px;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+}
+.bbg-party-settings input,
+.bbg-party-settings select {
+  display: block;
+  width: 100%;
+  height: 34px;
+  margin-top: 4px;
+  border: 1px solid #2a4354;
+  border-radius: 8px;
+  padding: 0 9px;
+  background: #07141f;
+  color: #edf8f4;
+}
+.bbg-party-settings button {
+  align-self: end;
+  height: 34px;
+  padding: 0 12px;
+}
+.bbg-party-start {
+  height: 43px;
+  font-size: 14px;
+}
+.bbg-party-start:disabled {
+  opacity: 0.38;
+}
+.bbg-party-spectator-note {
+  align-self: center;
+  color: #8198a8;
+  text-align: center;
+}
+
+.bbg-party-live {
+  position: relative;
+  display: grid;
+  grid-template-columns: 142px minmax(0, 1fr) 142px;
+  gap: 8px;
+  width: min(1440px, 100%);
+  height: 100%;
+  margin: 0 auto;
+}
+
+.bbg-party-live-field {
+  position: relative;
+  min-width: 0;
+  overflow: hidden;
+  border: 1px solid #284153;
+  border-radius: 18px;
+  background: #07131f;
+}
+
+.bbg-party-live-field > .bbg-stadium {
+  position: absolute;
+  inset: 54px 0 54px;
+  width: 100%;
+  max-width: none;
+  height: calc(100% - 108px);
+  max-height: none;
+  aspect-ratio: auto;
+  margin: 0;
+  background: transparent;
+  filter: none;
+}
+.bbg-party-live-field > .bbg-stadium > svg {
+  width: 100%;
+  height: 100%;
+}
+
+.bbg-party-v2-scoreboard {
+  position: absolute;
+  z-index: 4;
+  top: 8px;
+  left: 50%;
+  display: grid;
+  width: min(700px, calc(100% - 18px));
+  height: 70px;
+  transform: translateX(-50%);
+  grid-template-columns: minmax(220px, 1fr) 62px 50px 100px;
+  align-items: stretch;
+  overflow: hidden;
+  border: 1px solid #314959;
+  border-radius: 10px;
+  background: rgb(5 17 27 / 94%);
+  box-shadow: 0 10px 30px rgb(0 0 0 / 24%);
+}
+
+.bbg-party-v2-scoreboard > div:first-child {
+  display: grid;
+  grid-template-rows: 1fr 1fr;
+}
+.bbg-party-v2-scoreboard > div:first-child p {
+  display: grid;
+  grid-template-columns: 30px 1fr 24px;
+  align-items: center;
+  padding: 0 8px;
+  border-right: 1px solid #263b49;
+}
+.bbg-party-v2-scoreboard > div:first-child p[data-batting="true"] {
+  box-shadow: inset 3px 0 #f3c752;
+  background: rgb(243 199 82 / 7%);
+}
+.bbg-party-v2-scoreboard p small {
+  color: #7992a4;
+  font-size: 8px;
+}
+.bbg-party-v2-scoreboard p strong {
+  overflow: hidden;
+  font-size: 11px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.bbg-party-v2-scoreboard p b {
+  font-size: 17px;
+  text-align: right;
+}
+.bbg-party-v2-inning {
+  display: grid;
+  place-items: center;
+  border-right: 1px solid #263b49;
+  font-size: 13px;
+  white-space: nowrap;
+}
+.bbg-party-v2-diamond {
+  position: relative;
+  border-right: 1px solid #263b49;
+}
+.bbg-party-v2-diamond i,
+.bbg-party-mini-bases i {
+  position: absolute;
+  width: 10px;
+  height: 10px;
+  transform: rotate(45deg);
+  border: 1px solid #61798a;
+  background: #0e202d;
+}
+.bbg-party-v2-diamond i[data-on="true"],
+.bbg-party-mini-bases i[data-on="true"] {
+  border-color: #ffe071;
+  background: #ffe071;
+  box-shadow: 0 0 10px #ffe071;
+}
+.bbg-party-v2-diamond i[data-base="second"] {
+  top: 16px;
+  left: 19px;
+}
+.bbg-party-v2-diamond i[data-base="third"] {
+  top: 31px;
+  left: 7px;
+}
+.bbg-party-v2-diamond i[data-base="first"] {
+  top: 31px;
+  left: 31px;
+}
+.bbg-party-v2-counts {
+  display: grid;
+  align-content: center;
+  gap: 4px;
+  padding: 0 8px;
+}
+.bbg-party-v2-counts p {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+.bbg-party-v2-counts p b {
+  width: 10px;
+  font-size: 8px;
+}
+.bbg-party-v2-counts i {
+  width: 7px;
+  height: 7px;
+  border: 1px solid #4a6273;
+  border-radius: 50%;
+  background: #152632;
+}
+.bbg-party-v2-counts [data-tone="B"] i[data-on="true"] {
+  border-color: #64e8ac;
+  background: #64e8ac;
+}
+.bbg-party-v2-counts [data-tone="S"] i[data-on="true"] {
+  border-color: #ffd05b;
+  background: #ffd05b;
+}
+.bbg-party-v2-counts [data-tone="O"] i[data-on="true"] {
+  border-color: #ff5d65;
+  background: #ff5d65;
+}
+
+.bbg-party-live-result {
+  position: absolute;
+  z-index: 4;
+  right: 10px;
+  bottom: 9px;
+  left: 10px;
+  display: flex;
+  min-width: 0;
+  height: 46px;
+  align-items: center;
+  gap: 10px;
+  border: 1px solid #285343;
+  border-radius: 11px;
+  padding: 5px 12px;
+  background: rgb(3 15 20 / 94%);
+}
+.bbg-party-live-result > span {
+  display: grid;
+  width: 34px;
+  height: 34px;
+  place-items: center;
+  border-radius: 50%;
+  background: #70edbd;
+  color: #071a13;
+  font-weight: 950;
+}
+.bbg-party-live-result > div {
+  min-width: 0;
+}
+.bbg-party-live-result small {
+  display: block;
+  color: #77a18f;
+  font-size: 8px;
+}
+.bbg-party-live-result strong {
+  display: block;
+  overflow: hidden;
+  font-size: 14px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.bbg-party-team-rail {
+  min-width: 0;
+  overflow: hidden;
+  border: 1px solid #263d4e;
+  border-radius: 14px;
+  background: #091722;
+}
+.bbg-party-team-rail > header {
+  display: flex;
+  height: 38px;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 10px;
+  border-bottom: 1px solid #263d4e;
+  color: #9bb1c0;
+  font-size: 11px;
+  font-weight: 900;
+}
+.bbg-party-team-rail > header b {
+  color: #70edbd;
+}
+.bbg-party-team-rail ol {
+  display: grid;
+  gap: 5px;
+  padding: 7px;
+}
+.bbg-party-team-rail li {
+  display: grid;
+  min-width: 0;
+  height: 42px;
+  grid-template-columns: 26px minmax(0, 1fr);
+  align-items: center;
+  gap: 6px;
+  border: 1px solid transparent;
+  border-radius: 8px;
+  padding: 4px;
+  opacity: 0.38;
+}
+.bbg-party-team-rail li[data-connected="true"] {
+  opacity: 1;
+}
+.bbg-party-team-rail li[data-active="true"] {
+  border-color: #6ceabc;
+  background: rgb(108 234 188 / 9%);
+  box-shadow: 0 0 16px rgb(108 234 188 / 16%);
+}
+.bbg-party-team-rail li > span {
+  display: grid;
+  width: 26px;
+  height: 26px;
+  place-items: center;
+  border-radius: 50%;
+  background: #173244;
+  color: #acd1c3;
+  font-size: 10px;
+  font-weight: 900;
+}
+.bbg-party-team-rail li strong {
+  overflow: hidden;
+  font-size: 10px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.bbg-party-team-rail li em {
+  grid-column: 2;
+  margin-top: -8px;
+  color: #70edbd;
+  font-size: 7px;
+  font-style: normal;
+}
+
+.bbg-party-host-panel {
+  position: absolute;
+  z-index: 8;
+  right: 154px;
+  bottom: 62px;
+  border: 1px solid #2d4657;
+  border-radius: 10px;
+  background: rgb(7 20 30 / 96%);
+}
+.bbg-party-host-panel summary {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  padding: 8px 10px;
+  color: #a8bdca;
+  font-size: 10px;
+  font-weight: 800;
+  cursor: pointer;
+}
+.bbg-party-host-panel > div {
+  display: grid;
+  gap: 5px;
+  max-height: 290px;
+  padding: 0 7px 7px;
+  overflow: auto;
+}
+.bbg-party-host-panel button {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  border: 1px solid #314b5c;
+  border-radius: 7px;
+  padding: 7px 9px;
+  background: #0d202d;
+  color: #d9e8e3;
+  font-size: 10px;
+}
+
+.bbg-party-host-roster {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 4px;
+  padding-top: 5px;
+  border-top: 1px solid #253e4d;
+}
+
+.bbg-party-host-roster button {
+  min-width: 0;
+  overflow: hidden;
+  color: #ffb7b7;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.bbg-party-paused {
+  position: absolute;
+  z-index: 7;
+  inset: 0 150px;
+  display: grid;
+  place-items: center;
+  background: rgb(3 10 16 / 58%);
+  color: #ffe17a;
+  font-size: 22px;
+  font-weight: 950;
+  backdrop-filter: blur(2px);
+}
+
+.bbg-party-mobile-shell,
+.bbg-party-player-shell {
+  width: 100%;
+  height: 100dvh;
+  overflow: hidden;
+  background: #07131f;
+  color: #edf7f4;
+}
+.bbg-party-mobile-shell {
+  display: grid;
+  place-items: center;
+  padding: 16px;
+}
+.bbg-party-join-card {
+  display: flex;
+  width: min(100%, 390px);
+  flex-direction: column;
+  align-items: stretch;
+  padding: 22px;
+}
+.bbg-party-join-card > svg {
+  align-self: center;
+  width: 42px;
+  height: 42px;
+  margin-bottom: 10px;
+  color: #70edbd;
+}
+.bbg-party-join-card > small {
+  color: #70edbd;
+  text-align: center;
+  letter-spacing: 0.13em;
+}
+.bbg-party-join-card h1 {
+  margin: 5px 0;
+  text-align: center;
+}
+.bbg-party-join-card > p {
+  margin: 0 0 18px;
+  color: #8da4b3;
+  font-size: 12px;
+  line-height: 1.55;
+  text-align: center;
+}
+.bbg-party-join-card label {
+  color: #91a7b5;
+  font-size: 10px;
+  font-weight: 800;
+}
+.bbg-party-join-card input {
+  width: 100%;
+  height: 42px;
+  margin-top: 5px;
+  border: 1px solid #304b5b;
+  border-radius: 9px;
+  padding: 0 11px;
+  background: #081822;
+  color: white;
+}
+.bbg-party-join-card fieldset {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 7px;
+  margin: 16px 0;
+  border: 0;
+}
+.bbg-party-join-card legend {
+  margin-bottom: 6px;
+  color: #91a7b5;
+  font-size: 10px;
+  font-weight: 800;
+}
+.bbg-party-join-card fieldset button {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  align-items: flex-start;
+  border: 1px solid #2b4656;
+  border-radius: 10px;
+  padding: 10px;
+  background: #091b27;
+  color: #d9e6e2;
+}
+.bbg-party-join-card fieldset button[data-selected="true"] {
+  border-color: #70edbd;
+  box-shadow: inset 0 0 0 1px #70edbd;
+}
+.bbg-party-join-card fieldset strong {
+  overflow: hidden;
+  max-width: 100%;
+  margin: 3px 0;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.bbg-party-join-card fieldset small {
+  color: #7892a3;
+}
+.bbg-party-join-submit,
+.bbg-party-primary-link {
+  min-height: 44px;
+  text-decoration: none;
+}
+.bbg-party-join-card > a:not(.bbg-party-primary-link) {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  margin-top: 14px;
+  color: #89a1b1;
+  font-size: 11px;
+}
+
+.bbg-party-player-shell {
+  display: grid;
+  grid-template-rows: 44px 78px 82px 72px minmax(180px, 1fr) 94px auto;
+  gap: 7px;
+  padding: 8px;
+}
+.bbg-party-player-shell > header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+.bbg-party-player-shell > header a {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  color: white;
+  text-decoration: none;
+}
+.bbg-party-player-shell > header a span {
+  display: grid;
+  width: 30px;
+  height: 30px;
+  place-items: center;
+  border-radius: 9px;
+  background: #70edbd;
+  color: #062016;
+  font-size: 10px;
+  font-weight: 950;
+}
+.bbg-party-player-shell > header > div {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  border: 1px solid #294454;
+  border-radius: 999px;
+  padding: 5px 8px;
+  color: #8fa7b6;
+  font:
+    800 9px/1 ui-monospace,
+    monospace;
+}
+.bbg-party-mini-score {
+  display: grid;
+  grid-template-columns: 1fr 84px 48px;
+  overflow: hidden;
+  border: 1px solid #2a4353;
+  border-radius: 11px;
+  background: #091923;
+}
+.bbg-party-mini-score > div:first-child {
+  display: grid;
+  grid-template-rows: 1fr 1fr;
+}
+.bbg-party-mini-score p {
+  display: grid;
+  grid-template-columns: 26px 1fr 20px;
+  align-items: center;
+  padding: 0 7px;
+}
+.bbg-party-mini-score p[data-batting="true"] {
+  box-shadow: inset 3px 0 #f3cc61;
+  background: rgb(243 204 97 / 7%);
+}
+.bbg-party-mini-score p small {
+  color: #7690a1;
+  font-size: 8px;
+}
+.bbg-party-mini-score p strong {
+  overflow: hidden;
+  font-size: 10px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.bbg-party-mini-score p b {
+  text-align: right;
+}
+.bbg-party-mini-score > span {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  border-left: 1px solid #263d4c;
+  font-size: 11px;
+}
+.bbg-party-mini-score > span small {
+  margin-top: 4px;
+  color: #86a0af;
+  font-size: 8px;
+}
+.bbg-party-mini-bases {
+  position: relative;
+  border-left: 1px solid #263d4c;
+}
+.bbg-party-mini-bases i:nth-child(1) {
+  top: 17px;
+  left: 19px;
+}
+.bbg-party-mini-bases i:nth-child(2) {
+  top: 32px;
+  left: 7px;
+}
+.bbg-party-mini-bases i:nth-child(3) {
+  top: 32px;
+  left: 31px;
+}
+.bbg-party-player-status,
+.bbg-party-player-roster,
+.bbg-party-player-hand,
+.bbg-party-player-action {
+  min-width: 0;
+  overflow: hidden;
+  border: 1px solid #294454;
+  border-radius: 11px;
+  background: #091923;
+}
+.bbg-party-player-status {
+  padding: 10px 12px;
+}
+.bbg-party-player-status[data-active="true"] {
+  border-color: #70edbd;
+  box-shadow: inset 3px 0 #70edbd;
+}
+.bbg-party-player-status h1 {
+  margin: 3px 0;
+  font-size: 17px;
+}
+.bbg-party-player-status p {
+  color: #839ba9;
+  font-size: 10px;
+}
+.bbg-party-player-roster > header,
+.bbg-party-player-hand > header {
+  display: flex;
+  height: 34px;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 10px;
+  border-bottom: 1px solid #263d4c;
+}
+.bbg-party-player-roster header small,
+.bbg-party-player-hand header > span {
+  color: #8098a8;
+  font-size: 9px;
+}
+.bbg-party-player-roster ol {
+  display: flex;
+  gap: 5px;
+  padding: 5px;
+  overflow: hidden;
+}
+.bbg-party-player-roster li {
+  display: flex;
+  min-width: 0;
+  flex: 1 1 0;
+  align-items: center;
+  gap: 4px;
+  border: 1px solid transparent;
+  border-radius: 7px;
+  padding: 3px;
+}
+.bbg-party-player-roster li[data-active="true"] {
+  border-color: #70edbd;
+  background: rgb(112 237 189 / 8%);
+}
+.bbg-party-player-roster li > span {
+  display: grid;
+  width: 22px;
+  height: 22px;
+  flex: 0 0 auto;
+  place-items: center;
+  border-radius: 50%;
+  background: #183448;
+  font-size: 8px;
+}
+.bbg-party-player-roster li strong {
+  overflow: hidden;
+  font-size: 9px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.bbg-party-player-roster li em {
+  display: none;
+}
+.bbg-party-player-hand {
+  min-height: 0;
+}
+.bbg-party-player-hand header > div {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+}
+.bbg-party-player-hand > div {
+  display: grid;
+  height: calc(100% - 34px);
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  grid-template-rows: repeat(2, minmax(0, 1fr));
+  gap: 5px;
+  padding: 5px;
+}
+.bbg-party-player-hand button {
+  display: grid;
+  min-width: 0;
+  grid-template-columns: 34px 1fr;
+  align-content: center;
+  border: 1px solid #253e4d;
+  border-radius: 8px;
+  padding: 7px;
+  background: #0b1d29;
+  color: #d5e4df;
+  text-align: left;
+}
+.bbg-party-player-hand button[data-playable="true"] {
+  border-color: #70edbd;
+  box-shadow:
+    inset 0 0 0 1px #70edbd,
+    0 0 13px rgb(112 237 189 / 18%);
+}
+.bbg-party-player-hand button:disabled {
+  color: #81939a;
+}
+.bbg-party-player-hand button b {
+  grid-row: 1 / span 2;
+  align-self: center;
+  color: #f2cc60;
+  font-size: 13px;
+}
+.bbg-party-player-hand button strong {
+  overflow: hidden;
+  font-size: 10px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.bbg-party-player-hand button small {
+  overflow: hidden;
+  color: #708895;
+  font-size: 7px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.bbg-party-player-action {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 7px;
+}
+.bbg-party-player-action > small {
+  color: #70edbd;
+  font-size: 8px;
+  letter-spacing: 0.12em;
+}
+.bbg-party-player-action > strong {
+  margin: 3px 0 7px;
+  font-size: 12px;
+}
+.bbg-party-player-action > button {
+  display: flex;
+  width: min(260px, 100%);
+  height: 32px;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  border: 0;
+  border-radius: 8px;
+  background: #70edbd;
+  color: #052117;
+  font-weight: 900;
+}
+.bbg-party-player-action.is-waiting {
+  flex-direction: row;
+  gap: 7px;
+  color: #839aa9;
+}
+
+@media (max-width: 760px) {
+  .bbg-party-v2-topbar {
+    height: 48px;
+    min-height: 48px;
+    padding-inline: 10px;
+  }
+  .bbg-party-v2-topbar .bbg-brand small,
+  .bbg-party-v2-topbar .bbg-mp-room-chip span {
+    display: none;
+  }
+  .bbg-party-v2-main {
+    height: calc(100dvh - 48px);
+    padding: 7px;
+  }
+  .bbg-party-lobby {
+    grid-template-columns: 128px minmax(0, 1fr);
+    gap: 6px;
+  }
+  .bbg-party-invite {
+    padding: 8px;
+  }
+  .bbg-party-invite h1 {
+    margin-bottom: 9px;
+    font-size: 14px;
+  }
+  .bbg-party-invite img {
+    width: 110px;
+  }
+  .bbg-party-invite > strong {
+    font-size: 15px;
+  }
+  .bbg-party-invite > p {
+    display: none;
+  }
+  .bbg-party-lobby-board {
+    gap: 6px;
+    padding: 8px;
+  }
+  .bbg-party-lobby-board h2 {
+    font-size: 14px;
+  }
+  .bbg-party-lobby-board > header > span {
+    display: none;
+  }
+  .bbg-party-roster-grid {
+    grid-template-columns: 1fr;
+  }
+  .bbg-party-roster-card:first-child {
+    display: none;
+  }
+  .bbg-party-settings {
+    grid-template-columns: 1fr 70px;
+  }
+  .bbg-party-settings label:first-child,
+  .bbg-party-settings label:nth-child(2) {
+    display: none;
+  }
+  .bbg-party-live {
+    grid-template-columns: 48px minmax(0, 1fr) 48px;
+    gap: 3px;
+  }
+  .bbg-party-team-rail > header {
+    justify-content: center;
+    padding: 0;
+    font-size: 8px;
+  }
+  .bbg-party-team-rail > header b {
+    display: none;
+  }
+  .bbg-party-team-rail ol {
+    gap: 3px;
+    padding: 3px;
+  }
+  .bbg-party-team-rail li {
+    display: grid;
+    height: 34px;
+    grid-template-columns: 1fr;
+    place-items: center;
+    padding: 2px;
+  }
+  .bbg-party-team-rail li > span {
+    width: 22px;
+    height: 22px;
+  }
+  .bbg-party-team-rail li strong,
+  .bbg-party-team-rail li em {
+    display: none;
+  }
+  .bbg-party-live-field > .bbg-stadium {
+    inset: 74px 0 50px;
+  }
+  .bbg-party-v2-scoreboard {
+    grid-template-columns: minmax(100px, 1fr) 44px 40px 67px;
+    height: 62px;
+  }
+  .bbg-party-v2-scoreboard > div:first-child p {
+    grid-template-columns: 20px 1fr 17px;
+    padding: 0 4px;
+  }
+  .bbg-party-v2-scoreboard p strong {
+    font-size: 8px;
+  }
+  .bbg-party-v2-inning {
+    font-size: 9px;
+  }
+  .bbg-party-v2-diamond i[data-base="second"] {
+    top: 14px;
+    left: 15px;
+  }
+  .bbg-party-v2-diamond i[data-base="third"] {
+    top: 27px;
+    left: 4px;
+  }
+  .bbg-party-v2-diamond i[data-base="first"] {
+    top: 27px;
+    left: 25px;
+  }
+  .bbg-party-v2-counts {
+    padding: 0 4px;
+  }
+  .bbg-party-live-result strong {
+    font-size: 11px;
+  }
+  .bbg-party-host-panel {
+    right: 55px;
+    bottom: 60px;
+  }
+  .bbg-party-paused {
+    inset-inline: 50px;
+    font-size: 15px;
+  }
+}

@@ -11,6 +11,12 @@ import {
 } from "@/lib/baseball-game/multiplayer/security";
 import { readJson } from "@/lib/what-should-eat/api";
 import { mutationOriginError } from "@/lib/workbench/request";
+import { partyErrorResponse } from "@/lib/baseball-game/party/http";
+import {
+  partyCookieOptions,
+  partyHostCookieName,
+} from "@/lib/baseball-game/party/security";
+import { createPartyRoom } from "@/lib/baseball-game/party/service";
 
 type CreateRoomBody = {
   config?: unknown;
@@ -31,26 +37,26 @@ export async function POST(request: Request) {
   }
 
   try {
+    if (mode === "party") {
+      const { room, hostToken } = await createPartyRoom(config);
+      const response = NextResponse.json({
+        roomCode: room.roomCode,
+        roomUrl: `/baseball-game/party/${room.roomCode}`,
+        joinUrl: `/baseball-game/party/${room.roomCode}/join`,
+      });
+      response.cookies.set(
+        partyHostCookieName(room.roomCode),
+        hostToken,
+        partyCookieOptions(),
+      );
+      return response;
+    }
     const { room, seatToken } = await createMultiplayerRoom(config);
-    const roomUrl =
-      mode === "party"
-        ? `/baseball-game/party/${room.roomCode}`
-        : `/baseball-game/rooms/${room.roomCode}`;
-    const response = NextResponse.json(
-      mode === "party"
-        ? {
-            roomCode: room.roomCode,
-            roomUrl,
-            awayControllerUrl: `/baseball-game/party/${room.roomCode}/away#token=${seatToken}`,
-            homeControllerUrl: `/baseball-game/party/${room.roomCode}/home`,
-          }
-        : {
-            roomCode: room.roomCode,
-            seat: "away",
-            roomUrl,
-          },
-    );
-    if (mode === "party") return response;
+    const response = NextResponse.json({
+      roomCode: room.roomCode,
+      seat: "away",
+      roomUrl: `/baseball-game/rooms/${room.roomCode}`,
+    });
     response.cookies.set(
       seatCookieName(room.roomCode),
       seatToken,
@@ -58,6 +64,8 @@ export async function POST(request: Request) {
     );
     return response;
   } catch (error) {
-    return multiplayerErrorResponse(error);
+    return mode === "party"
+      ? partyErrorResponse(error)
+      : multiplayerErrorResponse(error);
   }
 }

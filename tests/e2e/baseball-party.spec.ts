@@ -1,22 +1,15 @@
-import { expect, test } from "@playwright/test";
+import { expect, test, type BrowserContext, type Page } from "@playwright/test";
 
-test("공용 화면과 두 개인기기가 손패를 분리한 채 같은 경기를 진행한다", async ({
+test("공용 화면과 2대2 개인기기가 한 파티 경기를 실제로 진행한다", async ({
   browser,
 }) => {
   const baseURL = process.env.PLAYWRIGHT_BASE_URL ?? "http://localhost:3000";
+  const contexts: BrowserContext[] = [];
   const displayContext = await browser.newContext({
     viewport: { width: 1280, height: 720 },
   });
-  const awayContext = await browser.newContext({
-    viewport: { width: 390, height: 844 },
-  });
-  const homeContext = await browser.newContext({
-    viewport: { width: 390, height: 844 },
-  });
+  contexts.push(displayContext);
   const display = await displayContext.newPage();
-  const away = await awayContext.newPage();
-  const home = await homeContext.newPage();
-
   await display.route("**/api/workbench/auth/me", (route) =>
     route.fulfill({ status: 200, json: { account: null } }),
   );
@@ -27,88 +20,169 @@ test("공용 화면과 두 개인기기가 손패를 분리한 채 같은 경기
   await display.getByLabel("게임 모드", { exact: true }).selectOption("party");
   await display.getByRole("button", { name: "파티플레이 경기 만들기" }).click();
   await expect(display).toHaveURL(/\/baseball-game\/party\/[A-Z2-9]{6}$/);
-
   const roomCode = display.url().split("/").at(-1)!;
+  await expect(display.getByAltText("파티플레이 참가 QR 코드")).toBeVisible();
+
+  const players: Page[] = [];
+  for (const [nickname, team] of [
+    ["원정하나", "away"],
+    ["원정둘", "away"],
+    ["홈하나", "home"],
+    ["홈둘", "home"],
+  ] as const) {
+    const context = await browser.newContext({
+      viewport: { width: 390, height: 844 },
+    });
+    contexts.push(context);
+    const page = await context.newPage();
+    await page.goto(`${baseURL}/baseball-game/party/${roomCode}/join`);
+    await page.getByLabel("닉네임").fill(nickname);
+    if (team === "home")
+      await page.getByRole("button", { name: /홈 홈팀/ }).click();
+    await page.getByRole("button", { name: "이 팀으로 참가" }).click();
+    await expect(page).toHaveURL(new RegExp(`/party/${roomCode}/play$`));
+    players.push(page);
+  }
+
   await expect(
-    display.getByRole("region", { name: "개인 화면 연결" }),
+    display.getByRole("region", { name: "원정팀 참가자" }).getByText("2/8"),
   ).toBeVisible();
   await expect(
-    display.getByRole("region", { name: "공용 경기 점수판 1회초" }),
+    display.getByRole("region", { name: "홈팀 참가자" }).getByText("2/8"),
   ).toBeVisible();
-  await expect(display.getByText("개인기기 연결 대기")).toBeVisible();
+  await display.getByRole("button", { name: "경기 시작" }).click();
+  await expect(
+    display.getByRole("region", { name: "파티플레이 공용 경기장" }),
+  ).toBeVisible();
 
-  const controllerLinks = await display.evaluate((code) => {
-    const stored = sessionStorage.getItem(`baseball-party:${code}:invites`);
-    return stored
-      ? (JSON.parse(stored) as {
-          awayControllerUrl: string;
-          homeControllerUrl: string;
-        })
-      : null;
-  }, roomCode);
-  expect(controllerLinks).not.toBeNull();
+  let activePage: Page | null = null;
+  await expect
+    .poll(async () => {
+      for (const page of players.slice(2)) {
+        if (
+          await page
+            .getByRole("button", { name: "주사위 굴리기" })
+            .isVisible()
+            .catch(() => false)
+        ) {
+          activePage = page;
+          return true;
+        }
+      }
+      return false;
+    })
+    .toBe(true);
+  expect(activePage).not.toBeNull();
 
-  const publicPayload = await display.evaluate(async (code) => {
-    const response = await fetch(
-      `/api/baseball-game/rooms/${code}/public-view`,
-    );
-    return response.json();
-  }, roomCode);
+  await display.getByText("방장 운영", { exact: true }).click();
+  await display.getByRole("button", { name: "일시정지" }).click();
+  await expect(display.getByText("경기가 일시정지되었습니다")).toBeVisible();
+  await expect
+    .poll(async () =>
+      activePage!
+        .getByText("방장이 경기를 일시정지했습니다.")
+        .isVisible()
+        .catch(() => false),
+    )
+    .toBe(true);
+  await display.getByRole("button", { name: "재개" }).click();
+  await expect(display.getByText("경기가 일시정지되었습니다")).toBeHidden();
+
+  const beforeSkip = await display.evaluate(
+    async (code) =>
+      (await fetch(`/api/baseball-game/rooms/${code}/public-view`)).json(),
+    roomCode,
+  );
+  await display.getByRole("button", { name: "현재 선수 넘기기" }).click();
+  await expect
+    .poll(async () => {
+      const payload = await display.evaluate(
+        async (code) =>
+          (await fetch(`/api/baseball-game/rooms/${code}/public-view`)).json(),
+        roomCode,
+      );
+      return payload.snapshot.activeDefenderId;
+    })
+    .not.toBe(beforeSkip.snapshot.activeDefenderId);
+
+  activePage = null;
+  await expect
+    .poll(async () => {
+      for (const page of players.slice(2)) {
+        if (
+          await page
+            .getByRole("button", { name: "주사위 굴리기" })
+            .isVisible()
+            .catch(() => false)
+        ) {
+          activePage = page;
+          return true;
+        }
+      }
+      return false;
+    })
+    .toBe(true);
+  await activePage!.getByRole("button", { name: "주사위 굴리기" }).click();
+  await expect
+    .poll(async () => {
+      const payload = await display.evaluate(
+        async (code) =>
+          (await fetch(`/api/baseball-game/rooms/${code}/public-view`)).json(),
+        roomCode,
+      );
+      return payload.snapshot.view.revision;
+    })
+    .toBe(1);
+
+  const publicPayload = await display.evaluate(
+    async (code) =>
+      (await fetch(`/api/baseball-game/rooms/${code}/public-view`)).json(),
+    roomCode,
+  );
   expect(publicPayload.snapshot.view.cards.offense.hand).toBeNull();
   expect(publicPayload.snapshot.view.cards.defense.hand).toBeNull();
   expect(publicPayload.snapshot.view).not.toHaveProperty("rng");
   expect(JSON.stringify(publicPayload)).not.toContain("token");
-
-  await away.goto(
-    new URL(controllerLinks!.awayControllerUrl, baseURL).toString(),
+  const playerPayload = await players[0].evaluate(
+    async (code) =>
+      (await fetch(`/api/baseball-game/rooms/${code}/party/view`)).json(),
+    roomCode,
   );
-  await expect(away).toHaveURL(new RegExp(`/baseball-game/rooms/${roomCode}$`));
-  await expect(
-    away.getByRole("region", { name: "원정팀 공격 손패" }),
-  ).toBeVisible();
+  expect(playerPayload.snapshot.view.cards.defense.hand).toBeNull();
+  expect(playerPayload.snapshot.view).not.toHaveProperty("rng");
 
-  await home.goto(
-    new URL(controllerLinks!.homeControllerUrl, baseURL).toString(),
-  );
-  await expect(home).toHaveURL(new RegExp(`/baseball-game/rooms/${roomCode}$`));
-  await expect(
-    home.getByRole("region", { name: "홈팀 수비 손패" }),
-  ).toBeVisible();
-  await expect(
-    home.getByRole("button", { name: "투구 주사위 굴리기" }),
-  ).toBeVisible();
-  await expect(display.getByText("경기 진행 중")).toBeVisible({
-    timeout: 4_000,
+  const spectatorContext = await browser.newContext({
+    viewport: { width: 390, height: 844 },
   });
+  contexts.push(spectatorContext);
+  const spectator = await spectatorContext.newPage();
+  await spectator.goto(`${baseURL}/baseball-game/party/${roomCode}/join`);
+  await expect(
+    spectator.getByRole("heading", { name: "경기가 시작되었습니다" }),
+  ).toBeVisible();
+  await spectator.getByRole("link", { name: "관전 화면 열기" }).click();
+  await expect(
+    spectator.getByRole("region", { name: "파티플레이 공용 경기장" }),
+  ).toBeVisible();
 
-  await home.getByRole("button", { name: "투구 주사위 굴리기" }).click();
-  await expect
-    .poll(async () => {
-      const payload = await display.evaluate(async (code) => {
-        const response = await fetch(
-          `/api/baseball-game/rooms/${code}/public-view`,
-        );
-        return response.json();
-      }, roomCode);
-      return payload.snapshot.view.revision;
-    })
-    .toBe(1);
-  await expect(display.getByText("REV 1")).toBeVisible({ timeout: 4_000 });
+  await display.setViewportSize({ width: 945, height: 1237 });
+  const tallField = await display
+    .getByRole("region", { name: "파티플레이 공용 경기장" })
+    .boundingBox();
+  const tallStadium = await display
+    .locator(".bbg-party-live-field > .bbg-stadium")
+    .boundingBox();
+  expect(tallField).not.toBeNull();
+  expect(tallStadium).not.toBeNull();
+  expect(tallStadium!.height).toBeGreaterThan(tallField!.height * 0.7);
 
-  const layouts = await Promise.all(
-    [display, away, home].map((page) =>
-      page.evaluate(() => ({
-        widthFits: document.documentElement.scrollWidth <= window.innerWidth,
-        heightFits: document.documentElement.scrollHeight <= window.innerHeight,
-      })),
-    ),
-  );
-  for (const layout of layouts) {
-    expect(layout.widthFits).toBe(true);
-    expect(layout.heightFits).toBe(true);
+  for (const page of [display, ...players, spectator]) {
+    const layout = await page.evaluate(() => ({
+      width: document.documentElement.scrollWidth <= window.innerWidth,
+      height: document.documentElement.scrollHeight <= window.innerHeight,
+    }));
+    expect(layout.width).toBe(true);
+    expect(layout.height).toBe(true);
   }
-
-  await displayContext.close();
-  await awayContext.close();
-  await homeContext.close();
+  await Promise.all(contexts.map((context) => context.close()));
 });

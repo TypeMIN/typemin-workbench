@@ -20,7 +20,6 @@ import {
   FACE_LABELS,
   rollDie,
 } from "@/lib/baseball-game/rules";
-import { partyInviteStorageKey } from "@/lib/baseball-game/multiplayer/types";
 import type {
   BattingFace,
   CardAvailability,
@@ -187,27 +186,12 @@ export default function BaseballGameDebug() {
         const payload = (await response.json()) as {
           roomCode?: string;
           roomUrl?: string;
-          awayControllerUrl?: string;
-          homeControllerUrl?: string;
+          joinUrl?: string;
           error?: string;
         };
         if (!response.ok || !payload.roomUrl) {
           setError(payload.error ?? "멀티플레이 방을 만들지 못했습니다.");
           return;
-        }
-        if (
-          draftSession.mode === "party" &&
-          payload.roomCode &&
-          payload.awayControllerUrl &&
-          payload.homeControllerUrl
-        ) {
-          window.sessionStorage.setItem(
-            partyInviteStorageKey(payload.roomCode),
-            JSON.stringify({
-              awayControllerUrl: payload.awayControllerUrl,
-              homeControllerUrl: payload.homeControllerUrl,
-            }),
-          );
         }
         router.push(payload.roomUrl);
       } catch {

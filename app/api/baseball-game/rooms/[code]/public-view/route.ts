@@ -1,5 +1,8 @@
-import { multiplayerErrorResponse } from "@/lib/baseball-game/multiplayer/http";
-import { getPartyRoomSnapshot } from "@/lib/baseball-game/multiplayer/service";
+import { cookies } from "next/headers";
+
+import { partyErrorResponse } from "@/lib/baseball-game/party/http";
+import { partyHostCookieName } from "@/lib/baseball-game/party/security";
+import { getPartyPublicSnapshot } from "@/lib/baseball-game/party/service";
 import {
   isValidRoomCode,
   normalizeRoomCode,
@@ -19,12 +22,14 @@ export async function GET(
   }
 
   try {
-    const snapshot = await getPartyRoomSnapshot(roomCode);
+    const hostToken =
+      (await cookies()).get(partyHostCookieName(roomCode))?.value ?? null;
+    const snapshot = await getPartyPublicSnapshot(roomCode, hostToken);
     return Response.json(
       { snapshot },
       { headers: { "cache-control": "no-store" } },
     );
   } catch (error) {
-    return multiplayerErrorResponse(error);
+    return partyErrorResponse(error);
   }
 }
