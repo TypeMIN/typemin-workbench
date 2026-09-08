@@ -10,8 +10,13 @@ import {
   Users,
 } from "lucide-react";
 import Link from "next/link";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useMemo, useRef, useState } from "react";
 
+import {
+  BaseballActionFeedback,
+  useAdaptiveGamePolling,
+  useBaseballActionFeedback,
+} from "@/components/baseball-game/baseball-action-feedback";
 import { BaseballStadium } from "@/components/baseball-game/baseball-game-debug";
 import {
   BaseballAudio,
@@ -47,6 +52,7 @@ export default function BaseballMultiplayerRoom({
   const [error, setError] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
   const seatEstablishedRef = useRef(false);
+  const actionFeedback = useBaseballActionFeedback();
 
   const loadSnapshot = useCallback(
     async (quiet = false) => {
@@ -89,14 +95,7 @@ export default function BaseballMultiplayerRoom({
     [roomCode],
   );
 
-  useEffect(() => {
-    const initialTimer = window.setTimeout(() => void loadSnapshot(), 0);
-    const timer = window.setInterval(() => void loadSnapshot(true), 900);
-    return () => {
-      window.clearTimeout(initialTimer);
-      window.clearInterval(timer);
-    };
-  }, [loadSnapshot]);
+  useAdaptiveGamePolling(loadSnapshot);
 
   async function joinRoom() {
     setJoining(true);
@@ -127,8 +126,15 @@ export default function BaseballMultiplayerRoom({
 
   async function submitCommand(command: MultiplayerCommand) {
     if (!snapshot || submitting) return;
+    const intent = multiplayerCommandLabel(command, snapshot.view);
+    const previousRevision = snapshot.view.revision;
     setSubmitting(true);
     setError(null);
+    actionFeedback.show({
+      status: "pending",
+      title: `${intent} 요청 중`,
+      detail: "입력은 한 번만 처리됩니다. 서버 판정을 기다려 주세요.",
+    });
     try {
       const response = await fetch(
         `/api/baseball-game/rooms/${encodeURIComponent(roomCode)}/actions`,
@@ -147,13 +153,38 @@ export default function BaseballMultiplayerRoom({
         error?: string;
       };
       if (!response.ok || !payload.snapshot) {
-        setError(payload.error ?? "경기 행동을 처리하지 못했습니다.");
-        if (response.status === 409) await loadSnapshot(true);
+        if (response.status === 409) {
+          await loadSnapshot(true);
+          actionFeedback.show({
+            status: "error",
+            title: "다른 행동이 먼저 반영됐습니다",
+            detail: "최신 경기 상태로 자동 동기화했습니다.",
+          });
+          return;
+        }
+        const message = payload.error ?? "경기 행동을 처리하지 못했습니다.";
+        setError(message);
+        actionFeedback.show({
+          status: "error",
+          title: `${intent}을 반영하지 못했습니다`,
+          detail: message,
+        });
         return;
       }
       setSnapshot(payload.snapshot);
+      actionFeedback.show({
+        status: "success",
+        title: `${intent} 반영 완료`,
+        detail: revisionSummary(payload.snapshot.view, previousRevision),
+      });
     } catch {
-      setError("경기 행동을 서버에 보내지 못했습니다.");
+      const message = "경기 행동을 서버에 보내지 못했습니다.";
+      setError(message);
+      actionFeedback.show({
+        status: "error",
+        title: `${intent} 전송 실패`,
+        detail: "연결을 확인한 뒤 다시 시도해 주세요.",
+      });
     } finally {
       setSubmitting(false);
     }
@@ -208,6 +239,7 @@ export default function BaseballMultiplayerRoom({
           <MultiplayerBoard
             copied={copied}
             error={error}
+            feedback={actionFeedback.feedback}
             onCopy={copyRoomLink}
             onRefresh={() => void loadSnapshot()}
             onSubmit={submitCommand}
@@ -277,6 +309,7 @@ function RoomMessage({ title, copy }: { title: string; copy: string }) {
 function MultiplayerBoard({
   copied,
   error,
+  feedback,
   onCopy,
   onRefresh,
   onSubmit,
@@ -285,6 +318,7 @@ function MultiplayerBoard({
 }: {
   copied: boolean;
   error: string | null;
+  feedback: ReturnType<typeof useBaseballActionFeedback>["feedback"];
   onCopy: () => void;
   onRefresh: () => void;
   onSubmit: (command: MultiplayerCommand) => void;
@@ -309,7 +343,15 @@ function MultiplayerBoard({
   const seatName = teamName(game, snapshot.seat);
 
   return (
-    <div className="bbg-mp-board" data-room-status={snapshot.status}>
+    <div
+      aria-busy={submitting}
+      className="bbg-mp-board"
+      data-room-status={snapshot.status}
+    >
+      <BaseballActionFeedback
+        className="bbg-mp-action-feedback"
+        feedback={feedback}
+      />
       <section className="bbg-mp-field" aria-label="야구 경기장">
         <section
           className="bbg-mp-broadcast"
@@ -498,7 +540,7 @@ function TurnControl({
           onClick={() => onSubmit({ type: "PASS_CARD_WINDOW" })}
           type="button"
         >
-          카드 없이 진행
+          {disabled ? "서버 확인 중…" : "카드 없이 진행"}
         </button>
       </div>
     );
@@ -522,8 +564,10 @@ function TurnControl({
           <b>?</b>
         </span>
         <span>
-          <Dices aria-hidden="true" size={16} /> {PHASE_LABEL[game.phase]}{" "}
-          주사위 굴리기
+          <Dices aria-hidden="true" size={16} />
+          {disabled
+            ? "서버 판정 확인 중…"
+            : `${PHASE_LABEL[game.phase]} 주사위 굴리기`}
         </span>
       </button>
     </div>
@@ -591,4 +635,23 @@ function shouldReplaceSnapshot(
   }
   const rank = { lobby: 0, playing: 1, finished: 2, expired: 3 } as const;
   return rank[incoming.status] >= rank[current.status];
+}
+
+function multiplayerCommandLabel(command: MultiplayerCommand, game: GameView) {
+  if (command.type === "ROLL_DIE") {
+    return `${PHASE_LABEL[game.phase]} 주사위`;
+  }
+  if (command.type === "PASS_CARD_WINDOW") return "카드 없이 진행";
+  const card = [
+    ...(game.cards.offense.hand ?? []),
+    ...(game.cards.defense.hand ?? []),
+  ].find((item) => item.instanceId === command.cardInstanceId);
+  return card ? `${CARD_DEFINITIONS[card.cardId].name} 카드` : "전략카드";
+}
+
+function revisionSummary(game: GameView, previousRevision: number) {
+  return (
+    game.eventLog.findLast((event) => event.revision > previousRevision)
+      ?.summary ?? "다음 경기 단계가 준비됐습니다."
+  );
 }

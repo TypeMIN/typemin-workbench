@@ -141,6 +141,7 @@ test("두 기기가 방을 만들고 비공개 손패로 같은 경기를 진행
     home.locator(".bbg-pitch-marker[data-current='true']"),
   ).toBeVisible();
 
+  const syncStartedAt = Date.now();
   await expect
     .poll(async () => {
       const payload = await host.evaluate(async (code) => {
@@ -150,6 +151,7 @@ test("두 기기가 방을 만들고 비공개 손패로 같은 경기를 진행
       return payload.snapshot.view.revision;
     })
     .toBe(1);
+  expect(Date.now() - syncStartedAt).toBeLessThan(1_800);
 
   const directFace = await home.evaluate(async (code) => {
     const response = await fetch(`/api/baseball-game/rooms/${code}/actions`, {

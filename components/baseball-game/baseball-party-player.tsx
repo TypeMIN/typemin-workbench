@@ -4,6 +4,11 @@ import { Dices, Radio, RefreshCw, Users } from "lucide-react";
 import Link from "next/link";
 import { useCallback, useEffect, useMemo, useState } from "react";
 
+import {
+  BaseballActionFeedback,
+  useAdaptiveGamePolling,
+  useBaseballActionFeedback,
+} from "./baseball-action-feedback";
 import { CARD_DEFINITIONS } from "@/lib/baseball-game/cards";
 import type { MultiplayerCommand } from "@/lib/baseball-game/multiplayer/types";
 import type { PartyPlayerSnapshot } from "@/lib/baseball-game/party/types";
@@ -27,6 +32,7 @@ export default function BaseballPartyPlayer({
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [removed, setRemoved] = useState(false);
+  const actionFeedback = useBaseballActionFeedback();
 
   const load = useCallback(
     async (quiet = false) => {
@@ -65,9 +71,9 @@ export default function BaseballPartyPlayer({
     [roomCode],
   );
 
+  useAdaptiveGamePolling(load);
+
   useEffect(() => {
-    const first = window.setTimeout(() => void load(), 0);
-    const poll = window.setInterval(() => void load(true), 1_000);
     const heartbeat = window.setInterval(
       () =>
         void fetch(`/api/baseball-game/rooms/${roomCode}/party/heartbeat`, {
@@ -76,16 +82,21 @@ export default function BaseballPartyPlayer({
       10_000,
     );
     return () => {
-      window.clearTimeout(first);
-      window.clearInterval(poll);
       window.clearInterval(heartbeat);
     };
-  }, [load, roomCode]);
+  }, [roomCode]);
 
   async function submit(command: MultiplayerCommand) {
     if (!snapshot || busy || !snapshot.canAct) return;
+    const intent = partyCommandLabel(command, snapshot.view);
+    const previousRevision = snapshot.view.revision;
     setBusy(true);
     setError(null);
+    actionFeedback.show({
+      status: "pending",
+      title: `${intent} 요청 중`,
+      detail: "서버 판정이 끝날 때까지 입력을 유지합니다.",
+    });
     try {
       const response = await fetch(
         `/api/baseball-game/rooms/${roomCode}/party/actions`,
@@ -105,14 +116,32 @@ export default function BaseballPartyPlayer({
         error?: string;
       };
       if (!response.ok || !payload.snapshot) {
-        if (response.status === 409) await load(true);
+        if (response.status === 409) {
+          await load(true);
+          actionFeedback.show({
+            status: "error",
+            title: "팀의 다른 행동이 먼저 반영됐습니다",
+            detail: "최신 경기 상태로 자동 동기화했습니다.",
+          });
+          return;
+        }
         throw new Error(payload.error ?? "행동을 처리하지 못했습니다.");
       }
       setSnapshot(payload.snapshot);
+      actionFeedback.show({
+        status: "success",
+        title: `${intent} 반영 완료`,
+        detail: revisionSummary(payload.snapshot.view, previousRevision),
+      });
     } catch (cause) {
-      setError(
-        cause instanceof Error ? cause.message : "행동을 보내지 못했습니다.",
-      );
+      const message =
+        cause instanceof Error ? cause.message : "행동을 보내지 못했습니다.";
+      setError(message);
+      actionFeedback.show({
+        status: "error",
+        title: `${intent} 전송 실패`,
+        detail: message,
+      });
     } finally {
       setBusy(false);
     }
@@ -140,6 +169,7 @@ export default function BaseballPartyPlayer({
     <PartyPlayerBoard
       busy={busy}
       error={error}
+      feedback={actionFeedback.feedback}
       onSubmit={submit}
       snapshot={snapshot}
     />
@@ -149,11 +179,13 @@ export default function BaseballPartyPlayer({
 function PartyPlayerBoard({
   busy,
   error,
+  feedback,
   onSubmit,
   snapshot,
 }: {
   busy: boolean;
   error: string | null;
+  feedback: ReturnType<typeof useBaseballActionFeedback>["feedback"];
   onSubmit: (command: MultiplayerCommand) => void;
   snapshot: PartyPlayerSnapshot;
 }) {
@@ -176,8 +208,12 @@ function PartyPlayerBoard({
     (player) => player.id === activeId,
   );
   return (
-    <main className="bbg-party-player-shell">
+    <main aria-busy={busy} className="bbg-party-player-shell">
       <BaseballAudio events={game.eventLog} mode="personal" />
+      <BaseballActionFeedback
+        className="bbg-party-player-feedback"
+        feedback={feedback}
+      />
       <header>
         <Link href="/baseball-game">
           <span>BB</span>
@@ -330,7 +366,7 @@ function PartyAction({
           onClick={() => onSubmit({ type: "PASS_CARD_WINDOW" })}
           type="button"
         >
-          카드 없이 진행
+          {busy ? "서버 확인 중…" : "카드 없이 진행"}
         </button>
       </section>
     );
@@ -344,7 +380,7 @@ function PartyAction({
         type="button"
       >
         <Dices size={18} />
-        주사위 굴리기
+        {busy ? "서버 판정 확인 중…" : "주사위 굴리기"}
       </button>
     </section>
   );
@@ -387,4 +423,21 @@ function PartyMiniScore({ game }: { game: GameView }) {
 }
 function roomCodeLabel(value: string) {
   return `ROOM ${value}`;
+}
+
+function partyCommandLabel(command: MultiplayerCommand, game: GameView) {
+  if (command.type === "ROLL_DIE") return `${PHASE[game.phase]} 주사위`;
+  if (command.type === "PASS_CARD_WINDOW") return "카드 없이 진행";
+  const card = [
+    ...(game.cards.offense.hand ?? []),
+    ...(game.cards.defense.hand ?? []),
+  ].find((item) => item.instanceId === command.cardInstanceId);
+  return card ? `${CARD_DEFINITIONS[card.cardId].name} 카드` : "전략카드";
+}
+
+function revisionSummary(game: GameView, previousRevision: number) {
+  return (
+    game.eventLog.findLast((event) => event.revision > previousRevision)
+      ?.summary ?? "다음 경기 단계가 준비됐습니다."
+  );
 }

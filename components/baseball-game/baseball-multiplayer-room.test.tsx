@@ -1,7 +1,11 @@
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-import { createGame, getGameView } from "@/lib/baseball-game/engine";
+import {
+  createGame,
+  getGameView,
+  transition,
+} from "@/lib/baseball-game/engine";
 import type { MultiplayerRoomSnapshot } from "@/lib/baseball-game/multiplayer/types";
 
 import BaseballMultiplayerRoom from "./baseball-multiplayer-room";
@@ -92,5 +96,46 @@ describe("BaseballMultiplayerRoom", () => {
         { method: "POST" },
       ),
     );
+  });
+
+  it("shows an immediate action receipt while the server response is delayed", async () => {
+    const current = snapshot("home", "playing");
+    const result = transition(createGame(current.view.config), {
+      type: "PITCH_RESULT",
+      face: "S",
+    });
+    if (!result.ok) throw new Error("테스트 경기 진행 실패");
+    const updated = {
+      ...current,
+      view: getGameView(result.state, "home"),
+    } satisfies MultiplayerRoomSnapshot;
+    let resolveAction: ((value: Response) => void) | undefined;
+    const actionResponse = new Promise<Response>((resolve) => {
+      resolveAction = resolve;
+    });
+    const fetchMock = vi.fn((input: RequestInfo | URL) =>
+      String(input).endsWith("/actions")
+        ? actionResponse
+        : Promise.resolve(response({ snapshot: current })),
+    );
+    vi.stubGlobal("fetch", fetchMock);
+
+    const { container } = render(<BaseballMultiplayerRoom roomCode="ABC234" />);
+    fireEvent.click(
+      await screen.findByRole("button", { name: "투구 주사위 굴리기" }),
+    );
+
+    expect(screen.getByRole("status")).toHaveTextContent("투구 주사위 요청 중");
+    expect(
+      screen.getByRole("button", { name: /서버 판정 확인 중/ }),
+    ).toBeDisabled();
+    expect(container.querySelector(".bbg-mp-board")).toHaveAttribute(
+      "aria-busy",
+      "true",
+    );
+
+    resolveAction?.(response({ snapshot: updated }));
+    expect(await screen.findByText("투구 주사위 반영 완료")).toBeVisible();
+    expect(screen.getByRole("status")).toHaveTextContent("스트라이크");
   });
 });

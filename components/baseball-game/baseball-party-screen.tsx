@@ -16,6 +16,11 @@ import Image from "next/image";
 import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
 
+import {
+  BaseballActionFeedback,
+  useAdaptiveGamePolling,
+  useBaseballActionFeedback,
+} from "@/components/baseball-game/baseball-action-feedback";
 import { BaseballStadium } from "@/components/baseball-game/baseball-game-debug";
 import {
   BaseballAudio,
@@ -40,6 +45,7 @@ export default function BaseballPartyScreen({
   const [copied, setCopied] = useState(false);
   const [joinUrl, setJoinUrl] = useState("");
   const [qr, setQr] = useState("");
+  const actionFeedback = useBaseballActionFeedback();
 
   const load = useCallback(
     async (quiet = false) => {
@@ -92,18 +98,20 @@ export default function BaseballPartyScreen({
         setJoinUrl(url);
         setQr(dataUrl);
       });
-    const first = window.setTimeout(() => void load(), 0);
-    const poll = window.setInterval(() => void load(true), 1_000);
-    return () => {
-      window.clearTimeout(first);
-      window.clearInterval(poll);
-    };
-  }, [load, roomCode]);
+  }, [roomCode]);
+
+  useAdaptiveGamePolling(load);
 
   async function host(command: PartyHostCommand) {
     if (!snapshot || busy) return;
+    const intent = hostCommandLabel(command);
     setBusy(true);
     setError(null);
+    actionFeedback.show({
+      status: "pending",
+      title: `${intent} 요청 중`,
+      detail: "방 상태를 안전하게 저장하고 있습니다.",
+    });
     try {
       const response = await fetch(
         `/api/baseball-game/rooms/${roomCode}/party/host`,
@@ -123,10 +131,20 @@ export default function BaseballPartyScreen({
       if (!response.ok || !payload.snapshot)
         throw new Error(payload.error ?? "명령을 처리하지 못했습니다.");
       setSnapshot(payload.snapshot);
+      actionFeedback.show({
+        status: "success",
+        title: `${intent} 완료`,
+        detail: hostCommandResult(command),
+      });
     } catch (cause) {
-      setError(
-        cause instanceof Error ? cause.message : "명령을 처리하지 못했습니다.",
-      );
+      const message =
+        cause instanceof Error ? cause.message : "명령을 처리하지 못했습니다.";
+      setError(message);
+      actionFeedback.show({
+        status: "error",
+        title: `${intent} 실패`,
+        detail: message,
+      });
       await load(true);
     } finally {
       setBusy(false);
@@ -137,6 +155,11 @@ export default function BaseballPartyScreen({
     try {
       await navigator.clipboard.writeText(joinUrl);
       setCopied(true);
+      actionFeedback.show({
+        status: "success",
+        title: "참가 링크를 복사했습니다",
+        detail: "선수에게 그대로 전달하면 됩니다.",
+      });
       window.setTimeout(() => setCopied(false), 1_500);
     } catch {
       setError("참가 링크를 복사하지 못했습니다.");
@@ -145,6 +168,10 @@ export default function BaseballPartyScreen({
 
   return (
     <div className="bbg-shell bbg-party-v2-shell">
+      <BaseballActionFeedback
+        className="bbg-party-host-feedback"
+        feedback={actionFeedback.feedback}
+      />
       <header className="bbg-topbar bbg-party-v2-topbar">
         <Link className="bbg-brand" href="/baseball-game">
           <span className="bbg-brand-mark">BB</span>
@@ -192,6 +219,42 @@ export default function BaseballPartyScreen({
       </main>
     </div>
   );
+}
+
+function hostCommandLabel(command: PartyHostCommand) {
+  switch (command.type) {
+    case "UPDATE_CONFIG":
+      return "경기 설정 저장";
+    case "MOVE_PLAYER":
+      return "선수 팀 이동";
+    case "REMOVE_PLAYER":
+      return "선수 퇴장";
+    case "START_GAME":
+      return "경기 시작";
+    case "PAUSE_GAME":
+      return "경기 일시정지";
+    case "RESUME_GAME":
+      return "경기 재개";
+    case "SKIP_ACTIVE_PLAYER":
+      return "현재 선수 넘기기";
+    case "END_GAME":
+      return "경기 강제 종료";
+  }
+}
+
+function hostCommandResult(command: PartyHostCommand) {
+  switch (command.type) {
+    case "START_GAME":
+      return "양 팀 타순을 확정하고 경기장을 열었습니다.";
+    case "PAUSE_GAME":
+      return "모든 선수의 경기 행동을 잠갔습니다.";
+    case "RESUME_GAME":
+      return "현재 선수부터 경기를 계속합니다.";
+    case "SKIP_ACTIVE_PLAYER":
+      return "같은 팀의 다음 선수에게 행동권을 넘겼습니다.";
+    default:
+      return "모든 연결 화면에 변경 사항을 동기화했습니다.";
+  }
 }
 
 function PartyLobby({

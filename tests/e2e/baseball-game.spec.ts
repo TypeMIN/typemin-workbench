@@ -160,6 +160,9 @@ test("야구 게임에서 강제 주사위 판정과 새 경기를 진행한다"
 
   await page.getByText("특정 면 강제 입력").click();
   await page.getByRole("button", { name: /9번 면 C 컨택/ }).click();
+  await expect(page.getByRole("status")).toContainText(
+    "C · 컨택 결과를 선택했습니다",
+  );
   await expect(
     page.locator(".bbg-pitch-marker[data-current='true']"),
   ).toHaveText("1");
@@ -272,7 +275,9 @@ test("중계 화면에서 득점부터 공수교대와 경기 종료까지 이�
   await page.getByRole("button", { name: /9번 면 C 컨택/ }).click();
   await page.getByRole("button", { name: /12번 면 HR 홈런/ }).click();
   await expect(page.getByTestId("play-result")).toContainText("+1점");
-  await expect(page.getByRole("status")).toContainText("HOME RUN");
+  await expect(page.locator(".bbg-stadium-highlight")).toContainText(
+    "HOME RUN",
+  );
   await expect(page.getByRole("region", { name: /경기 점수판/ })).toContainText(
     "1",
   );
@@ -383,8 +388,11 @@ test("주요 데스크톱·태블릿·모바일 화면비율에서 게임 UI가 
     { width: 390, height: 844 },
     { width: 430, height: 932 },
     { width: 768, height: 1024 },
+    { width: 820, height: 1180 },
+    { width: 1024, height: 600 },
     { width: 1024, height: 768 },
     { width: 1280, height: 720 },
+    { width: 1366, height: 768 },
     { width: 1440, height: 900 },
     { width: 1920, height: 1080 },
   ];

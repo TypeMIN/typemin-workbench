@@ -7,6 +7,10 @@ import { useEffect, useRef, useState, type FormEvent } from "react";
 
 import { WorkbenchAccountControl } from "@/components/workbench-account-control";
 import {
+  BaseballActionFeedback,
+  useBaseballActionFeedback,
+} from "@/components/baseball-game/baseball-action-feedback";
+import {
   BaseballAudio,
   BroadcastLineScore,
   usePresentation,
@@ -104,6 +108,11 @@ export default function BaseballGameDebug() {
   const [acknowledgedInterlude, setAcknowledgedInterlude] = useState<
     number | null
   >(null);
+  const {
+    feedback: actionFeedback,
+    show: showActionFeedback,
+    clear: clearActionFeedback,
+  } = useBaseballActionFeedback();
   const currentDie = PHASE_DIE[game.phase] ?? null;
   const currentFaces = currentDie ? DIE_FACES[currentDie] : [];
   const currentRevisionEvents = game.eventLog.filter(
@@ -136,39 +145,76 @@ export default function BaseballGameDebug() {
       const result = transition(game, action);
       if (!result.ok) {
         setError(result.error.message);
+        showActionFeedback({
+          status: "error",
+          title: "AI 행동을 처리하지 못했습니다",
+          detail: result.error.message,
+        });
         return;
       }
       setError(null);
       setGame(result.state);
+      showActionFeedback({
+        status: "success",
+        title: `${teamNameFor(game, aiTeam)}이 ${gameActionLabel(action, game)}`,
+        detail: result.events.at(-1)?.summary,
+      });
     }, AI_TURN_DELAY_MS);
 
     return () => window.clearTimeout(timer);
-  }, [aiTeam, game, isAiTurn, modalOpen]);
+  }, [aiTeam, game, isAiTurn, modalOpen, showActionFeedback]);
 
-  function dispatchResult(kind: DieKind, face: DieFace) {
+  function dispatchResult(
+    kind: DieKind,
+    face: DieFace,
+    source: "roll" | "forced" = "forced",
+  ) {
     const action = actionFor(kind, face);
     const result = transition(game, action);
     if (!result.ok) {
       setError(result.error.message);
+      showActionFeedback({
+        status: "error",
+        title: "행동을 반영하지 못했습니다",
+        detail: result.error.message,
+      });
       return;
     }
     setError(null);
     setGame(result.state);
+    showActionFeedback({
+      status: "success",
+      title:
+        source === "roll"
+          ? `${DIE_LABELS[kind]} 주사위를 굴렸습니다`
+          : `${face} · ${FACE_LABELS[face]} 결과를 선택했습니다`,
+      detail: result.events.at(-1)?.summary,
+    });
   }
 
   function dispatchAction(action: GameAction) {
     const result = transition(game, action);
     if (!result.ok) {
       setError(result.error.message);
+      showActionFeedback({
+        status: "error",
+        title: "행동을 반영하지 못했습니다",
+        detail: result.error.message,
+      });
       return;
     }
     setError(null);
     setGame(result.state);
+    showActionFeedback({
+      status: "success",
+      title: gameActionLabel(action, game),
+      detail: result.events.at(-1)?.summary,
+    });
   }
 
   function rollCurrentDie() {
     if (!currentDie) return;
-    dispatchResult(currentDie, rollDie(currentDie));
+    dispatchResult(currentDie, rollDie(currentDie), "roll");
   }
 
   async function startGame(event: FormEvent<HTMLFormElement>) {
@@ -218,6 +264,7 @@ export default function BaseballGameDebug() {
     setGame(createGame(draft, { seed: createRandomSeed() }));
     setSession(draftSession);
     setError(null);
+    clearActionFeedback();
     setAcknowledgedInterlude(null);
     setupDetailsRef.current?.removeAttribute("open");
   }
@@ -227,6 +274,7 @@ export default function BaseballGameDebug() {
     setDraft(game.config);
     setDraftSession(session);
     setError(null);
+    clearActionFeedback();
     setAcknowledgedInterlude(null);
   }
 
@@ -376,7 +424,10 @@ export default function BaseballGameDebug() {
               />
             ) : null}
 
-            <p className="bbg-die-help">{PHASE_COPY[game.phase]}</p>
+            <div className="bbg-control-feedback-slot">
+              <p className="bbg-die-help">{PHASE_COPY[game.phase]}</p>
+              <BaseballActionFeedback feedback={actionFeedback} />
+            </div>
 
             <CardHands
               game={game}
@@ -1712,4 +1763,17 @@ function formatNextPlay(
   return event.kind === "count"
     ? "같은 타자에게 다음 투구"
     : "다음 타자에게 투구";
+}
+
+function gameActionLabel(action: GameAction, game: GameState) {
+  if (action.type === "PASS_CARD_WINDOW") return "카드 없이 진행했습니다";
+  if (action.type === "PLAY_CARD") {
+    const card = [...game.cards.offense.hand, ...game.cards.defense.hand].find(
+      (item) => item.instanceId === action.cardInstanceId,
+    );
+    return card
+      ? `${CARD_DEFINITIONS[card.cardId].name} 카드를 사용했습니다`
+      : "전략카드를 사용했습니다";
+  }
+  return `${action.face} · ${FACE_LABELS[action.face]} 판정을 선택했습니다`;
 }

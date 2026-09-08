@@ -119,6 +119,9 @@ describe("BaseballGameDebug", () => {
     render(<BaseballGameDebug />);
 
     fireEvent.click(screen.getByRole("button", { name: "투구 주사위 굴리기" }));
+    expect(screen.getByRole("status")).toHaveTextContent(
+      "투구 주사위를 굴렸습니다",
+    );
     expect(screen.getByLabelText("스트라이크 1")).toBeVisible();
     expect(
       document.querySelectorAll(
@@ -400,7 +403,9 @@ describe("BaseballGameDebug", () => {
         screen.getByRole("button", { name: /1번 면 S 스트라이크/ }),
       );
     }
-    expect(screen.getByRole("status")).toHaveTextContent("STRIKE OUT");
+    expect(document.querySelector(".bbg-stadium-highlight")).toHaveTextContent(
+      "STRIKE OUT",
+    );
 
     for (let pitch = 0; pitch < 6; pitch += 1) {
       fireEvent.click(

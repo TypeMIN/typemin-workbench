@@ -161,7 +161,20 @@ test("공용 화면과 2대2 개인기기가 한 파티 경기를 실제로 진�
       return false;
     })
     .toBe(true);
-  await activePage!.getByRole("button", { name: "주사위 굴리기" }).click();
+  await activePage!.route("**/party/actions", async (route) => {
+    await new Promise((resolve) => setTimeout(resolve, 350));
+    await route.continue();
+  });
+  const roll = activePage!
+    .getByRole("button", { name: "주사위 굴리기" })
+    .click();
+  await expect(activePage!.getByRole("status")).toContainText(
+    "투구 주사위 요청 중",
+  );
+  await roll;
+  await expect(activePage!.getByRole("status")).toContainText(
+    "투구 주사위 반영 완료",
+  );
   await expect
     .poll(async () => {
       const payload = await display.evaluate(

@@ -2382,6 +2382,7 @@
   gap: 7px;
   color: var(--bbg-mint);
   font-size: 14px;
+  white-space: nowrap;
 }
 
 .bbg-die-help {
@@ -3951,6 +3952,15 @@
 
   .bbg-control-panel--broadcast .bbg-d12 {
     width: 82px;
+  }
+
+  .bbg-control-panel--broadcast .bbg-roll-caption strong {
+    gap: 0;
+    font-size: 9px;
+  }
+
+  .bbg-control-panel--broadcast .bbg-roll-caption svg {
+    display: none;
   }
 
   .bbg-card-decision {
@@ -8625,5 +8635,234 @@
       minmax(62px, 1fr)
       repeat(var(--inning-count), minmax(15px, 22px))
       repeat(4, minmax(21px, 26px));
+  }
+}
+
+/* Interaction receipts and latency-aware controls. */
+.bbg-action-feedback {
+  display: grid;
+  min-width: 0;
+  min-height: 40px;
+  grid-template-columns: 18px minmax(0, 1fr);
+  align-items: center;
+  gap: 8px;
+  padding: 7px 9px;
+  border: 1px solid rgb(112 240 186 / 34%);
+  border-radius: 9px;
+  color: #eaf8f3;
+  background: rgb(5 20 27 / 96%);
+  box-shadow: 0 10px 30px rgb(0 0 0 / 28%);
+  animation: bbg-feedback-in 160ms ease-out both;
+}
+
+.bbg-action-feedback[data-status="pending"] {
+  border-color: rgb(255 209 102 / 45%);
+}
+
+.bbg-action-feedback[data-status="error"] {
+  border-color: rgb(255 99 109 / 58%);
+}
+
+.bbg-action-feedback-indicator {
+  width: 12px;
+  height: 12px;
+  justify-self: center;
+  border: 3px solid rgb(112 240 186 / 26%);
+  border-top-color: #70efba;
+  border-radius: 50%;
+}
+
+.bbg-action-feedback[data-status="pending"] .bbg-action-feedback-indicator {
+  border-color: rgb(255 209 102 / 25%);
+  border-top-color: #ffd166;
+  animation: bbg-feedback-spin 700ms linear infinite;
+}
+
+.bbg-action-feedback[data-status="success"] .bbg-action-feedback-indicator {
+  border: 0;
+  border-radius: 3px;
+  background: #70efba;
+  box-shadow: 0 0 12px rgb(112 239 186 / 55%);
+}
+
+.bbg-action-feedback[data-status="error"] .bbg-action-feedback-indicator {
+  border: 0;
+  background: #ff636d;
+  box-shadow: 0 0 12px rgb(255 99 109 / 48%);
+}
+
+.bbg-action-feedback > span:last-child {
+  display: grid;
+  min-width: 0;
+  gap: 2px;
+}
+
+.bbg-action-feedback strong,
+.bbg-action-feedback small {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.bbg-action-feedback strong {
+  font-size: 10px;
+}
+
+.bbg-action-feedback small {
+  color: #91a9b4;
+  font-size: 8px;
+}
+
+.bbg-control-panel--broadcast {
+  position: relative;
+}
+
+.bbg-control-feedback-slot {
+  flex: 0 0 auto;
+  min-height: 0;
+}
+
+.bbg-control-feedback-slot .bbg-die-help {
+  margin: 0;
+}
+
+.bbg-mp-action-feedback,
+.bbg-party-host-feedback,
+.bbg-party-player-feedback {
+  position: absolute;
+  z-index: 30;
+  pointer-events: none;
+}
+
+.bbg-mp-action-feedback {
+  top: 62px;
+  right: 14px;
+  width: min(332px, calc(100% - 28px));
+}
+
+.bbg-party-host-feedback {
+  top: 66px;
+  right: 18px;
+  width: min(340px, calc(100% - 36px));
+}
+
+.bbg-party-player-shell {
+  position: relative;
+}
+
+.bbg-party-player-feedback {
+  right: 8px;
+  bottom: 108px;
+  left: 8px;
+}
+
+.bbg-mp-board[aria-busy="true"] button:disabled,
+.bbg-party-player-shell[aria-busy="true"] button:disabled {
+  cursor: wait;
+}
+
+.bbg-mp-turn button:active,
+.bbg-party-player-action > button:active,
+.bbg-card-hand button:active,
+.bbg-mp-hand button:active,
+.bbg-party-player-hand button:active {
+  transform: scale(0.975);
+}
+
+.bbg-mp-connection button:hover,
+.bbg-mp-connection button:focus-visible {
+  border-color: rgb(112 240 186 / 52%);
+  color: var(--bbg-mint);
+}
+
+@keyframes bbg-feedback-in {
+  from {
+    opacity: 0;
+    transform: translateY(5px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes bbg-feedback-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@media (max-width: 760px) {
+  .bbg-action-feedback {
+    min-height: 38px;
+    padding: 6px 8px;
+  }
+
+  .bbg-action-feedback strong {
+    font-size: 9px;
+  }
+
+  .bbg-action-feedback small {
+    font-size: 7px;
+  }
+
+  .bbg-control-feedback-slot {
+    position: absolute;
+    z-index: 20;
+    right: 8px;
+    bottom: 44px;
+    left: 8px;
+    pointer-events: none;
+  }
+
+  .bbg-mp-action-feedback {
+    top: calc(45% + 8px);
+    right: 8px;
+    left: 8px;
+    width: auto;
+  }
+
+  .bbg-party-host-feedback {
+    top: 54px;
+    right: 8px;
+    left: 8px;
+    width: auto;
+  }
+
+  .bbg-party-player-hand button small {
+    font-size: 8px;
+  }
+
+  .bbg-party-player-action > button {
+    min-height: 38px;
+  }
+}
+
+@media (max-height: 700px) and (min-width: 681px) {
+  .bbg-game-console {
+    height: calc(100dvh - 145px);
+  }
+
+  .bbg-mp-board {
+    height: 100%;
+  }
+
+  .bbg-control-panel--broadcast,
+  .bbg-mp-controls {
+    gap: 5px;
+    padding: 8px;
+  }
+
+  .bbg-control-panel--broadcast .bbg-phase-copy,
+  .bbg-mp-connection {
+    min-height: 40px;
+    padding-block: 5px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .bbg-action-feedback,
+  .bbg-action-feedback-indicator {
+    animation: none !important;
   }
 }

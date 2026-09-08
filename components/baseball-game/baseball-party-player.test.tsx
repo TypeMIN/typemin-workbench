@@ -1,7 +1,11 @@
-import { render, screen } from "@testing-library/react";
+import { fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-import { createGame, getGameView } from "@/lib/baseball-game/engine";
+import {
+  createGame,
+  getGameView,
+  transition,
+} from "@/lib/baseball-game/engine";
 import type { PartyPlayerSnapshot } from "@/lib/baseball-game/party/types";
 
 import BaseballPartyPlayer from "./baseball-party-player";
@@ -78,5 +82,44 @@ describe("BaseballPartyPlayer", () => {
     expect(
       screen.queryByRole("button", { name: "주사위 굴리기" }),
     ).not.toBeInTheDocument();
+  });
+
+  it("confirms a player action before and after a delayed server response", async () => {
+    const current = snapshot(true);
+    const result = transition(createGame(current.view.config), {
+      type: "PITCH_RESULT",
+      face: "B",
+    });
+    if (!result.ok) throw new Error("테스트 경기 진행 실패");
+    const updated = {
+      ...current,
+      roomRevision: current.roomRevision + 1,
+      view: getGameView(result.state, "home"),
+    } satisfies PartyPlayerSnapshot;
+    let resolveAction: ((value: Response) => void) | undefined;
+    const actionResponse = new Promise<Response>((resolve) => {
+      resolveAction = resolve;
+    });
+    vi.stubGlobal(
+      "fetch",
+      vi.fn((input: RequestInfo | URL) =>
+        String(input).endsWith("/party/actions")
+          ? actionResponse
+          : Promise.resolve(response({ snapshot: current })),
+      ),
+    );
+
+    render(<BaseballPartyPlayer roomCode="ABC234" />);
+    fireEvent.click(
+      await screen.findByRole("button", { name: "주사위 굴리기" }),
+    );
+    expect(screen.getByRole("status")).toHaveTextContent("투구 주사위 요청 중");
+    expect(
+      screen.getByRole("button", { name: "서버 판정 확인 중…" }),
+    ).toBeDisabled();
+
+    resolveAction?.(response({ snapshot: updated }));
+    expect(await screen.findByText("투구 주사위 반영 완료")).toBeVisible();
+    expect(screen.getByRole("status")).toHaveTextContent("B");
   });
 });

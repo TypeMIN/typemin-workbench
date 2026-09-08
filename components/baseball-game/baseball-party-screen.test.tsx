@@ -79,5 +79,8 @@ describe("BaseballPartyScreen", () => {
         expect.stringMatching(/\/party\/ABC234\/join$/),
       ),
     );
+    expect(screen.getByRole("status")).toHaveTextContent(
+      "참가 링크를 복사했습니다",
+    );
   });
 });
