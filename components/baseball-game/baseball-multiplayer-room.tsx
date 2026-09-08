@@ -13,6 +13,10 @@ import Link from "next/link";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import { BaseballStadium } from "@/components/baseball-game/baseball-game-debug";
+import {
+  BaseballAudio,
+  BroadcastLineScore,
+} from "@/components/baseball-game/baseball-broadcast";
 import { CARD_DEFINITIONS } from "@/lib/baseball-game/cards";
 import type {
   MultiplayerCommand,
@@ -312,16 +316,7 @@ function MultiplayerBoard({
           aria-label={`멀티플레이 경기 점수판 ${inningLabel(game)}`}
         >
           <div className="bbg-mp-score">
-            <div className={game.battingTeam === "away" ? "is-batting" : ""}>
-              <small>원정</small>
-              <strong>{game.config.awayTeamName}</strong>
-              <b>{game.score.away}</b>
-            </div>
-            <div className={game.battingTeam === "home" ? "is-batting" : ""}>
-              <small>홈</small>
-              <strong>{game.config.homeTeamName}</strong>
-              <b>{game.score.home}</b>
-            </div>
+            <BroadcastLineScore game={game} />
           </div>
           <div className="bbg-mp-score-status">
             <div className="bbg-mp-inning">
@@ -344,6 +339,7 @@ function MultiplayerBoard({
               <CountLights label="O" active={game.outs} total={2} tone="out" />
             </div>
           </div>
+          <BaseballAudio events={game.eventLog} />
         </section>
         <BaseballStadium
           face={latestFace}

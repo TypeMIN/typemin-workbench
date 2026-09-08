@@ -1015,3 +1015,125 @@ describe("advanced strategy and automatic pro rules", () => {
     expect(dropped.outs).toBe(2);
   });
 });
+
+describe("broadcast-v1 box score", () => {
+  it("initializes schema 4 and keeps structured inning totals", () => {
+    const state = createGame(CONFIG);
+    expect(state.schemaVersion).toBe(4);
+    expect(state.presentationVersion).toBe("broadcast-v1");
+    expect(state.boxScore).toEqual({
+      innings: [{ away: 0, home: null }],
+      totals: {
+        away: { hits: 0, errors: 0, freePasses: 0 },
+        home: { hits: 0, errors: 0, freePasses: 0 },
+      },
+    });
+  });
+
+  it("records hits, home runs, walks, HBP and 1H1E without parsing summaries", () => {
+    const single = hit(game({ phase: "awaiting_hit" }), "IH");
+    expect(single.boxScore.totals.away.hits).toBe(1);
+
+    const homer = batting(game({ phase: "awaiting_batting" }), "HR");
+    expect(homer.boxScore.totals.away.hits).toBe(1);
+    expect(homer.boxScore.innings[0].away).toBe(1);
+
+    const walk = pitch(game({ phase: "awaiting_pitch", balls: 3 }), "B");
+    expect(walk.boxScore.totals.away.freePasses).toBe(1);
+
+    let hbp = cardState({
+      offense: ["HBP"],
+      timing: "after_pitch",
+      pendingResolution: { kind: "pitch", face: "B" },
+      priorityOrder: ["offense"],
+    });
+    hbp = playCardId(hbp, "HBP");
+    expect(hbp.boxScore.totals.away.freePasses).toBe(1);
+
+    let oneHitError = cardState({
+      offense: ["1H1E"],
+      timing: "after_hit",
+      pendingResolution: { kind: "hit", face: "L1" },
+      priorityOrder: ["offense"],
+    });
+    oneHitError = playCardId(oneHitError, "1H1E");
+    expect(oneHitError.boxScore.totals.away.hits).toBe(1);
+    expect(oneHitError.boxScore.totals.home.errors).toBe(1);
+  });
+
+  it("charges E to the fielding team but excludes wild pitches and balks", () => {
+    let error = cardState({
+      offense: ["E"],
+      timing: "after_batting",
+      pendingResolution: { kind: "batting", face: "GA" },
+      priorityOrder: ["offense"],
+    });
+    error = playCardId(error, "E");
+    expect(error.boxScore.totals.home.errors).toBe(1);
+
+    for (const cardId of ["WP", "BK"] as const) {
+      let state = cardState({
+        bases: { first: true, second: false, third: false },
+        offense: [cardId],
+        timing: cardId === "WP" ? "after_pitch" : "before_pitch",
+        pendingResolution:
+          cardId === "WP" ? { kind: "pitch", face: "B" } : null,
+        priorityOrder: ["offense"],
+      });
+      state = playCardId(state, cardId);
+      expect(state.boxScore.totals.away.freePasses).toBe(0);
+      expect(state.boxScore.totals.home.errors).toBe(0);
+    }
+  });
+
+  it("extends line score in extras and preserves an unplayed home half", () => {
+    const totals = {
+      away: { hits: 0, errors: 0, freePasses: 0 },
+      home: { hits: 0, errors: 0, freePasses: 0 },
+    };
+    const extra = pitch(
+      game({
+        inning: 3,
+        half: "bottom",
+        battingTeam: "home",
+        outs: 2,
+        strikes: 2,
+        phase: "awaiting_pitch",
+        boxScore: {
+          innings: [
+            { away: 0, home: 0 },
+            { away: 0, home: 0 },
+            { away: 0, home: 0 },
+          ],
+          totals,
+        },
+      }),
+      "S",
+    );
+    expect(extra.inning).toBe(4);
+    expect(extra.boxScore.innings[3]).toEqual({ away: 0, home: null });
+
+    const skipped = pitch(
+      game({
+        inning: 3,
+        half: "top",
+        battingTeam: "away",
+        outs: 2,
+        strikes: 2,
+        phase: "awaiting_pitch",
+        score: { away: 0, home: 1 },
+        boxScore: {
+          innings: [
+            { away: 0, home: 1 },
+            { away: 0, home: 0 },
+            { away: 0, home: null },
+          ],
+          totals,
+        },
+      }),
+      "S",
+    );
+    expect(skipped.phase).toBe("finished");
+    expect(skipped.boxScore.innings[2].home).toBeNull();
+  });
+});

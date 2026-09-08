@@ -7,6 +7,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { CARD_DEFINITIONS } from "@/lib/baseball-game/cards";
 import type { MultiplayerCommand } from "@/lib/baseball-game/multiplayer/types";
 import type { PartyPlayerSnapshot } from "@/lib/baseball-game/party/types";
+import { BaseballAudio, BroadcastLineScore } from "./baseball-broadcast";
 import type { CardRole, GameView } from "@/lib/baseball-game/types";
 
 const PHASE = {
@@ -176,6 +177,7 @@ function PartyPlayerBoard({
   );
   return (
     <main className="bbg-party-player-shell">
+      <BaseballAudio events={game.eventLog} mode="personal" />
       <header>
         <Link href="/baseball-game">
           <span>BB</span>
@@ -191,6 +193,7 @@ function PartyPlayerBoard({
         className="bbg-party-player-status"
         data-active={snapshot.canAct}
       >
+        <BroadcastLineScore game={game} />
         <small>{snapshot.canAct ? "YOUR TURN" : "WAITING"}</small>
         <h1>
           {snapshot.canAct

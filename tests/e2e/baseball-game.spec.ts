@@ -32,6 +32,13 @@ test("야구 게임에서 강제 주사위 판정과 새 경기를 진행한다"
       name: /경기 점수판, 1회초, 무사, 주자 없음/,
     }),
   ).toBeVisible();
+  await expect(page.getByLabel("이닝별 점수와 경기 기록")).toContainText(
+    "RHEB",
+  );
+  await expect(page.getByLabel("투구 위치")).toBeVisible();
+  await expect(
+    page.getByRole("button", { name: "경기 음향 끄기" }),
+  ).toBeVisible();
   await expect(
     page.getByRole("button", { name: "투구 주사위 굴리기" }),
   ).toBeVisible();
@@ -132,10 +139,10 @@ test("야구 게임에서 강제 주사위 판정과 새 경기를 진행한다"
   expect(broadcastFit.scoreStatus.bottom).toBeLessThanOrEqual(
     broadcastFit.field.top + 70,
   );
-  expect(broadcastFit.scoreTeams.right).toBeLessThan(
-    broadcastFit.scoreStatus.left,
+  expect(broadcastFit.scoreTeams.right).toBeLessThanOrEqual(
+    broadcastFit.scoreStatus.left + 1,
   );
-  expect(broadcastFit.scoreTeams.width).toBeLessThanOrEqual(172);
+  expect(broadcastFit.scoreTeams.width).toBeGreaterThan(300);
   expect(broadcastFit.scoreStatus.width).toBeLessThanOrEqual(210);
   expect(broadcastFit.resultCopy.bottom).toBeLessThanOrEqual(
     broadcastFit.result.bottom + 1,
@@ -153,6 +160,10 @@ test("야구 게임에서 강제 주사위 판정과 새 경기를 진행한다"
 
   await page.getByText("특정 면 강제 입력").click();
   await page.getByRole("button", { name: /9번 면 C 컨택/ }).click();
+  await expect(
+    page.locator(".bbg-pitch-marker[data-current='true']"),
+  ).toHaveText("1");
+  await expect(page.locator(".bbg-pitch-flight")).toBeVisible();
   await expect(
     page.getByRole("button", { name: "타격 주사위 굴리기" }),
   ).toBeVisible();
@@ -407,6 +418,15 @@ test("주요 데스크톱·태블릿·모바일 화면비율에서 게임 UI가 
         scoreboard: bounds(".bbg-scoreboard"),
         controls: bounds(".bbg-control-panel"),
         hands: bounds(".bbg-card-hands"),
+        inningColumns: [
+          ...document.querySelectorAll(".bbg-line-score-head.bbg-line-inning"),
+        ].filter((element) => getComputedStyle(element).display !== "none")
+          .length,
+        totalHeaders: [
+          ...document.querySelectorAll(".bbg-line-score-head.bbg-line-total"),
+        ]
+          .filter((element) => getComputedStyle(element).display !== "none")
+          .map((element) => element.textContent),
       };
     });
 
@@ -417,6 +437,8 @@ test("주요 데스크톱·태블릿·모바일 화면비율에서 게임 UI가 
       layout.document.height,
       JSON.stringify(viewport),
     ).toBeLessThanOrEqual(layout.viewport.height);
+    expect(layout.totalHeaders).toEqual(["R", "H", "E", "B"]);
+    expect(layout.inningColumns > 0).toBe(viewport.width > 639);
     for (const region of [
       layout.console,
       layout.scoreboard,

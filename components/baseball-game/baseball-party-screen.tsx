@@ -17,6 +17,10 @@ import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
 
 import { BaseballStadium } from "@/components/baseball-game/baseball-game-debug";
+import {
+  BaseballAudio,
+  BroadcastLineScore,
+} from "@/components/baseball-game/baseball-broadcast";
 import type {
   PartyHostCommand,
   PartyPlayer,
@@ -445,6 +449,7 @@ function PartyLive({
         aria-label="파티플레이 공용 경기장"
       >
         <PartyScoreboard game={game} />
+        <BaseballAudio events={game.eventLog} />
         <BaseballStadium face={face} game={game} key={game.revision} />
         <div className="bbg-party-live-result">
           <span>{face ?? "▶"}</span>
@@ -571,14 +576,8 @@ function PartyScoreboard({ game }: { game: GameView }) {
       className="bbg-party-v2-scoreboard"
       aria-label={`공용 경기 점수판 ${inningLabel(game)}`}
     >
-      <div>
-        {(["away", "home"] as const).map((team) => (
-          <p data-batting={game.battingTeam === team} key={team}>
-            <small>{team === "away" ? "원정" : "홈"}</small>
-            <strong>{teamName(game, team)}</strong>
-            <b>{game.score[team]}</b>
-          </p>
-        ))}
+      <div className="bbg-party-line-score">
+        <BroadcastLineScore game={game} />
       </div>
       <strong className="bbg-party-v2-inning">{inningLabel(game)}</strong>
       <div className="bbg-party-v2-diamond" aria-label="주자 현황">

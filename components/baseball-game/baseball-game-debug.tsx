@@ -6,6 +6,11 @@ import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState, type FormEvent } from "react";
 
 import { WorkbenchAccountControl } from "@/components/workbench-account-control";
+import {
+  BaseballAudio,
+  BroadcastLineScore,
+  usePresentation,
+} from "@/components/baseball-game/baseball-broadcast";
 import { chooseAiAction } from "@/lib/baseball-game/ai";
 import { CARD_DEFINITIONS } from "@/lib/baseball-game/cards";
 import {
@@ -14,6 +19,7 @@ import {
   getLegalCards,
   transition,
 } from "@/lib/baseball-game/engine";
+import { getPlateAppearancePitchHistory } from "@/lib/baseball-game/presentation";
 import {
   DIE_FACES,
   DIE_LABELS,
@@ -33,6 +39,9 @@ import type {
   GameState,
   HitFace,
   PitchFace,
+  PresentationCue,
+  RunnerDestination,
+  RunnerOrigin,
   ScheduledInnings,
   TeamSide,
 } from "@/lib/baseball-game/types";
@@ -292,6 +301,7 @@ export default function BaseballGameDebug() {
               <div className="bbg-broadcast-heading">
                 <h1 id="field-heading">야구 게임 라이브</h1>
                 <BroadcastScoreboard game={game} />
+                <BaseballAudio events={game.eventLog} />
               </div>
 
               <div className="bbg-field-content">
@@ -996,8 +1006,7 @@ function BroadcastScoreboard({ game }: { game: GameState }) {
         <small>{game.config.innings}이닝 경기</small>
       </div>
       <div className="bbg-score-teams">
-        <TeamScore game={game} side="away" />
-        <TeamScore game={game} side="home" />
+        <BroadcastLineScore game={game} />
       </div>
       <div className="bbg-score-status">
         <div
@@ -1065,23 +1074,6 @@ function BroadcastBases({ game }: { game: GameState }) {
   );
 }
 
-function TeamScore({ game, side }: { game: GameState; side: "away" | "home" }) {
-  const isBatting = game.battingTeam === side && game.phase !== "finished";
-  return (
-    <div
-      className={["bbg-team-score", isBatting && "is-batting"]
-        .filter(Boolean)
-        .join(" ")}
-    >
-      <span>{side === "away" ? "원정" : "홈"}</span>
-      <strong>
-        {game.config[side === "away" ? "awayTeamName" : "homeTeamName"]}
-      </strong>
-      <b key={game.score[side]}>{game.score[side]}</b>
-    </div>
-  );
-}
-
 type BallFlight = {
   kind: "ground" | "fly" | "line" | "contact";
   label: string;
@@ -1089,12 +1081,47 @@ type BallFlight = {
   target: { x: number; y: number };
 };
 
+const RUNNER_POINTS: Record<
+  RunnerOrigin | RunnerDestination,
+  [number, number]
+> = {
+  batter: [450, 650],
+  home: [450, 650],
+  first: [540, 560],
+  second: [450, 470],
+  third: [360, 560],
+  out: [450, 560],
+};
+
+function runnerPath(from: RunnerOrigin, to: RunnerDestination) {
+  const [fromX, fromY] = RUNNER_POINTS[from];
+  const [toX, toY] = RUNNER_POINTS[to];
+  return `M${fromX} ${fromY} L${toX} ${toY}`;
+}
+
+function presentationLabel(cue: PresentationCue) {
+  if (cue.type === "call") {
+    return {
+      ball: "BALL",
+      strike: "STRIKE",
+      foul: "FOUL",
+      contact: "CONTACT",
+    }[cue.call];
+  }
+  if (cue.type === "decision") return cue.result.toUpperCase();
+  if (cue.type === "pitch") return `${cue.location.pitchNumber}구`;
+  if (cue.type === "batted_ball") return cue.face;
+  if (cue.type === "catch") return "CATCH";
+  if (cue.type === "throw") return "THROW";
+  return "RUN";
+}
+
 export function BaseballStadium({
   face,
   game,
 }: {
   face?: DieFace;
-  game: Pick<GameState, "bases" | "battingTeam" | "config">;
+  game: Pick<GameState, "bases" | "battingTeam" | "config" | "eventLog">;
 }) {
   const occupied = [
     game.bases.first ? "1루" : null,
@@ -1102,6 +1129,8 @@ export function BaseballStadium({
     game.bases.third ? "3루" : null,
   ].filter(Boolean);
   const flight = getBallFlight(face);
+  const pitchHistory = getPlateAppearancePitchHistory(game.eventLog);
+  const { cue, skip } = usePresentation(game.eventLog);
   const battingTeamName =
     game.config[game.battingTeam === "away" ? "awayTeamName" : "homeTeamName"];
   const baseLabel = occupied.length
@@ -1112,11 +1141,12 @@ export function BaseballStadium({
     <div
       aria-label={`${battingTeamName} 공격, ${baseLabel}${flight ? `, ${flight.label} 타구 표시` : ""}`}
       className="bbg-diamond bbg-stadium"
-      role="img"
+      data-cue={cue?.type ?? "idle"}
     >
       <svg
-        aria-hidden="true"
+        aria-label={`${battingTeamName} 공격, ${baseLabel}${flight ? `, ${flight.label} 타구 표시` : ""}`}
         preserveAspectRatio="xMidYMid meet"
+        role="img"
         viewBox="0 0 900 700"
       >
         <defs>
@@ -1217,7 +1247,60 @@ export function BaseballStadium({
         </g>
 
         {flight ? <BallFlightVisual face={face} flight={flight} /> : null}
+        {cue?.type === "pitch" ? (
+          <g className="bbg-pitch-flight">
+            <path
+              d={`M450 555 Q${430 + cue.location.x * 0.4} 600 ${438 + cue.location.x * 0.24} 650`}
+            />
+            <circle r="6">
+              <animateMotion
+                dur="420ms"
+                fill="freeze"
+                path={`M450 555 Q${430 + cue.location.x * 0.4} 600 ${438 + cue.location.x * 0.24} 650`}
+              />
+            </circle>
+          </g>
+        ) : null}
+        {cue?.type === "throw" ? (
+          <g className="bbg-throw-cue">
+            <path d={`M${cue.from.x} ${cue.from.y} L${cue.to.x} ${cue.to.y}`} />
+            <circle cx={cue.to.x} cy={cue.to.y} r="7" />
+          </g>
+        ) : null}
+        {cue?.type === "runner_move" ? (
+          <path
+            className="bbg-runner-cue"
+            d={runnerPath(cue.move.from, cue.move.to)}
+          />
+        ) : null}
       </svg>
+      <div className="bbg-strike-zone" aria-label="투구 위치">
+        <span className="bbg-strike-zone-label">PITCH MAP</span>
+        <div aria-hidden="true" className="bbg-zone-grid" />
+        {pitchHistory.map(({ event, face: pitchFace, location }, index) => (
+          <i
+            aria-label={`${location.pitchNumber}구 ${pitchFace}`}
+            className="bbg-pitch-marker"
+            data-current={index === pitchHistory.length - 1}
+            data-zone={location.zone}
+            key={event.sequence}
+            style={{ left: `${location.x}%`, top: `${location.y}%` }}
+          >
+            {location.pitchNumber}
+          </i>
+        ))}
+      </div>
+      {cue ? (
+        <button
+          aria-label="현재 연출 빠르게 넘기기"
+          className="bbg-presentation-cue"
+          data-cue={cue.type}
+          onClick={skip}
+          type="button"
+        >
+          {presentationLabel(cue)}
+        </button>
+      ) : null}
     </div>
   );
 }

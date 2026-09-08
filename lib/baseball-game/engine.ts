@@ -22,6 +22,7 @@ import {
   type PitchFace,
   type RuleError,
   type RunnerMove,
+  type ScoringRecord,
   type TeamSide,
   type TransitionResult,
 } from "./types";
@@ -34,6 +35,7 @@ type PlateAppearanceOutcome = {
   runs?: number;
   outsRecorded?: number;
   moves?: RunnerMove[];
+  scoring?: Partial<ScoringRecord>;
 };
 
 const PHASE_ACTION: Record<
@@ -67,8 +69,9 @@ export function createGame(
   drawToFour(cards.defense, rng);
 
   const state: GameState = {
-    schemaVersion: 3,
+    schemaVersion: 4,
     rulesetVersion: "pro-cards-v1",
+    presentationVersion: "broadcast-v1",
     revision: 0,
     config: {
       innings: config.innings,
@@ -84,6 +87,13 @@ export function createGame(
     strikes: 0,
     bases: { ...EMPTY_BASES },
     score: { away: 0, home: 0 },
+    boxScore: {
+      innings: [{ away: 0, home: null }],
+      totals: {
+        away: { hits: 0, errors: 0, freePasses: 0 },
+        home: { hits: 0, errors: 0, freePasses: 0 },
+      },
+    },
     winner: null,
     rng,
     cards,
@@ -265,11 +275,19 @@ function wrongPhase(expectedAction: GameAction["type"]): RuleError {
 }
 
 function cloneState(state: GameState): GameState {
+  const boxScore = state.boxScore ?? createLegacyBoxScore(state);
   return {
     ...state,
     config: { ...state.config },
     bases: { ...state.bases },
     score: { ...state.score },
+    boxScore: {
+      innings: boxScore.innings.map((inning) => ({ ...inning })),
+      totals: {
+        away: { ...boxScore.totals.away },
+        home: { ...boxScore.totals.home },
+      },
+    },
     rng: { ...state.rng },
     cards: {
       offense: cloneCardZone(state.cards.offense),
@@ -310,6 +328,7 @@ function emit(
     runs?: number;
     outsRecorded?: number;
     moves?: RunnerMove[];
+    scoring?: ScoringRecord;
   },
 ) {
   events.push({
@@ -326,7 +345,60 @@ function emit(
     runs: event.runs ?? 0,
     outsRecorded: event.outsRecorded ?? 0,
     moves: event.moves ?? [],
+    scoring: event.scoring,
   });
+}
+
+function createLegacyBoxScore(state: GameState): GameState["boxScore"] {
+  const innings: GameState["boxScore"]["innings"] = Array.from(
+    { length: Math.max(1, state.inning) },
+    (_, index) => ({
+      away: index === state.inning - 1 ? state.score.away : 0,
+      home: index === state.inning - 1 ? state.score.home : 0,
+    }),
+  );
+  if (state.half === "top" && state.score.home === 0) {
+    innings[state.inning - 1].home = null;
+  }
+  return {
+    innings,
+    totals: {
+      away: { hits: 0, errors: 0, freePasses: 0 },
+      home: { hits: 0, errors: 0, freePasses: 0 },
+    },
+  };
+}
+
+function ensureInningScore(state: GameState, inning = state.inning) {
+  while (state.boxScore.innings.length < inning) {
+    state.boxScore.innings.push({ away: 0, home: null });
+  }
+  return state.boxScore.innings[inning - 1];
+}
+
+function recordRuns(state: GameState, runs: number) {
+  if (runs <= 0) return;
+  state.score[state.battingTeam] += runs;
+  const inning = ensureInningScore(state);
+  inning[state.battingTeam] = (inning[state.battingTeam] ?? 0) + runs;
+}
+
+function normalizeScoring(
+  scoring: Partial<ScoringRecord> | undefined,
+): ScoringRecord {
+  return {
+    hit: scoring?.hit ?? false,
+    error: scoring?.error ?? false,
+    freePass: scoring?.freePass ?? false,
+  };
+}
+
+function recordScoring(state: GameState, scoring: ScoringRecord) {
+  if (scoring.hit) state.boxScore.totals[state.battingTeam].hits += 1;
+  if (scoring.freePass)
+    state.boxScore.totals[state.battingTeam].freePasses += 1;
+  if (scoring.error)
+    state.boxScore.totals[oppositeTeam(state.battingTeam)].errors += 1;
 }
 
 function resolvePitch(state: GameState, face: PitchFace, events: GameEvent[]) {
@@ -482,7 +554,13 @@ function resolveWalk(bases: Bases): PlateAppearanceOutcome {
     }
   }
 
-  return { summary: "볼넷", bases: nextBases, runs, moves };
+  return {
+    summary: "볼넷",
+    bases: nextBases,
+    runs,
+    moves,
+    scoring: { freePass: true },
+  };
 }
 
 function resolveBatting(
@@ -689,6 +767,7 @@ function resolveHomeRun(bases: Bases): PlateAppearanceOutcome {
     bases: { ...EMPTY_BASES },
     runs: occupiedBaseCount(bases) + 1,
     moves,
+    scoring: { hit: true },
   };
 }
 
@@ -708,6 +787,7 @@ function hitOutcome(bases: Bases, face: HitFace): PlateAppearanceOutcome {
         ...moveExistingRunnersOneBase(bases),
         { runner: "batter", from: "batter", to: "first" },
       ],
+      scoring: { hit: true },
     };
   }
 
@@ -723,6 +803,7 @@ function hitOutcome(bases: Bases, face: HitFace): PlateAppearanceOutcome {
           : []),
         { runner: "batter", from: "batter", to: "first" },
       ],
+      scoring: { hit: true },
     };
   }
 
@@ -738,6 +819,7 @@ function hitOutcome(bases: Bases, face: HitFace): PlateAppearanceOutcome {
           : []),
         { runner: "batter", from: "batter", to: "first" },
       ],
+      scoring: { hit: true },
     };
   }
 
@@ -753,6 +835,7 @@ function hitOutcome(bases: Bases, face: HitFace): PlateAppearanceOutcome {
           : []),
         { runner: "batter", from: "batter", to: "second" },
       ],
+      scoring: { hit: true },
     };
   }
 
@@ -765,6 +848,7 @@ function hitOutcome(bases: Bases, face: HitFace): PlateAppearanceOutcome {
         ...occupiedRunnerMoves(bases, "home"),
         { runner: "batter", from: "batter", to: "second" },
       ],
+      scoring: { hit: true },
     };
   }
 
@@ -776,6 +860,7 @@ function hitOutcome(bases: Bases, face: HitFace): PlateAppearanceOutcome {
       ...occupiedRunnerMoves(bases, "home"),
       { runner: "batter", from: "batter", to: "third" },
     ],
+    scoring: { hit: true },
   };
 }
 
@@ -795,11 +880,14 @@ function finishPlateAppearance(
   const moves = thirdOut
     ? (outcome.moves ?? []).filter((move) => move.to === "out")
     : (outcome.moves ?? []);
+  const scoring = normalizeScoring(outcome.scoring);
+
+  recordScoring(state, scoring);
 
   if (!thirdOut) {
     state.bases = { ...outcome.bases };
     state.outs = (state.outs + outsRecorded) as GameState["outs"];
-    state.score[state.battingTeam] += runs;
+    recordRuns(state, runs);
   }
 
   resetCount(state);
@@ -813,6 +901,7 @@ function finishPlateAppearance(
     runs,
     outsRecorded,
     moves,
+    scoring,
   });
 
   if (thirdOut) {
@@ -849,6 +938,7 @@ function advanceHalfInning(state: GameState, events: GameEvent[]) {
     }
     state.half = "bottom";
     state.battingTeam = "home";
+    ensureInningScore(state).home ??= 0;
     resetHandsForHalfInning(state);
     emit(state, events, {
       kind: "half_inning",
@@ -870,6 +960,7 @@ function advanceHalfInning(state: GameState, events: GameEvent[]) {
   state.inning += 1;
   state.half = "top";
   state.battingTeam = "away";
+  ensureInningScore(state);
   resetHandsForHalfInning(state);
   emit(state, events, {
     kind: "half_inning",
@@ -1371,7 +1462,10 @@ function resolvePrimaryCard(
   }
   if (cardId === "E") {
     emitCardResolution(state, events, cardId, "수비 실책 적용");
-    finishPlateAppearance(state, events, errorOutcome(state.bases));
+    finishPlateAppearance(state, events, {
+      ...errorOutcome(state.bases),
+      scoring: { error: true },
+    });
     return;
   }
   if (cardId === "GDP" || cardId === "IFD") {
@@ -1492,6 +1586,7 @@ function resolveCardPair(
       events,
       "견제 송구 실책 · 모든 주자 진루",
       response.cardId,
+      { error: true },
     );
     continueCardWindow(state, events);
     return;
@@ -1520,7 +1615,10 @@ function resolveCardPair(
   }
   if (response.cardId === "E") {
     emitCardResolution(state, events, response.cardId, "수비 실책 적용");
-    finishPlateAppearance(state, events, errorOutcome(state.bases));
+    finishPlateAppearance(state, events, {
+      ...errorOutcome(state.bases),
+      scoring: { error: true },
+    });
   }
 }
 
@@ -1638,6 +1736,7 @@ function applyAllRunnerAdvance(
   events: GameEvent[],
   summary: string,
   cardId: CardId,
+  scoring?: Partial<ScoringRecord>,
 ) {
   const before = { ...state.bases };
   const runs = before.third ? 1 : 0;
@@ -1647,13 +1746,16 @@ function applyAllRunnerAdvance(
     second: before.first,
     third: before.second,
   };
-  state.score[state.battingTeam] += runs;
+  recordRuns(state, runs);
+  const scoringRecord = normalizeScoring(scoring);
+  if (scoring) recordScoring(state, scoringRecord);
   emit(state, events, {
     kind: "card_resolve",
     summary,
     cardId,
     runs,
     moves,
+    scoring: scoring ? scoringRecord : undefined,
   });
   if (isWalkOff(state)) finishGame(state, "home", events, "홈팀 끝내기 승리");
 }
@@ -1691,7 +1793,7 @@ function resolveSuccessfulSteal(
   state.bases[from] = false;
   if (to !== "home") state.bases[to] = true;
   const runs = to === "home" ? 1 : 0;
-  state.score[state.battingTeam] += runs;
+  recordRuns(state, runs);
   emit(state, events, {
     kind: "card_resolve",
     summary: `${CARD_DEFINITIONS[cardId].name} 성공`,
@@ -1908,6 +2010,7 @@ function oneHitOneErrorOutcome(
     bases: nextBases,
     runs,
     moves,
+    scoring: { hit: true, error: true },
   };
 }
 

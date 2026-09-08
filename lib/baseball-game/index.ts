@@ -9,6 +9,12 @@ export {
 export { CARD_DECK_COUNTS, CARD_DEFINITIONS } from "./cards";
 export { chooseAiAction } from "./ai";
 export {
+  buildPresentationCues,
+  getAudioCues,
+  getPitchLocation,
+  getPlateAppearancePitchHistory,
+} from "./presentation";
+export {
   BATTING_DIE_FACES,
   DIE_FACES,
   DIE_LABELS,

@@ -69,6 +69,17 @@ test("공용 화면과 2대2 개인기기가 한 파티 경기를 실제로 진�
   await expect(
     display.getByRole("region", { name: "파티플레이 공용 경기장" }),
   ).toBeVisible({ timeout: 15_000 });
+  await expect(display.getByLabel("이닝별 점수와 경기 기록")).toBeVisible();
+  await expect(display.getByLabel("투구 위치")).toBeVisible();
+  await expect(
+    display.getByRole("button", { name: "경기 음향 끄기" }),
+  ).toBeVisible();
+  for (const page of players) {
+    await expect(page.getByLabel("이닝별 점수와 경기 기록")).toBeVisible();
+    await expect(page.getByRole("button", { name: /경기 음향/ })).toHaveCount(
+      0,
+    );
+  }
 
   let activePage: Page | null = null;
   await expect

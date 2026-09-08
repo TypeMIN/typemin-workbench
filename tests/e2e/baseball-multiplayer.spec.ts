@@ -35,6 +35,11 @@ test("두 기기가 방을 만들고 비공개 손패로 같은 경기를 진행
   await expect(
     host.getByRole("region", { name: "원정팀 공격 손패" }),
   ).toBeVisible();
+  await expect(host.getByLabel("이닝별 점수와 경기 기록")).toBeVisible();
+  await expect(host.getByLabel("투구 위치")).toBeVisible();
+  await expect(
+    host.getByRole("button", { name: "경기 음향 끄기" }),
+  ).toBeVisible();
 
   await host.setViewportSize({ width: 944, height: 1013 });
   const portraitField = await host.evaluate(() => {
@@ -132,6 +137,9 @@ test("두 기기가 방을 만들고 비공개 손패로 같은 경기를 진행
   );
   expect(retry.status).toBe(200);
   expect(retry.payload.snapshot.view.revision).toBe(1);
+  await expect(
+    home.locator(".bbg-pitch-marker[data-current='true']"),
+  ).toBeVisible();
 
   await expect
     .poll(async () => {

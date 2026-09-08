@@ -138,6 +138,60 @@ export type RunnerMove = {
   to: RunnerDestination;
 };
 
+export type InningScore = {
+  away: number | null;
+  home: number | null;
+};
+
+export type TeamBoxScore = {
+  hits: number;
+  errors: number;
+  freePasses: number;
+};
+
+export type BoxScore = {
+  innings: InningScore[];
+  totals: Record<TeamSide, TeamBoxScore>;
+};
+
+export type ScoringRecord = {
+  hit: boolean;
+  error: boolean;
+  freePass: boolean;
+};
+
+export type FieldPoint = {
+  x: number;
+  y: number;
+};
+
+export type PitchLocation = FieldPoint & {
+  zone: "strike" | "ball" | "edge";
+  pitchNumber: number;
+};
+
+export type PresentationCue =
+  | { type: "pitch"; location: PitchLocation; face: PitchFace }
+  | { type: "call"; call: "ball" | "strike" | "foul" | "contact" }
+  | { type: "batted_ball"; face: BattingFace | HitFace }
+  | { type: "catch"; location: FieldPoint }
+  | { type: "throw"; from: FieldPoint; to: FieldPoint }
+  | { type: "runner_move"; move: RunnerMove }
+  | { type: "decision"; result: "safe" | "out" | "score" };
+
+export type AudioCue =
+  | "pitch"
+  | "mitt"
+  | "contact"
+  | "ground"
+  | "throw"
+  | "safe"
+  | "out"
+  | "score"
+  | "home_run"
+  | "ball"
+  | "strike";
+
 export type GameEventKind =
   | "die_roll"
   | "count"
@@ -163,11 +217,13 @@ export type GameEvent = {
   runs: number;
   outsRecorded: number;
   moves: RunnerMove[];
+  scoring?: ScoringRecord;
 };
 
 export type GameState = {
-  schemaVersion: 3;
+  schemaVersion: 4;
   rulesetVersion: "pro-cards-v1";
+  presentationVersion: "broadcast-v1";
   revision: number;
   config: GameConfig;
   phase: GamePhase;
@@ -179,6 +235,7 @@ export type GameState = {
   strikes: 0 | 1 | 2;
   bases: Bases;
   score: Record<TeamSide, number>;
+  boxScore: BoxScore;
   winner: TeamSide | null;
   rng: {
     algorithm: "mulberry32-v1";
