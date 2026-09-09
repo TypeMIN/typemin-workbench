@@ -89,7 +89,9 @@ export default function BaseballMultiplayerRoom({
     [roomCode],
   );
 
-  useAdaptiveGamePolling(loadSnapshot);
+  useAdaptiveGamePolling(loadSnapshot, {
+    activeMs: snapshot?.isYourTurn ? 550 : 250,
+  });
 
   async function joinRoom() {
     setJoining(true);

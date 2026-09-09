@@ -43,16 +43,18 @@ class TestStorage implements MultiplayerStorage {
     return roomCode === this.room.roomCode ? structuredClone(this.room) : null;
   }
 
-  async findSeat(roomId: string, tokenHash: string) {
-    if (roomId !== this.room.id) return null;
+  async getSeatContext(roomId: string, tokenHash: string) {
+    let seat: TeamSide | null = null;
     for (const [team, hash] of this.seats) {
-      if (hash === tokenHash) return team;
+      if (roomId === this.room.id && hash === tokenHash) seat = team;
     }
-    return null;
-  }
-
-  async hasSeat(roomId: string, team: TeamSide) {
-    return roomId === this.room.id && this.seats.has(team);
+    return {
+      seat,
+      occupied: {
+        away: roomId === this.room.id && this.seats.has("away"),
+        home: roomId === this.room.id && this.seats.has("home"),
+      },
+    };
   }
 
   async getIdempotencyRevision(roomId: string, idempotencyKey: string) {

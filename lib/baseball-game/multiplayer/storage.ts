@@ -22,8 +22,13 @@ type CreateStoredRoomInput = {
 export interface MultiplayerStorage {
   createRoom(input: CreateStoredRoomInput): Promise<MultiplayerRoomRecord>;
   getRoom(roomCode: string): Promise<MultiplayerRoomRecord | null>;
-  findSeat(roomId: string, tokenHash: string): Promise<TeamSide | null>;
-  hasSeat(roomId: string, team: TeamSide): Promise<boolean>;
+  getSeatContext(
+    roomId: string,
+    tokenHash: string,
+  ): Promise<{
+    seat: TeamSide | null;
+    occupied: Record<TeamSide, boolean>;
+  }>;
   getIdempotencyRevision(
     roomId: string,
     idempotencyKey: string,
@@ -31,6 +36,11 @@ export interface MultiplayerStorage {
   claimHomeSeat(roomCode: string, tokenHash: string): Promise<boolean>;
   commitAction(input: MultiplayerCommitInput): Promise<MultiplayerCommitResult>;
 }
+
+type MultiplayerSeatContext = {
+  seat: TeamSide | null;
+  occupied: Record<TeamSide, boolean>;
+};
 
 type MemoryRoom = MultiplayerRoomRecord & {
   seats: Partial<Record<TeamSide, string>>;
@@ -77,16 +87,24 @@ class MemoryMultiplayerStorage implements MultiplayerStorage {
     return cloneRoom(room);
   }
 
-  async findSeat(roomId: string, tokenHash: string) {
+  async getSeatContext(
+    roomId: string,
+    tokenHash: string,
+  ): Promise<MultiplayerSeatContext> {
     const room = findMemoryRoom(roomId);
-    if (!room) return null;
-    if (room.seats.away === tokenHash) return "away";
-    if (room.seats.home === tokenHash) return "home";
-    return null;
-  }
-
-  async hasSeat(roomId: string, team: TeamSide) {
-    return Boolean(findMemoryRoom(roomId)?.seats[team]);
+    return {
+      seat: !room
+        ? null
+        : room.seats.away === tokenHash
+          ? "away"
+          : room.seats.home === tokenHash
+            ? "home"
+            : null,
+      occupied: {
+        away: Boolean(room?.seats.away),
+        home: Boolean(room?.seats.home),
+      },
+    };
   }
 
   async getIdempotencyRevision(roomId: string, idempotencyKey: string) {
@@ -166,25 +184,30 @@ class SupabaseMultiplayerStorage implements MultiplayerStorage {
     return data ? rowToRoom(data) : null;
   }
 
-  async findSeat(roomId: string, tokenHash: string) {
+  async getSeatContext(
+    roomId: string,
+    tokenHash: string,
+  ): Promise<MultiplayerSeatContext> {
     const { data, error } = await getSupabaseAdmin()
       .from("baseball_game_seats")
-      .select("team")
+      .select("team, token_hash")
       .eq("game_id", roomId)
-      .eq("token_hash", tokenHash)
-      .maybeSingle();
+      .limit(2);
     if (error) throw new Error("ROOM_SEAT_READ_FAILED");
-    return data?.team === "away" || data?.team === "home" ? data.team : null;
-  }
-
-  async hasSeat(roomId: string, team: TeamSide) {
-    const { count, error } = await getSupabaseAdmin()
-      .from("baseball_game_seats")
-      .select("game_id", { count: "exact", head: true })
-      .eq("game_id", roomId)
-      .eq("team", team);
-    if (error) throw new Error("ROOM_SEAT_READ_FAILED");
-    return (count ?? 0) > 0;
+    const away = data?.find((row) => row.team === "away");
+    const home = data?.find((row) => row.team === "home");
+    return {
+      seat:
+        away?.token_hash === tokenHash
+          ? "away"
+          : home?.token_hash === tokenHash
+            ? "home"
+            : null,
+      occupied: {
+        away: Boolean(away),
+        home: Boolean(home),
+      },
+    };
   }
 
   async getIdempotencyRevision(roomId: string, idempotencyKey: string) {

@@ -122,8 +122,12 @@ export async function getMultiplayerSnapshot(
   storage: MultiplayerStorage = getMultiplayerStorage(),
 ): Promise<MultiplayerRoomSnapshot> {
   const room = await requireRoom(roomCode, storage);
-  const seat = await requireSeat(room, seatToken, storage);
-  return buildSnapshot(room, seat, storage);
+  const seatContext = await requireSeatContext(room, seatToken, storage);
+  return buildSnapshot(
+    room,
+    seatContext.seat,
+    seatContext.occupied[seatContext.seat === "away" ? "home" : "away"],
+  );
 }
 
 export async function submitMultiplayerCommand(
@@ -137,7 +141,10 @@ export async function submitMultiplayerCommand(
   storage: MultiplayerStorage = getMultiplayerStorage(),
 ): Promise<MultiplayerRoomSnapshot> {
   const room = await requireRoom(roomCode, storage);
-  const seat = await requireSeat(room, seatToken, storage);
+  const seatContext = await requireSeatContext(room, seatToken, storage);
+  const seat = seatContext.seat;
+  const opponentConnected =
+    seatContext.occupied[seat === "away" ? "home" : "away"];
   if (room.status !== "playing") {
     throw new MultiplayerServiceError(
       "ROOM_UNAVAILABLE",
@@ -152,7 +159,7 @@ export async function submitMultiplayerCommand(
       input.idempotencyKey,
     );
     if (duplicateRevision !== null) {
-      return buildSnapshot(room, seat, storage);
+      return buildSnapshot(room, seat, opponentConnected);
     }
     throw new MultiplayerServiceError(
       "REVISION_CONFLICT",
@@ -208,8 +215,16 @@ export async function submitMultiplayerCommand(
     );
   }
 
-  const latest = await requireRoom(roomCode, storage);
-  return buildSnapshot(latest, seat, storage);
+  return buildSnapshot(
+    {
+      ...room,
+      status: result.state.phase === "finished" ? "finished" : "playing",
+      state: result.state,
+      revision: result.state.revision,
+    },
+    seat,
+    opponentConnected,
+  );
 }
 
 async function requireRoom(roomCode: string, storage: MultiplayerStorage) {
@@ -234,7 +249,7 @@ async function requireRoom(roomCode: string, storage: MultiplayerStorage) {
   return room;
 }
 
-async function requireSeat(
+async function requireSeatContext(
   room: MultiplayerRoomRecord,
   seatToken: string | null,
   storage: MultiplayerStorage,
@@ -245,28 +260,30 @@ async function requireSeat(
       "이 기기는 아직 경기에 참가하지 않았습니다.",
     );
   }
-  const seat = await storage.findSeat(room.id, seatTokenHash(seatToken));
-  if (!seat) {
+  const context = await storage.getSeatContext(
+    room.id,
+    seatTokenHash(seatToken),
+  );
+  if (!context.seat) {
     throw new MultiplayerServiceError(
       "SEAT_REQUIRED",
       "유효한 참가 좌석이 없습니다.",
     );
   }
-  return seat;
+  return { ...context, seat: context.seat };
 }
 
-async function buildSnapshot(
+function buildSnapshot(
   room: MultiplayerRoomRecord,
   seat: TeamSide,
-  storage: MultiplayerStorage,
-): Promise<MultiplayerRoomSnapshot> {
-  const opponent = seat === "away" ? "home" : "away";
+  opponentConnected: boolean,
+): MultiplayerRoomSnapshot {
   const actionOwner = getActionOwner(room.state);
   return {
     roomCode: room.roomCode,
     status: room.status,
     seat,
-    opponentConnected: await storage.hasSeat(room.id, opponent),
+    opponentConnected,
     actionOwner,
     isYourTurn: actionOwner === seat,
     legalCards:
