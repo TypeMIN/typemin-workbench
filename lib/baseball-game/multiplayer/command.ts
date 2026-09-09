@@ -1,19 +1,28 @@
-import { rollDie } from "../rules";
-import type { DieKind, GameAction, GameState } from "../types";
+import { PITCH_TARGETS } from "../duel";
+import type { GameAction, GameState } from "../types";
 import type { MultiplayerCommand } from "./types";
-
-const PHASE_DIE: Partial<Record<GameState["phase"], DieKind>> = {
-  awaiting_pitch: "pitch",
-  awaiting_batting: "batting",
-  awaiting_hit: "hit",
-};
 
 export function parseMultiplayerCommand(
   value: unknown,
 ): MultiplayerCommand | null {
   if (!value || typeof value !== "object") return null;
   const record = value as Record<string, unknown>;
-  if (record.type === "ROLL_DIE") return { type: "ROLL_DIE" };
+  if (
+    record.type === "SELECT_PITCH" &&
+    typeof record.target === "string" &&
+    PITCH_TARGETS.includes(record.target as (typeof PITCH_TARGETS)[number])
+  ) {
+    return {
+      type: "SELECT_PITCH",
+      target: record.target as (typeof PITCH_TARGETS)[number],
+    };
+  }
+  if (
+    record.type === "SELECT_SWING" &&
+    (record.decision === "swing" || record.decision === "take")
+  ) {
+    return { type: "SELECT_SWING", decision: record.decision };
+  }
   if (record.type === "PASS_CARD_WINDOW") {
     return { type: "PASS_CARD_WINDOW" };
   }
@@ -36,14 +45,7 @@ export function commandToGameAction(
   command: MultiplayerCommand,
   random: () => number = Math.random,
 ): GameAction | null {
-  if (command.type !== "ROLL_DIE") return command;
-  const die = PHASE_DIE[state.phase];
-  if (!die) return null;
-  if (die === "pitch") {
-    return { type: "PITCH_RESULT", face: rollDie("pitch", random) };
-  }
-  if (die === "batting") {
-    return { type: "BATTING_RESULT", face: rollDie("batting", random) };
-  }
-  return { type: "HIT_RESULT", face: rollDie("hit", random) };
+  void state;
+  void random;
+  return command;
 }

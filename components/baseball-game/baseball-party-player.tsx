@@ -1,6 +1,6 @@
 "use client";
 
-import { Dices, Radio, RefreshCw, Users } from "lucide-react";
+import { Radio, RefreshCw, Users } from "lucide-react";
 import Link from "next/link";
 import { useCallback, useEffect, useMemo, useState } from "react";
 
@@ -13,10 +13,12 @@ import { CARD_DEFINITIONS } from "@/lib/baseball-game/cards";
 import type { MultiplayerCommand } from "@/lib/baseball-game/multiplayer/types";
 import type { PartyPlayerSnapshot } from "@/lib/baseball-game/party/types";
 import { BaseballAudio, BroadcastLineScore } from "./baseball-broadcast";
-import type { CardRole, GameView } from "@/lib/baseball-game/types";
+import { BaseballDuelControl } from "./baseball-duel-control";
+import type { CardRole, GameAction, GameView } from "@/lib/baseball-game/types";
 
 const PHASE = {
   awaiting_pitch: "투구",
+  awaiting_swing: "타격 판단",
   awaiting_batting: "타격",
   awaiting_hit: "안타",
   awaiting_card: "전략카드",
@@ -370,18 +372,26 @@ function PartyAction({
         </button>
       </section>
     );
+  if (game.phase === "awaiting_pitch" || game.phase === "awaiting_swing")
+    return (
+      <section className="bbg-party-player-action bbg-party-player-action--duel">
+        <BaseballDuelControl
+          busy={busy}
+          game={game}
+          onAction={(action: GameAction) => {
+            if (
+              action.type === "SELECT_PITCH" ||
+              action.type === "SELECT_SWING"
+            ) {
+              onSubmit(action);
+            }
+          }}
+        />
+      </section>
+    );
   return (
-    <section className="bbg-party-player-action">
-      <small>D12 · {PHASE[game.phase]}</small>
-      <strong>{PHASE[game.phase]} 주사위를 굴리세요</strong>
-      <button
-        disabled={busy}
-        onClick={() => onSubmit({ type: "ROLL_DIE" })}
-        type="button"
-      >
-        <Dices size={18} />
-        {busy ? "서버 판정 확인 중…" : "주사위 굴리기"}
-      </button>
+    <section className="bbg-party-player-action is-waiting">
+      <strong>{PHASE[game.phase]} 자동 판정 중</strong>
     </section>
   );
 }
@@ -426,7 +436,10 @@ function roomCodeLabel(value: string) {
 }
 
 function partyCommandLabel(command: MultiplayerCommand, game: GameView) {
-  if (command.type === "ROLL_DIE") return `${PHASE[game.phase]} 주사위`;
+  if (command.type === "SELECT_PITCH") return "투구 코스 선택";
+  if (command.type === "SELECT_SWING") {
+    return command.decision === "swing" ? "스윙 선택" : "지켜보기 선택";
+  }
   if (command.type === "PASS_CARD_WINDOW") return "카드 없이 진행";
   const card = [
     ...(game.cards.offense.hand ?? []),

@@ -1,14 +1,6 @@
 "use client";
 
-import {
-  ArrowLeft,
-  Check,
-  Copy,
-  Dices,
-  Radio,
-  RefreshCw,
-  Users,
-} from "lucide-react";
+import { ArrowLeft, Check, Copy, Radio, RefreshCw, Users } from "lucide-react";
 import Link from "next/link";
 import { useCallback, useMemo, useRef, useState } from "react";
 
@@ -18,6 +10,7 @@ import {
   useBaseballActionFeedback,
 } from "@/components/baseball-game/baseball-action-feedback";
 import { BaseballStadium } from "@/components/baseball-game/baseball-game-debug";
+import { BaseballDuelControl } from "@/components/baseball-game/baseball-duel-control";
 import {
   BaseballAudio,
   BroadcastLineScore,
@@ -27,10 +20,11 @@ import type {
   MultiplayerCommand,
   MultiplayerRoomSnapshot,
 } from "@/lib/baseball-game/multiplayer/types";
-import type { CardRole, GameView } from "@/lib/baseball-game/types";
+import type { CardRole, GameAction, GameView } from "@/lib/baseball-game/types";
 
 const PHASE_LABEL = {
   awaiting_pitch: "투구",
+  awaiting_swing: "타격 판단",
   awaiting_batting: "타격",
   awaiting_hit: "안타",
   awaiting_card: "전략카드",
@@ -338,7 +332,10 @@ function MultiplayerBoard({
   );
   const latestEvent = game.eventLog.at(-1);
   const latestFace = game.eventLog.findLast(
-    (event) => event.kind === "die_roll",
+    (event) =>
+      event.kind === "pitch_result" ||
+      event.kind === "batted_ball" ||
+      event.kind === "die_roll",
   )?.face;
   const seatName = teamName(game, snapshot.seat);
 
@@ -390,7 +387,7 @@ function MultiplayerBoard({
         />
         <div className="bbg-mp-field-result" aria-live="polite">
           <span className="bbg-mp-result-token" aria-hidden="true">
-            <small>{latestFace ? "D12" : "NEXT"}</small>
+            <small>{latestFace ? "PLAY" : "NEXT"}</small>
             <b>{latestFace ?? "▶"}</b>
           </span>
           <small>{latestEvent ? "방금 판정" : "PLAY BALL"}</small>
@@ -404,7 +401,7 @@ function MultiplayerBoard({
             <p>ON DECK</p>
             <h2>현재 판정</h2>
           </div>
-          <span>D12 · {PHASE_LABEL[game.phase]}</span>
+          <span>PITCH DUEL · {PHASE_LABEL[game.phase]}</span>
         </div>
         <div className="bbg-mp-connection">
           <span data-online={snapshot.opponentConnected} />
@@ -545,31 +542,28 @@ function TurnControl({
       </div>
     );
   }
+  if (game.phase === "awaiting_pitch" || game.phase === "awaiting_swing") {
+    return (
+      <div className="bbg-mp-turn is-yours bbg-mp-turn--duel">
+        <BaseballDuelControl
+          busy={disabled}
+          game={game}
+          onAction={(action: GameAction) => {
+            if (
+              action.type === "SELECT_PITCH" ||
+              action.type === "SELECT_SWING"
+            ) {
+              onSubmit(action);
+            }
+          }}
+        />
+      </div>
+    );
+  }
   return (
-    <div className="bbg-mp-turn is-yours">
-      <small>YOUR TURN · {PHASE_LABEL[game.phase]}</small>
-      <strong>{PHASE_LABEL[game.phase]} 주사위를 굴리세요</strong>
-      <button
-        className="bbg-mp-d12-button"
-        disabled={disabled}
-        onClick={() => onSubmit({ type: "ROLL_DIE" })}
-        type="button"
-      >
-        <span className="bbg-d12" aria-hidden="true">
-          <i className="bbg-d12-facet bbg-d12-facet--one" />
-          <i className="bbg-d12-facet bbg-d12-facet--two" />
-          <i className="bbg-d12-facet bbg-d12-facet--three" />
-          <i className="bbg-d12-facet bbg-d12-facet--four" />
-          <small>D12</small>
-          <b>?</b>
-        </span>
-        <span>
-          <Dices aria-hidden="true" size={16} />
-          {disabled
-            ? "서버 판정 확인 중…"
-            : `${PHASE_LABEL[game.phase]} 주사위 굴리기`}
-        </span>
-      </button>
+    <div className="bbg-mp-turn is-waiting">
+      <small>AUTO RESOLVE</small>
+      <strong>{PHASE_LABEL[game.phase]} 처리 중</strong>
     </div>
   );
 }
@@ -638,8 +632,9 @@ function shouldReplaceSnapshot(
 }
 
 function multiplayerCommandLabel(command: MultiplayerCommand, game: GameView) {
-  if (command.type === "ROLL_DIE") {
-    return `${PHASE_LABEL[game.phase]} 주사위`;
+  if (command.type === "SELECT_PITCH") return "투구 코스 선택";
+  if (command.type === "SELECT_SWING") {
+    return command.decision === "swing" ? "스윙 선택" : "지켜보기 선택";
   }
   if (command.type === "PASS_CARD_WINDOW") return "카드 없이 진행";
   const card = [

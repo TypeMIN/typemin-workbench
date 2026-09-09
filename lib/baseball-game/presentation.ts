@@ -44,9 +44,10 @@ const CATCH_POINTS: Record<BattingFace | HitFace, FieldPoint> = {
 };
 
 export function getPitchLocation(
-  event: Pick<GameEvent, "sequence" | "revision" | "face">,
+  event: Pick<GameEvent, "sequence" | "revision" | "face" | "pitchLocation">,
   pitchNumber = 1,
 ): PitchLocation | null {
+  if (event.pitchLocation) return { ...event.pitchLocation };
   const face = event.face;
   if (
     face !== "S" &&
@@ -121,7 +122,11 @@ export function getPlateAppearancePitchHistory(events: GameEvent[]) {
   );
   const pitchEvents = events
     .slice(latestPlateAppearance + 1)
-    .filter((event) => event.kind === "die_roll" && event.die === "pitch");
+    .filter(
+      (event) =>
+        event.kind === "pitch_result" ||
+        (event.kind === "die_roll" && event.die === "pitch"),
+    );
   const history: Array<{
     event: GameEvent;
     face: PitchFace;
@@ -153,13 +158,15 @@ export function getPlateAppearancePitchHistory(events: GameEvent[]) {
 export function buildPresentationCues(events: GameEvent[]): PresentationCue[] {
   const cues: PresentationCue[] = [];
   const pitchEventsBefore = events.filter(
-    (event) => event.kind === "die_roll" && event.die === "pitch",
+    (event) =>
+      event.kind === "pitch_result" ||
+      (event.kind === "die_roll" && event.die === "pitch"),
   );
 
   events.forEach((event) => {
     if (
-      event.kind === "die_roll" &&
-      event.die === "pitch" &&
+      (event.kind === "pitch_result" ||
+        (event.kind === "die_roll" && event.die === "pitch")) &&
       isPitchFace(event.face)
     ) {
       const pitchNumber =
@@ -171,8 +178,9 @@ export function buildPresentationCues(events: GameEvent[]): PresentationCue[] {
       cues.push({ type: "call", call: pitchCall(event.face) });
     }
     if (
-      event.kind === "die_roll" &&
-      (event.die === "batting" || event.die === "hit") &&
+      (event.kind === "batted_ball" ||
+        (event.kind === "die_roll" &&
+          (event.die === "batting" || event.die === "hit"))) &&
       isBattedFace(event.face)
     ) {
       cues.push({ type: "batted_ball", face: event.face });
@@ -204,8 +212,15 @@ export function buildPresentationCues(events: GameEvent[]): PresentationCue[] {
 export function getAudioCues(events: GameEvent[]): AudioCue[] {
   const cues: AudioCue[] = [];
   for (const event of events) {
-    if (event.kind === "die_roll" && event.die === "pitch") cues.push("pitch");
-    if (event.kind === "die_roll" && event.die === "batting") {
+    if (
+      event.kind === "pitch_result" ||
+      (event.kind === "die_roll" && event.die === "pitch")
+    )
+      cues.push("pitch");
+    if (
+      (event.kind === "batted_ball" && isBattedFace(event.face)) ||
+      (event.kind === "die_roll" && event.die === "batting")
+    ) {
       cues.push(
         event.face === "GF" || event.face === "G3" || event.face === "GA"
           ? "ground"

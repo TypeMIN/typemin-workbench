@@ -122,7 +122,7 @@ describe("pitch and phase flow", () => {
       awayTeamName: "원정팀",
       homeTeamName: "홈",
     });
-    expect(getLegalActions(state)).toEqual(["PITCH_RESULT"]);
+    expect(getLegalActions(state)).toEqual(["SELECT_PITCH"]);
     expect(JSON.parse(JSON.stringify(state))).toEqual(state);
   });
 
@@ -134,12 +134,106 @@ describe("pitch and phase flow", () => {
       state,
       error: {
         code: "WRONG_PHASE",
-        message: "현재 단계에서는 PITCH_RESULT 행동이 필요합니다.",
-        expectedAction: "PITCH_RESULT",
+        message: "현재 단계에서는 SELECT_PITCH 행동이 필요합니다.",
+        expectedAction: "SELECT_PITCH",
       },
     });
     expect(state.revision).toBe(0);
   });
+
+  it("keeps the selected pitch private, gives the batter only a hint, then reveals both choices", () => {
+    const initial = game({ phase: "awaiting_pitch" });
+    const locked = apply(initial, {
+      type: "SELECT_PITCH",
+      target: "low_outside",
+    });
+
+    expect(locked.phase).toBe("awaiting_swing");
+    expect(getActionOwner(locked)).toBe("away");
+    expect(getLegalActions(locked)).toEqual(["SELECT_SWING"]);
+    expect(getGameView(locked, "home").pitchDuel).toMatchObject({
+      pitcherChoice: "low_outside",
+      hint: null,
+      actualLocation: null,
+    });
+    expect(getGameView(locked, "away").pitchDuel).toMatchObject({
+      pitcherChoice: null,
+      actualLocation: null,
+    });
+    expect(getGameView(locked, "away").pitchDuel?.hint).not.toBeNull();
+    expect(getGameView(locked, "public").pitchDuel).toMatchObject({
+      pitcherChoice: null,
+      hint: null,
+      actualLocation: null,
+    });
+    expect(
+      getGameView(locked, "debug").pitchDuel?.actualLocation,
+    ).not.toBeNull();
+
+    const resolved = apply(locked, {
+      type: "SELECT_SWING",
+      decision: "take",
+    });
+    const reveal = resolved.eventLog.findLast(
+      (event) => event.kind === "pitch_result",
+    );
+    expect(reveal).toMatchObject({
+      pitchTarget: "low_outside",
+      swingDecision: "take",
+      face: "S",
+    });
+    expect(reveal?.pitchLocation).toMatchObject({ zone: "strike" });
+  });
+
+  it("replays the same pitch duel deterministically from the same state and actions", () => {
+    const initial = game({ phase: "awaiting_pitch" });
+    const actions: GameAction[] = [
+      { type: "SELECT_PITCH", target: "ball" },
+      { type: "SELECT_SWING", decision: "swing" },
+    ];
+    const play = () =>
+      actions.reduce((state, action) => apply(state, action), initial);
+    expect(play()).toEqual(play());
+  });
+
+  it.each([
+    "high_inside",
+    "high_outside",
+    "low_inside",
+    "low_outside",
+    "ball",
+  ] as const)(
+    "automatically completes every batter response against %s",
+    (target) => {
+      for (const decision of ["swing", "take"] as const) {
+        const locked = apply(game({ phase: "awaiting_pitch" }), {
+          type: "SELECT_PITCH",
+          target,
+        });
+        const resolved = apply(locked, { type: "SELECT_SWING", decision });
+        expect(["awaiting_pitch", "awaiting_card", "finished"]).toContain(
+          resolved.phase,
+        );
+        expect(resolved.phase).not.toBe("awaiting_batting");
+        expect(resolved.phase).not.toBe("awaiting_hit");
+        expect(resolved.outs).toBeGreaterThanOrEqual(0);
+        expect(resolved.outs).toBeLessThan(3);
+        expect(
+          Object.values(resolved.bases).every(
+            (value) => typeof value === "boolean",
+          ),
+        ).toBe(true);
+        expect(
+          resolved.eventLog.some(
+            (event) =>
+              event.kind === "pitch_result" &&
+              event.pitchTarget === target &&
+              event.swingDecision === decision,
+          ),
+        ).toBe(true);
+      }
+    },
+  );
 
   it("handles four balls, forced advancement, and a bases-loaded run", () => {
     let state = game({
@@ -903,8 +997,11 @@ describe("advanced strategy and automatic pro rules", () => {
       priorityOrder: ["offense"],
     });
     ground = playCardId(ground, "HNR");
-    expect(ground.phase).toBe("awaiting_batting");
-    ground = apply(ground, { type: "BATTING_RESULT", face: "GF" });
+    expect(ground.phase).toBe("awaiting_pitch");
+    ground = apply(
+      { ...ground, phase: "awaiting_batting" },
+      { type: "BATTING_RESULT", face: "GF" },
+    );
     expect(ground.outs).toBe(1);
     expect(ground.bases.second).toBe(true);
 
@@ -1016,11 +1113,11 @@ describe("advanced strategy and automatic pro rules", () => {
   });
 });
 
-describe("broadcast-v1 box score", () => {
-  it("initializes schema 4 and keeps structured inning totals", () => {
+describe("broadcast-v2 box score", () => {
+  it("initializes schema 5 and keeps structured inning totals", () => {
     const state = createGame(CONFIG);
-    expect(state.schemaVersion).toBe(4);
-    expect(state.presentationVersion).toBe("broadcast-v1");
+    expect(state.schemaVersion).toBe(5);
+    expect(state.presentationVersion).toBe("broadcast-v2");
     expect(state.boxScore).toEqual({
       innings: [{ away: 0, home: null }],
       totals: {

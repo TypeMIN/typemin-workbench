@@ -7,6 +7,7 @@ export {
   transition,
 } from "./engine";
 export { CARD_DECK_COUNTS, CARD_DEFINITIONS } from "./cards";
+export { PITCH_TARGET_LABELS, PITCH_TARGETS, PITCH_TENDENCIES } from "./duel";
 export { chooseAiAction } from "./ai";
 export {
   buildPresentationCues,

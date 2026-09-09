@@ -5,6 +5,8 @@ import type {
   GameEvent,
   GameState,
   GameView,
+  PitchTarget,
+  SwingDecision,
   TeamSide,
 } from "../types";
 
@@ -12,7 +14,8 @@ export type MultiplayerRoomStatus =
   "lobby" | "playing" | "finished" | "expired";
 
 export type MultiplayerCommand =
-  | { type: "ROLL_DIE" }
+  | { type: "SELECT_PITCH"; target: PitchTarget }
+  | { type: "SELECT_SWING"; decision: SwingDecision }
   | { type: "PLAY_CARD"; cardInstanceId: string }
   | { type: "PASS_CARD_WINDOW" };
 

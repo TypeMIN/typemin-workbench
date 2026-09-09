@@ -249,7 +249,7 @@ describe("baseball party service", () => {
           room.roomCode,
           candidates[snapshots.indexOf(inactive)].playerToken,
           {
-            command: { type: "ROLL_DIE" },
+            command: { type: "SELECT_PITCH", target: "low_outside" },
             expectedRevision: inactive.view.revision,
             expectedRoomRevision: started.roomRevision,
             idempotencyKey: randomUUID(),
@@ -330,7 +330,7 @@ describe("baseball party service", () => {
           room.roomCode,
           player.playerToken,
           {
-            command: { type: "ROLL_DIE" },
+            command: { type: "SELECT_PITCH", target: "low_outside" },
             expectedRevision: paused.view.revision,
             expectedRoomRevision: paused.roomRevision,
             idempotencyKey: randomUUID(),
@@ -456,7 +456,7 @@ describe("baseball party service", () => {
       room.roomCode,
       home.playerToken,
       {
-        command: { type: "ROLL_DIE" },
+        command: { type: "SELECT_PITCH", target: "low_outside" },
         expectedRevision: 0,
         expectedRoomRevision: started.roomRevision,
         idempotencyKey,
@@ -476,7 +476,7 @@ describe("baseball party service", () => {
       room.roomCode,
       home.playerToken,
       {
-        command: { type: "ROLL_DIE" },
+        command: { type: "SELECT_PITCH", target: "low_outside" },
         expectedRevision: 0,
         expectedRoomRevision: started.roomRevision,
         idempotencyKey,
@@ -506,7 +506,9 @@ describe("baseball party service", () => {
     const command =
       current.view.phase === "awaiting_card"
         ? ({ type: "PASS_CARD_WINDOW" } as const)
-        : ({ type: "ROLL_DIE" } as const);
+        : current.view.phase === "awaiting_pitch"
+          ? ({ type: "SELECT_PITCH", target: "low_outside" } as const)
+          : ({ type: "SELECT_SWING", decision: "take" } as const);
     const race = await Promise.allSettled([
       submitPartyAction(
         room.roomCode,

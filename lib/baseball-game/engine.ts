@@ -1,6 +1,15 @@
 import { BATTING_DIE_FACES, HIT_DIE_FACES, PITCH_DIE_FACES } from "./rules";
 import { CARD_DECK_COUNTS, CARD_DEFINITIONS } from "./cards";
 import {
+  createActualPitchLocation,
+  createPitchHint,
+  PITCH_TARGET_LABELS,
+  PITCH_TARGETS,
+  resolveBattedBall,
+  resolveHitOutcome,
+  resolvePitchFace as resolveDuelPitchFace,
+} from "./duel";
+import {
   SCHEDULED_INNINGS,
   type Bases,
   type BattingFace,
@@ -20,6 +29,9 @@ import {
   type GameViewer,
   type HitFace,
   type PitchFace,
+  type PitchHint,
+  type PitchLocation,
+  type PitchTarget,
   type RuleError,
   type RunnerMove,
   type ScoringRecord,
@@ -42,7 +54,8 @@ const PHASE_ACTION: Record<
   Exclude<GamePhase, "finished" | "awaiting_card">,
   GameAction["type"]
 > = {
-  awaiting_pitch: "PITCH_RESULT",
+  awaiting_pitch: "SELECT_PITCH",
+  awaiting_swing: "SELECT_SWING",
   awaiting_batting: "BATTING_RESULT",
   awaiting_hit: "HIT_RESULT",
 };
@@ -69,9 +82,9 @@ export function createGame(
   drawToFour(cards.defense, rng);
 
   const state: GameState = {
-    schemaVersion: 4,
-    rulesetVersion: "pro-cards-v1",
-    presentationVersion: "broadcast-v1",
+    schemaVersion: 5,
+    rulesetVersion: "pitch-duel-v1",
+    presentationVersion: "broadcast-v2",
     revision: 0,
     config: {
       innings: config.innings,
@@ -100,6 +113,7 @@ export function createGame(
     cardWindow: null,
     pendingResolution: null,
     activeStrategy: null,
+    pitchDuel: null,
     eventLog: [],
   };
   openCardWindow(state, "before_pitch", ["offense", "defense"]);
@@ -123,7 +137,9 @@ export function getActionOwner(state: GameState): TeamSide | null {
   }
   return state.phase === "awaiting_pitch"
     ? oppositeTeam(state.battingTeam)
-    : state.battingTeam;
+    : state.phase === "awaiting_swing"
+      ? state.battingTeam
+      : state.battingTeam;
 }
 
 export function getLegalCards(
@@ -144,9 +160,15 @@ export function getGameView(state: GameState, viewer: GameViewer): GameView {
         ? "offense"
         : "defense";
   const cloned = cloneState(state);
-  const { cards: privateCards, rng: privateRng, ...publicState } = cloned;
+  const {
+    cards: privateCards,
+    rng: privateRng,
+    pitchDuel: privatePitchDuel,
+    ...publicState
+  } = cloned;
   void privateCards;
   void privateRng;
+  void privatePitchDuel;
   return {
     ...publicState,
     cards: {
@@ -159,6 +181,7 @@ export function getGameView(state: GameState, viewer: GameViewer): GameView {
         viewer === "debug" || visibleRole === "defense",
       ),
     },
+    pitchDuel: pitchDuelView(state, viewer),
   };
 }
 
@@ -177,6 +200,10 @@ export function transition(
     playCard(next, action.cardInstanceId, events);
   } else if (action.type === "PASS_CARD_WINDOW") {
     passCardWindow(next, events);
+  } else if (action.type === "SELECT_PITCH") {
+    selectPitch(next, action.target, events);
+  } else if (action.type === "SELECT_SWING") {
+    selectSwing(next, action.decision, events);
   } else if (action.type === "PITCH_RESULT") {
     emit(next, events, {
       kind: "die_roll",
@@ -202,6 +229,8 @@ export function transition(
     });
     resolveHit(next, action.face, events);
   }
+
+  continueDuelAutomation(next, events);
 
   next.eventLog.push(...events);
   return { ok: true, state: next, events };
@@ -245,8 +274,31 @@ function validateAction(
   }
 
   const expectedAction = PHASE_ACTION[state.phase];
-  if (action.type !== expectedAction) {
+  const legacyResolution =
+    (state.phase === "awaiting_pitch" && action.type === "PITCH_RESULT") ||
+    (state.phase === "awaiting_batting" && action.type === "BATTING_RESULT") ||
+    (state.phase === "awaiting_hit" && action.type === "HIT_RESULT");
+  if (action.type !== expectedAction && !legacyResolution) {
     return wrongPhase(expectedAction);
+  }
+
+  if (action.type === "SELECT_PITCH") {
+    return PITCH_TARGETS.includes(action.target)
+      ? null
+      : {
+          code: "INVALID_FACE",
+          message: "선택할 수 없는 투구 위치입니다.",
+          expectedAction,
+        };
+  }
+  if (action.type === "SELECT_SWING") {
+    return action.decision === "swing" || action.decision === "take"
+      ? null
+      : {
+          code: "INVALID_FACE",
+          message: "선택할 수 없는 타격 판단입니다.",
+          expectedAction,
+        };
   }
 
   const validFace =
@@ -311,6 +363,15 @@ function cloneState(state: GameState): GameState {
         : { ...state.pendingResolution }
       : null,
     activeStrategy: state.activeStrategy ? { ...state.activeStrategy } : null,
+    pitchDuel: state.pitchDuel
+      ? {
+          ...state.pitchDuel,
+          hint: { ...state.pitchDuel.hint },
+          actualLocation: state.pitchDuel.actualLocation
+            ? { ...state.pitchDuel.actualLocation }
+            : null,
+        }
+      : null,
     eventLog: [...state.eventLog],
   };
 }
@@ -329,6 +390,10 @@ function emit(
     outsRecorded?: number;
     moves?: RunnerMove[];
     scoring?: ScoringRecord;
+    pitchTarget?: PitchTarget;
+    swingDecision?: GameEvent["swingDecision"];
+    pitchLocation?: PitchLocation;
+    pitchHint?: PitchHint;
   },
 ) {
   events.push({
@@ -346,6 +411,10 @@ function emit(
     outsRecorded: event.outsRecorded ?? 0,
     moves: event.moves ?? [],
     scoring: event.scoring,
+    pitchTarget: event.pitchTarget,
+    swingDecision: event.swingDecision,
+    pitchLocation: event.pitchLocation,
+    pitchHint: event.pitchHint,
   });
 }
 
@@ -399,6 +468,134 @@ function recordScoring(state: GameState, scoring: ScoringRecord) {
     state.boxScore.totals[state.battingTeam].freePasses += 1;
   if (scoring.error)
     state.boxScore.totals[oppositeTeam(state.battingTeam)].errors += 1;
+}
+
+function selectPitch(
+  state: GameState,
+  target: PitchTarget,
+  events: GameEvent[],
+) {
+  const pitchNumber = currentPlateAppearancePitchCount(state.eventLog) + 1;
+  const actualLocation = createActualPitchLocation(target, pitchNumber, () =>
+    nextRandom(state.rng),
+  );
+  const hint = createPitchHint(target, actualLocation, () =>
+    nextRandom(state.rng),
+  );
+  state.pitchDuel = {
+    sequence: pitchNumber,
+    status: "pitch_locked",
+    pitcherChoice: target,
+    hint,
+    batterDecision: null,
+    actualLocation,
+    result: null,
+  };
+  state.phase = "awaiting_swing";
+  emit(state, events, {
+    kind: "pitch_commit",
+    summary: "투수가 코스를 선택했습니다.",
+  });
+
+  if (state.activeStrategy?.cardId === "HNR") {
+    revealPitchDuel(state, "swing", "C", actualLocation, events);
+    resolvePitch(state, "C", events);
+  }
+}
+
+function selectSwing(
+  state: GameState,
+  decision: "swing" | "take",
+  events: GameEvent[],
+) {
+  const duel = state.pitchDuel;
+  if (!duel) return;
+  const actualLocation = duel.actualLocation;
+  if (!actualLocation) return;
+  const face = resolveDuelPitchFace(duel.pitcherChoice, decision, () =>
+    nextRandom(state.rng),
+  );
+  revealPitchDuel(state, decision, face, actualLocation, events);
+  resolvePitch(state, face, events);
+}
+
+function revealPitchDuel(
+  state: GameState,
+  decision: "swing" | "take",
+  face: PitchFace,
+  actualLocation: PitchLocation,
+  events: GameEvent[],
+) {
+  const duel = state.pitchDuel;
+  if (!duel) return;
+  duel.status = "revealed";
+  duel.batterDecision = decision;
+  duel.actualLocation = actualLocation;
+  duel.result = face;
+  emit(state, events, {
+    kind: "pitch_result",
+    summary: `${PITCH_TARGET_LABELS[duel.pitcherChoice]} · ${decision === "swing" ? "스윙" : "지켜보기"} · ${pitchFaceSummary(face)}`,
+    face,
+    pitchTarget: duel.pitcherChoice,
+    swingDecision: decision,
+    pitchLocation: actualLocation,
+    pitchHint: { ...duel.hint },
+  });
+}
+
+function continueDuelAutomation(state: GameState, events: GameEvent[]) {
+  let guard = 0;
+  while (
+    state.pitchDuel?.status === "revealed" &&
+    state.phase !== "awaiting_card" &&
+    state.phase !== "awaiting_pitch" &&
+    state.phase !== "awaiting_swing" &&
+    state.phase !== "finished" &&
+    guard < 4
+  ) {
+    guard += 1;
+    if (state.phase === "awaiting_batting") {
+      const face = resolveBattedBall(state.pitchDuel.pitcherChoice, () =>
+        nextRandom(state.rng),
+      );
+      emit(state, events, {
+        kind: "batted_ball",
+        summary: `타구 판정 · ${face}`,
+        face,
+      });
+      resolveBatting(state, face, events);
+      continue;
+    }
+    if (state.phase === "awaiting_hit") {
+      const face = resolveHitOutcome(() => nextRandom(state.rng));
+      emit(state, events, {
+        kind: "batted_ball",
+        summary: `안타 판정 · ${face}`,
+        face,
+      });
+      resolveHit(state, face, events);
+      continue;
+    }
+    break;
+  }
+}
+
+function currentPlateAppearancePitchCount(events: GameEvent[]) {
+  let count = 0;
+  for (let index = events.length - 1; index >= 0; index -= 1) {
+    const event = events[index];
+    if (event.kind === "plate_appearance") break;
+    if (event.kind === "pitch_result") count += 1;
+  }
+  return count;
+}
+
+function pitchFaceSummary(face: PitchFace) {
+  if (face === "B") return "볼";
+  if (face === "S") return "스트라이크";
+  if (face === "SM") return "헛스윙";
+  if (face === "F") return "파울";
+  return "컨택";
 }
 
 function resolvePitch(state: GameState, face: PitchFace, events: GameEvent[]) {
@@ -485,7 +682,7 @@ function resolvePitchFace(
     state.phase = "awaiting_batting";
     emit(state, events, {
       kind: "count",
-      summary: "컨택 · 타격 주사위를 굴립니다.",
+      summary: "컨택 · 타구를 판정합니다.",
     });
     return;
   }
@@ -584,7 +781,7 @@ function resolveBattingFace(
     state.phase = "awaiting_hit";
     emit(state, events, {
       kind: "count",
-      summary: "안타 판정 · 안타 주사위를 굴립니다.",
+      summary: "안타 진루를 판정합니다.",
     });
     return;
   }
@@ -978,6 +1175,7 @@ function isWalkOff(state: GameState) {
 
 function prepareNextPitch(state: GameState) {
   if (state.phase === "finished") return;
+  state.pitchDuel = null;
   state.phase = "awaiting_pitch";
   state.pendingResolution = null;
   state.cardWindow = null;
@@ -1353,7 +1551,7 @@ function resolvePrimaryCard(
     };
     state.cardWindow = null;
     state.pendingResolution = null;
-    state.phase = cardId === "HNR" ? "awaiting_batting" : "awaiting_pitch";
+    state.phase = "awaiting_pitch";
     emitCardResolution(
       state,
       events,
@@ -2106,6 +2304,7 @@ function resetHandsForHalfInning(state: GameState) {
   state.cardWindow = null;
   state.pendingResolution = null;
   state.activeStrategy = null;
+  state.pitchDuel = null;
   state.phase = "awaiting_pitch";
   for (const role of ["offense", "defense"] as const) {
     const zone = state.cards[role];
@@ -2151,6 +2350,34 @@ function cardZoneView(zone: CardZone, reveal: boolean) {
     drawCount: zone.drawPile.length,
     discardCount: zone.discardPile.length,
     hand: reveal ? zone.hand.map((card) => ({ ...card })) : null,
+  };
+}
+
+function pitchDuelView(
+  state: GameState,
+  viewer: GameViewer,
+): GameView["pitchDuel"] {
+  const duel = state.pitchDuel;
+  if (!duel) return null;
+
+  const revealed = duel.status === "revealed";
+  const defenseTeam = oppositeTeam(state.battingTeam);
+  const canSeeChoice = viewer === "debug" || revealed || viewer === defenseTeam;
+  const canSeeHint =
+    viewer === "debug" || revealed || viewer === state.battingTeam;
+
+  return {
+    sequence: duel.sequence,
+    status: duel.status,
+    pitcherLocked: true,
+    pitcherChoice: canSeeChoice ? duel.pitcherChoice : null,
+    hint: canSeeHint ? { ...duel.hint } : null,
+    batterDecision: revealed ? duel.batterDecision : null,
+    actualLocation:
+      (revealed || viewer === "debug") && duel.actualLocation
+        ? { ...duel.actualLocation }
+        : null,
+    result: revealed ? duel.result : null,
   };
 }
 

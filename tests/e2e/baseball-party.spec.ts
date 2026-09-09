@@ -16,7 +16,7 @@ test("공용 화면과 2대2 개인기기가 한 파티 경기를 실제로 진�
   );
   await display.goto(`${baseURL}/baseball-game`);
   await display
-    .getByRole("button", { name: "게임 모드 변경, 현재 로컬 2인" })
+    .getByRole("button", { name: "게임 모드 변경, 현재 AI 대전 홈팀" })
     .click();
   await display.getByLabel("게임 모드", { exact: true }).selectOption("party");
   await display.getByRole("button", { name: "파티플레이 경기 만들기" }).click();
@@ -87,7 +87,7 @@ test("공용 화면과 2대2 개인기기가 한 파티 경기를 실제로 진�
       for (const page of players.slice(2)) {
         if (
           await page
-            .getByRole("button", { name: "주사위 굴리기" })
+            .getByRole("button", { name: /^높은 몸쪽/ })
             .isVisible()
             .catch(() => false)
         ) {
@@ -150,7 +150,7 @@ test("공용 화면과 2대2 개인기기가 한 파티 경기를 실제로 진�
           playerView.snapshot?.me.id === afterSkip.snapshot.activeDefenderId &&
           playerView.snapshot?.canAct === true &&
           (await page
-            .getByRole("button", { name: "주사위 굴리기" })
+            .getByRole("button", { name: /^높은 몸쪽/ })
             .isVisible()
             .catch(() => false))
         ) {
@@ -161,20 +161,27 @@ test("공용 화면과 2대2 개인기기가 한 파티 경기를 실제로 진�
       return false;
     })
     .toBe(true);
-  await activePage!.route("**/party/actions", async (route) => {
-    await new Promise((resolve) => setTimeout(resolve, 350));
-    await route.continue();
-  });
-  const roll = activePage!
-    .getByRole("button", { name: "주사위 굴리기" })
-    .click();
-  await expect(activePage!.getByRole("status")).toContainText(
-    "투구 주사위 요청 중",
-  );
-  await roll;
-  await expect(activePage!.getByRole("status")).toContainText(
-    "투구 주사위 반영 완료",
-  );
+  const pitchCommit = await activePage!.evaluate(async (code) => {
+    const current = await (
+      await fetch(`/api/baseball-game/rooms/${code}/party/view`)
+    ).json();
+    const response = await fetch(
+      `/api/baseball-game/rooms/${code}/party/actions`,
+      {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          command: { type: "SELECT_PITCH", target: "high_inside" },
+          expectedRevision: current.snapshot.view.revision,
+          expectedRoomRevision: current.snapshot.roomRevision,
+          idempotencyKey: crypto.randomUUID(),
+        }),
+      },
+    );
+    return { status: response.status, payload: await response.json() };
+  }, roomCode);
+  expect(pitchCommit.status).toBe(200);
+  expect(pitchCommit.payload.snapshot.view.revision).toBe(1);
   await expect
     .poll(async () => {
       const payload = await display.evaluate(
@@ -193,6 +200,9 @@ test("공용 화면과 2대2 개인기기가 한 파티 경기를 실제로 진�
   );
   expect(publicPayload.snapshot.view.cards.offense.hand).toBeNull();
   expect(publicPayload.snapshot.view.cards.defense.hand).toBeNull();
+  expect(publicPayload.snapshot.view.pitchDuel.pitcherChoice).toBeNull();
+  expect(publicPayload.snapshot.view.pitchDuel.hint).toBeNull();
+  expect(publicPayload.snapshot.view.pitchDuel.actualLocation).toBeNull();
   expect(publicPayload.snapshot.view).not.toHaveProperty("rng");
   expect(JSON.stringify(publicPayload)).not.toContain("token");
   const playerPayload = await players[0].evaluate(
@@ -201,6 +211,8 @@ test("공용 화면과 2대2 개인기기가 한 파티 경기를 실제로 진�
     roomCode,
   );
   expect(playerPayload.snapshot.view.cards.defense.hand).toBeNull();
+  expect(playerPayload.snapshot.view.pitchDuel.pitcherChoice).toBeNull();
+  expect(playerPayload.snapshot.view.pitchDuel.hint).not.toBeNull();
   expect(playerPayload.snapshot.view).not.toHaveProperty("rng");
 
   const spectatorContext = await browser.newContext({

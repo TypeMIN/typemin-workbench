@@ -32,14 +32,14 @@ describe("BaseballGameDebug", () => {
     vi.unstubAllGlobals();
   });
 
-  it("renders the initial local game state and forced D12 faces", () => {
+  it("starts in solo AI mode with five one-tap pitch choices", () => {
     const { container } = render(<BaseballGameDebug />);
 
-    expect(screen.getByText("PRO-CARDS-V1 · LOCAL 2P")).toBeVisible();
-    expect(screen.getByText("로컬 2인")).toBeVisible();
+    expect(screen.getByText("PITCH-DUEL-V1 · SOLO AI")).toBeVisible();
+    expect(screen.getByText("AI 대전 · 홈팀")).toBeVisible();
     expect(
       screen.getByRole("button", {
-        name: "게임 모드 변경, 현재 로컬 2인",
+        name: "게임 모드 변경, 현재 AI 대전 홈팀",
       }),
     ).toBeVisible();
     expect(
@@ -51,7 +51,9 @@ describe("BaseballGameDebug", () => {
       screen.getByRole("heading", { name: "야구 게임 라이브" }),
     ).toBeVisible();
     expect(screen.getByLabelText("현재 진행 단계 투구")).toBeVisible();
-    expect(screen.getByText(/투구 결과를 정합니다/)).toBeVisible();
+    expect(
+      screen.getByText(/투수가 한 번의 선택으로 코스를 정합니다/),
+    ).toBeVisible();
     expect(
       screen.getByRole("region", {
         name: /경기 점수판, 1회초, 무사, 주자 없음/,
@@ -63,10 +65,10 @@ describe("BaseballGameDebug", () => {
       screen.getByRole("heading", { name: "첫 투구를 준비하세요" }),
     ).toBeVisible();
     expect(
-      screen.getByRole("button", { name: "투구 주사위 굴리기" }),
+      screen.getByRole("region", { name: "투구 코스 선택" }),
     ).toBeVisible();
-    expect(container.querySelector(".bbg-d12")).toBeVisible();
-    expect(screen.getAllByRole("button", { name: /번 면/ })).toHaveLength(12);
+    expect(container.querySelector(".bbg-d12")).not.toBeInTheDocument();
+    expect(container.querySelectorAll(".bbg-pitch-choice")).toHaveLength(5);
     expect(screen.getByRole("img", { name: /주자 없음/ })).toBeVisible();
     expect(
       container.querySelector(".bbg-team-score.is-batting"),
@@ -114,69 +116,19 @@ describe("BaseballGameDebug", () => {
     ).not.toBeInTheDocument();
   });
 
-  it("supports random rolls and exact forced-result phase changes", () => {
-    vi.spyOn(Math, "random").mockReturnValue(0);
+  it("resolves a private player pitch and the AI batter decision without dice", () => {
+    vi.useFakeTimers();
     render(<BaseballGameDebug />);
 
-    fireEvent.click(screen.getByRole("button", { name: "투구 주사위 굴리기" }));
-    expect(screen.getByRole("status")).toHaveTextContent(
-      "투구 주사위를 굴렸습니다",
-    );
-    expect(screen.getByLabelText("스트라이크 1")).toBeVisible();
-    expect(
-      document.querySelectorAll(
-        '.bbg-count-line[data-tone="strike"] i[data-active="true"]',
-      ),
-    ).toHaveLength(1);
-    expect(screen.getByText("같은 타자에게 다음 투구")).toBeVisible();
-
-    fireEvent.click(screen.getByRole("button", { name: /9번 면 C 컨택/ }));
-    expect(
-      screen.getByRole("button", { name: "타격 주사위 굴리기" }),
-    ).toBeVisible();
-    expect(screen.getByText(/공이 배트에 맞았습니다/)).toBeVisible();
-
-    fireEvent.click(screen.getByRole("button", { name: /9번 면 HIT 안타/ }));
-    expect(
-      screen.getByRole("button", { name: "안타 주사위 굴리기" }),
-    ).toBeVisible();
-    expect(screen.getByText(/타구 방향과 모든 주자의 진루/)).toBeVisible();
-
-    fireEvent.click(
-      screen.getByRole("button", { name: /1번 면 IH 내야 안타/ }),
-    );
-    expect(
-      document.querySelector('.bbg-ball-flight[aria-label*="IH"]'),
-    ).toBeVisible();
-    expect(screen.getByRole("img", { name: /1루 주자 있음/ })).toBeVisible();
-    const result = screen.getByTestId("play-result");
-    expect(
-      within(result).getByRole("heading", { name: "IH 단타" }),
-    ).toBeVisible();
-    expect(within(result).getByText("타자")).toBeVisible();
-    expect(within(result).getByText("1루")).toBeVisible();
-    const playableCard = screen.getByRole("button", {
-      name: /BK 보크 사용 가능/,
+    fireEvent.click(screen.getByRole("button", { name: "볼 선택" }));
+    expect(screen.getByText("투구 코스를 선택했습니다")).toBeVisible();
+    expect(screen.getByText("원정팀 판단 중")).toBeVisible();
+    act(() => {
+      vi.advanceTimersByTime(650);
     });
-    expect(playableCard).toHaveAttribute("data-playable", "true");
-    expect(playableCard.closest(".bbg-card-hand")).toHaveAttribute(
-      "data-active",
-      "true",
-    );
-    expect(
-      screen.queryByRole("button", { name: "BK 사용" }),
-    ).not.toBeInTheDocument();
-    fireEvent.click(playableCard);
-    expect(screen.getByRole("img", { name: /2루 주자 있음/ })).toBeVisible();
-    expect(document.querySelectorAll(".bbg-card-hand button")).toHaveLength(4);
-    for (let step = 0; step < 8; step += 1) {
-      const pass = screen.queryByRole("button", { name: "카드 없이 진행" });
-      if (!pass) break;
-      fireEvent.click(pass);
-    }
-    expect(
-      screen.getByRole("button", { name: "투구 주사위 굴리기" }),
-    ).toBeVisible();
+    expect(screen.getByTestId("play-result")).toHaveTextContent("투수 볼");
+    expect(screen.getByTestId("play-result")).toHaveTextContent(/타자/);
+    expect(screen.queryByText(/특정 면 강제 입력/)).not.toBeInTheDocument();
   });
 
   it("creates a new game from edited team names and innings", () => {
@@ -188,7 +140,8 @@ describe("BaseballGameDebug", () => {
     if (!setup) throw new Error("새 경기 패널을 찾지 못했습니다.");
     const form = within(setup);
 
-    expect(form.getByLabelText("게임 모드")).toHaveValue("local_two_player");
+    expect(form.getByLabelText("게임 모드")).toHaveValue("solo_ai");
+    expect(form.queryByRole("option", { name: /로컬 2인/ })).toBeNull();
 
     fireEvent.change(form.getByLabelText("원정팀"), {
       target: { value: "블루" },
@@ -207,7 +160,7 @@ describe("BaseballGameDebug", () => {
     expect(scoreboard).toHaveAttribute("data-scheduled-innings", "5");
   });
 
-  it("switches to solo mode, conceals the AI hand, and advances the AI turn", () => {
+  it("conceals the AI hand and advances the AI pitch turn", () => {
     vi.useFakeTimers();
     vi.spyOn(Math, "random").mockReturnValue(0);
     render(<BaseballGameDebug />);
@@ -219,17 +172,17 @@ describe("BaseballGameDebug", () => {
     if (!setup) throw new Error("새 경기 패널을 찾지 못했습니다.");
     const form = within(setup);
 
-    fireEvent.change(form.getByLabelText("게임 모드"), {
-      target: { value: "solo_ai" },
+    expect(form.getByLabelText("내 팀")).toHaveValue("home");
+    fireEvent.change(form.getByLabelText("내 팀"), {
+      target: { value: "away" },
     });
-    expect(form.getByLabelText("내 팀")).toHaveValue("away");
     fireEvent.click(form.getByRole("button", { name: /새 경기 시작/ }));
 
-    expect(screen.getByText("PRO-CARDS-V1 · SOLO AI")).toBeVisible();
+    expect(screen.getByText("PITCH-DUEL-V1 · SOLO AI")).toBeVisible();
     expect(screen.getByText("AI 대전 · 원정팀")).toBeVisible();
     expect(screen.getByRole("status")).toHaveTextContent("홈팀 판단 중");
     expect(
-      screen.queryByRole("button", { name: "투구 주사위 굴리기" }),
+      screen.queryByRole("region", { name: "투구 코스 선택" }),
     ).not.toBeInTheDocument();
     expect(
       screen.getByRole("region", { name: "원정팀 공격 손패" }),
@@ -242,7 +195,7 @@ describe("BaseballGameDebug", () => {
       vi.advanceTimersByTime(650);
     });
 
-    expect(screen.getByLabelText("스트라이크 1")).toBeVisible();
+    expect(screen.getByRole("region", { name: "타격 판단" })).toBeVisible();
   });
 
   it("lets a solo player choose the home team and take the first pitch turn", () => {
@@ -254,9 +207,6 @@ describe("BaseballGameDebug", () => {
       .closest("details");
     if (!setup) throw new Error("새 경기 패널을 찾지 못했습니다.");
     const form = within(setup);
-    fireEvent.change(form.getByLabelText("게임 모드"), {
-      target: { value: "solo_ai" },
-    });
     fireEvent.change(form.getByLabelText("내 팀"), {
       target: { value: "home" },
     });
@@ -264,7 +214,7 @@ describe("BaseballGameDebug", () => {
 
     expect(screen.getByText("AI 대전 · 홈팀")).toBeVisible();
     expect(
-      screen.getByRole("button", { name: "투구 주사위 굴리기" }),
+      screen.getByRole("region", { name: "투구 코스 선택" }),
     ).toBeVisible();
     expect(
       screen.getByRole("region", { name: "홈팀 수비 손패" }),
@@ -294,7 +244,7 @@ describe("BaseballGameDebug", () => {
 
     fireEvent.click(
       screen.getByRole("button", {
-        name: "게임 모드 변경, 현재 로컬 2인",
+        name: "게임 모드 변경, 현재 AI 대전 홈팀",
       }),
     );
     const setup = screen
@@ -338,7 +288,7 @@ describe("BaseballGameDebug", () => {
 
     fireEvent.click(
       screen.getByRole("button", {
-        name: "게임 모드 변경, 현재 로컬 2인",
+        name: "게임 모드 변경, 현재 AI 대전 홈팀",
       }),
     );
     const setup = screen
@@ -372,7 +322,7 @@ describe("BaseballGameDebug", () => {
 
     fireEvent.click(
       screen.getByRole("button", {
-        name: "게임 모드 변경, 현재 로컬 2인",
+        name: "게임 모드 변경, 현재 AI 대전 홈팀",
       }),
     );
     const setup = screen
@@ -393,40 +343,5 @@ describe("BaseballGameDebug", () => {
       "/api/baseball-game/rooms",
       expect.anything(),
     );
-  });
-
-  it("shows strikeout emphasis and switches the visible hand after changing sides", () => {
-    render(<BaseballGameDebug />);
-
-    for (let pitch = 0; pitch < 3; pitch += 1) {
-      fireEvent.click(
-        screen.getByRole("button", { name: /1번 면 S 스트라이크/ }),
-      );
-    }
-    expect(document.querySelector(".bbg-stadium-highlight")).toHaveTextContent(
-      "STRIKE OUT",
-    );
-
-    for (let pitch = 0; pitch < 6; pitch += 1) {
-      fireEvent.click(
-        screen.getByRole("button", { name: /1번 면 S 스트라이크/ }),
-      );
-    }
-    const sideChange = screen.getByRole("dialog", { name: "공수 교대" });
-    expect(sideChange).toBeVisible();
-    expect(within(sideChange).getByText("1회말 시작")).toBeVisible();
-    fireEvent.click(screen.getByRole("button", { name: "다음 공격 준비" }));
-    expect(
-      screen.queryByRole("dialog", { name: /기기를 넘겨주세요/ }),
-    ).not.toBeInTheDocument();
-    expect(
-      screen.getByRole("region", { name: /경기 점수판, 1회말/ }),
-    ).toBeVisible();
-    expect(
-      screen.getByRole("region", { name: "홈팀 공격 비공개 손패" }),
-    ).toBeVisible();
-    expect(
-      screen.getByRole("region", { name: "원정팀 수비 손패" }),
-    ).toBeVisible();
   });
 });

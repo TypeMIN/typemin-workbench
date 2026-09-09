@@ -22,7 +22,20 @@ function event(overrides: Partial<GameEvent>): GameEvent {
   };
 }
 
-describe("broadcast-v1 presentation", () => {
+describe("broadcast-v2 presentation", () => {
+  it("uses the server-recorded duel location without re-randomizing it", () => {
+    const source = event({
+      kind: "pitch_result",
+      face: "S",
+      pitchLocation: { x: 42, y: 31, zone: "strike", pitchNumber: 4 },
+    });
+    expect(getPitchLocation(source, 4)).toEqual(source.pitchLocation);
+    expect(buildPresentationCues([source]).at(0)).toEqual({
+      type: "pitch",
+      face: "S",
+      location: source.pitchLocation,
+    });
+  });
   it.each(["S", "SM", "F", "B", "C"] as PitchFace[])(
     "creates a deterministic valid location for %s",
     (face) => {

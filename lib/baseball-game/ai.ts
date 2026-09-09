@@ -1,7 +1,12 @@
 import { CARD_DEFINITIONS } from "./cards";
-import { getActionOwner, getLegalCards } from "./engine";
-import { rollDie } from "./rules";
-import type { CardId, GameAction, GameState, TeamSide } from "./types";
+import { getActionOwner, getGameView, getLegalCards } from "./engine";
+import type {
+  CardId,
+  GameAction,
+  GameState,
+  PitchTarget,
+  TeamSide,
+} from "./types";
 
 const CARD_PRIORITY: Partial<Record<CardId, number>> = {
   GTP: 120,
@@ -76,12 +81,36 @@ export function chooseAiAction(
   }
 
   if (state.phase === "awaiting_pitch") {
-    return { type: "PITCH_RESULT", face: rollDie("pitch", random) };
+    return { type: "SELECT_PITCH", target: choosePitchTarget(state, random) };
   }
-  if (state.phase === "awaiting_batting") {
-    return { type: "BATTING_RESULT", face: rollDie("batting", random) };
+  if (state.phase === "awaiting_swing") {
+    const view = getGameView(state, aiTeam);
+    const read = view.pitchDuel?.hint?.read ?? "borderline";
+    let swingChance =
+      read === "likely_strike" ? 0.78 : read === "likely_ball" ? 0.18 : 0.48;
+    if (state.strikes === 2) swingChance += 0.14;
+    if (state.balls === 3) swingChance -= 0.12;
+    return {
+      type: "SELECT_SWING",
+      decision: random() < swingChance ? "swing" : "take",
+    };
   }
-  return { type: "HIT_RESULT", face: rollDie("hit", random) };
+  return null;
+}
+
+function choosePitchTarget(
+  state: GameState,
+  random: () => number,
+): PitchTarget {
+  const ballChance = state.balls === 3 ? 0.08 : state.strikes === 2 ? 0.3 : 0.2;
+  if (random() < ballChance) return "ball";
+  const strikeTargets: PitchTarget[] = [
+    "high_inside",
+    "high_outside",
+    "low_inside",
+    "low_outside",
+  ];
+  return strikeTargets[Math.floor(random() * strikeTargets.length)]!;
 }
 
 function scoreCard(state: GameState, cardId: CardId) {

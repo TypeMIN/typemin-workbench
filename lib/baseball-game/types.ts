@@ -12,6 +12,32 @@ export type HitFace =
   "IH" | "L1" | "L2" | "C1" | "C2" | "R1" | "R2" | "D2" | "D3" | "T3";
 export type DieFace = PitchFace | BattingFace | HitFace;
 
+export type PitchTarget =
+  "high_inside" | "high_outside" | "low_inside" | "low_outside" | "ball";
+
+export type SwingDecision = "swing" | "take";
+
+export type PitchHint = FieldPoint & {
+  radius: number;
+  read: "likely_strike" | "borderline" | "likely_ball";
+};
+
+export type PitchDuelState = {
+  sequence: number;
+  status: "pitch_locked" | "revealed";
+  pitcherChoice: PitchTarget;
+  hint: PitchHint;
+  batterDecision: SwingDecision | null;
+  actualLocation: PitchLocation | null;
+  result: PitchFace | null;
+};
+
+export type PitchDuelView = Omit<PitchDuelState, "pitcherChoice" | "hint"> & {
+  pitcherLocked: boolean;
+  pitcherChoice: PitchTarget | null;
+  hint: PitchHint | null;
+};
+
 export type CardRole = "offense" | "defense";
 export type CardId =
   | "HBP"
@@ -114,12 +140,15 @@ export type GameConfig = {
 
 export type GamePhase =
   | "awaiting_pitch"
+  | "awaiting_swing"
   | "awaiting_batting"
   | "awaiting_hit"
   | "awaiting_card"
   | "finished";
 
 export type GameAction =
+  | { type: "SELECT_PITCH"; target: PitchTarget }
+  | { type: "SELECT_SWING"; decision: SwingDecision }
   | { type: "PITCH_RESULT"; face: PitchFace }
   | { type: "BATTING_RESULT"; face: BattingFace }
   | { type: "HIT_RESULT"; face: HitFace }
@@ -193,6 +222,9 @@ export type AudioCue =
   | "strike";
 
 export type GameEventKind =
+  | "pitch_commit"
+  | "pitch_result"
+  | "batted_ball"
   | "die_roll"
   | "count"
   | "plate_appearance"
@@ -218,12 +250,16 @@ export type GameEvent = {
   outsRecorded: number;
   moves: RunnerMove[];
   scoring?: ScoringRecord;
+  pitchTarget?: PitchTarget;
+  swingDecision?: SwingDecision;
+  pitchLocation?: PitchLocation;
+  pitchHint?: PitchHint;
 };
 
 export type GameState = {
-  schemaVersion: 4;
-  rulesetVersion: "pro-cards-v1";
-  presentationVersion: "broadcast-v1";
+  schemaVersion: 5;
+  rulesetVersion: "pitch-duel-v1";
+  presentationVersion: "broadcast-v2";
   revision: number;
   config: GameConfig;
   phase: GamePhase;
@@ -245,6 +281,7 @@ export type GameState = {
   cardWindow: CardWindow | null;
   pendingResolution: PendingResolution | null;
   activeStrategy: ActiveStrategy;
+  pitchDuel: PitchDuelState | null;
   eventLog: GameEvent[];
 };
 
@@ -264,8 +301,9 @@ export type CardZoneView = {
   hand: CardInstance[] | null;
 };
 
-export type GameView = Omit<GameState, "cards" | "rng"> & {
+export type GameView = Omit<GameState, "cards" | "rng" | "pitchDuel"> & {
   cards: Record<CardRole, CardZoneView>;
+  pitchDuel: PitchDuelView | null;
 };
 
 export type RuleError = {

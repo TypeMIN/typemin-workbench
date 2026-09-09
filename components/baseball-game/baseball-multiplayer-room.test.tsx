@@ -88,7 +88,7 @@ describe("BaseballMultiplayerRoom", () => {
       await screen.findByRole("region", { name: "레드 수비 손패" }),
     ).toBeVisible();
     expect(
-      screen.getByRole("button", { name: "투구 주사위 굴리기" }),
+      screen.getByRole("region", { name: "투구 코스 선택" }),
     ).toBeVisible();
     await waitFor(() =>
       expect(fetchMock).toHaveBeenCalledWith(
@@ -101,12 +101,14 @@ describe("BaseballMultiplayerRoom", () => {
   it("shows an immediate action receipt while the server response is delayed", async () => {
     const current = snapshot("home", "playing");
     const result = transition(createGame(current.view.config), {
-      type: "PITCH_RESULT",
-      face: "S",
+      type: "SELECT_PITCH",
+      target: "high_inside",
     });
     if (!result.ok) throw new Error("테스트 경기 진행 실패");
     const updated = {
       ...current,
+      actionOwner: "away" as const,
+      isYourTurn: false,
       view: getGameView(result.state, "home"),
     } satisfies MultiplayerRoomSnapshot;
     let resolveAction: ((value: Response) => void) | undefined;
@@ -121,21 +123,19 @@ describe("BaseballMultiplayerRoom", () => {
     vi.stubGlobal("fetch", fetchMock);
 
     const { container } = render(<BaseballMultiplayerRoom roomCode="ABC234" />);
-    fireEvent.click(
-      await screen.findByRole("button", { name: "투구 주사위 굴리기" }),
-    );
+    fireEvent.click(await screen.findByRole("button", { name: /^높은 몸쪽/ }));
 
-    expect(screen.getByRole("status")).toHaveTextContent("투구 주사위 요청 중");
-    expect(
-      screen.getByRole("button", { name: /서버 판정 확인 중/ }),
-    ).toBeDisabled();
+    expect(screen.getByRole("status")).toHaveTextContent(
+      "투구 코스 선택 요청 중",
+    );
+    expect(screen.getByRole("button", { name: /^높은 몸쪽/ })).toBeDisabled();
     expect(container.querySelector(".bbg-mp-board")).toHaveAttribute(
       "aria-busy",
       "true",
     );
 
     resolveAction?.(response({ snapshot: updated }));
-    expect(await screen.findByText("투구 주사위 반영 완료")).toBeVisible();
-    expect(screen.getByRole("status")).toHaveTextContent("스트라이크");
+    expect(await screen.findByText("투구 코스 선택 반영 완료")).toBeVisible();
+    expect(screen.getByText("상대 팀의 결정을 기다리는 중")).toBeVisible();
   });
 });

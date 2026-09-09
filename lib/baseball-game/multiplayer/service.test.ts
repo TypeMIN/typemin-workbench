@@ -113,7 +113,7 @@ describe("baseball multiplayer service", () => {
         "ABC234",
         AWAY_TOKEN,
         {
-          command: { type: "ROLL_DIE" },
+          command: { type: "SELECT_PITCH", target: "low_outside" },
           expectedRevision: 0,
           idempotencyKey: randomUUID(),
         },
@@ -130,13 +130,21 @@ describe("baseball multiplayer service", () => {
     const first = await submitMultiplayerCommand(
       "ABC234",
       HOME_TOKEN,
-      { command: { type: "ROLL_DIE" }, expectedRevision: 0, idempotencyKey },
+      {
+        command: { type: "SELECT_PITCH", target: "low_outside" },
+        expectedRevision: 0,
+        idempotencyKey,
+      },
       storage,
     );
     const retry = await submitMultiplayerCommand(
       "ABC234",
       HOME_TOKEN,
-      { command: { type: "ROLL_DIE" }, expectedRevision: 0, idempotencyKey },
+      {
+        command: { type: "SELECT_PITCH", target: "low_outside" },
+        expectedRevision: 0,
+        idempotencyKey,
+      },
       storage,
     );
 
@@ -151,7 +159,7 @@ describe("baseball multiplayer service", () => {
       "ABC234",
       HOME_TOKEN,
       {
-        command: { type: "ROLL_DIE" },
+        command: { type: "SELECT_PITCH", target: "low_outside" },
         expectedRevision: 0,
         idempotencyKey: randomUUID(),
       },
@@ -162,7 +170,7 @@ describe("baseball multiplayer service", () => {
         "ABC234",
         HOME_TOKEN,
         {
-          command: { type: "ROLL_DIE" },
+          command: { type: "SELECT_PITCH", target: "low_outside" },
           expectedRevision: 0,
           idempotencyKey: randomUUID(),
         },

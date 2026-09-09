@@ -1,6 +1,6 @@
 "use client";
 
-import { ArrowRight, Dices, House, Layers3, RotateCcw } from "lucide-react";
+import { ArrowRight, House, Layers3, RotateCcw } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState, type FormEvent } from "react";
@@ -15,8 +15,10 @@ import {
   BroadcastLineScore,
   usePresentation,
 } from "@/components/baseball-game/baseball-broadcast";
+import { BaseballDuelControl } from "@/components/baseball-game/baseball-duel-control";
 import { chooseAiAction } from "@/lib/baseball-game/ai";
 import { CARD_DEFINITIONS } from "@/lib/baseball-game/cards";
+import { PITCH_TARGET_LABELS } from "@/lib/baseball-game/duel";
 import {
   createGame,
   getActionOwner,
@@ -24,25 +26,16 @@ import {
   transition,
 } from "@/lib/baseball-game/engine";
 import { getPlateAppearancePitchHistory } from "@/lib/baseball-game/presentation";
-import {
-  DIE_FACES,
-  DIE_LABELS,
-  FACE_LABELS,
-  rollDie,
-} from "@/lib/baseball-game/rules";
+import { FACE_LABELS } from "@/lib/baseball-game/rules";
 import type {
-  BattingFace,
   CardAvailability,
   CardRole,
   DieFace,
-  DieKind,
   GameAction,
   GameConfig,
   GameEvent,
   GamePhase,
   GameState,
-  HitFace,
-  PitchFace,
   PresentationCue,
   RunnerDestination,
   RunnerOrigin,
@@ -56,7 +49,7 @@ const DEFAULT_CONFIG: GameConfig = {
   homeTeamName: "홈팀",
 };
 
-type PlayMode = "solo_ai" | "local_two_player" | "multiplayer" | "party";
+type PlayMode = "solo_ai" | "multiplayer" | "party";
 
 type SessionConfig = {
   mode: PlayMode;
@@ -64,32 +57,28 @@ type SessionConfig = {
 };
 
 const DEFAULT_SESSION: SessionConfig = {
-  mode: "local_two_player",
-  humanTeam: "away",
+  mode: "solo_ai",
+  humanTeam: "home",
 };
 
 const AI_TURN_DELAY_MS = 650;
 
-const PHASE_DIE: Partial<Record<GamePhase, DieKind>> = {
-  awaiting_pitch: "pitch",
-  awaiting_batting: "batting",
-  awaiting_hit: "hit",
-};
-
 const PHASE_COPY: Record<GamePhase, string> = {
   awaiting_pitch:
-    "투구 결과를 정합니다. 볼·스트라이크 또는 컨택으로 이어집니다.",
-  awaiting_batting:
-    "공이 배트에 맞았습니다. 아웃·안타·홈런 중 타구 결과를 정합니다.",
-  awaiting_hit: "안타성 타구입니다. 타구 방향과 모든 주자의 진루를 정합니다.",
+    "투수가 한 번의 선택으로 코스를 정합니다. 선택은 타자에게 공개되지 않습니다.",
+  awaiting_swing:
+    "타자는 예상 위치를 읽고 스윙하거나 지켜봅니다. 선택 즉시 판정됩니다.",
+  awaiting_batting: "컨택 결과를 자동으로 판정하고 있습니다.",
+  awaiting_hit: "안타 방향과 주자 진루를 자동으로 판정하고 있습니다.",
   awaiting_card: "사용할 전략카드를 고르거나 카드 없이 진행하세요.",
   finished: "경기가 종료되었습니다.",
 };
 
 const PHASE_TITLE: Record<GamePhase, string> = {
-  awaiting_pitch: "투구할 차례",
-  awaiting_batting: "타격 결과를 정할 차례",
-  awaiting_hit: "안타 결과를 정할 차례",
+  awaiting_pitch: "투구 코스 선택",
+  awaiting_swing: "타격 판단",
+  awaiting_batting: "타구 판정",
+  awaiting_hit: "주루 판정",
   awaiting_card: "전략카드 결정",
   finished: "경기 종료",
 };
@@ -113,12 +102,12 @@ export default function BaseballGameDebug() {
     show: showActionFeedback,
     clear: clearActionFeedback,
   } = useBaseballActionFeedback();
-  const currentDie = PHASE_DIE[game.phase] ?? null;
-  const currentFaces = currentDie ? DIE_FACES[currentDie] : [];
   const currentRevisionEvents = game.eventLog.filter(
     (event) => event.revision === game.revision,
   );
-  const lastRoll = game.eventLog.findLast((event) => event.kind === "die_roll");
+  const lastResult = game.eventLog.findLast((event) =>
+    ["pitch_result", "batted_ball", "die_roll"].includes(event.kind),
+  );
   const actionOwner = getActionOwner(game);
   const aiTeam =
     session.mode === "solo_ai" ? oppositeTeam(session.humanTeam) : null;
@@ -164,34 +153,6 @@ export default function BaseballGameDebug() {
     return () => window.clearTimeout(timer);
   }, [aiTeam, game, isAiTurn, modalOpen, showActionFeedback]);
 
-  function dispatchResult(
-    kind: DieKind,
-    face: DieFace,
-    source: "roll" | "forced" = "forced",
-  ) {
-    const action = actionFor(kind, face);
-    const result = transition(game, action);
-    if (!result.ok) {
-      setError(result.error.message);
-      showActionFeedback({
-        status: "error",
-        title: "행동을 반영하지 못했습니다",
-        detail: result.error.message,
-      });
-      return;
-    }
-    setError(null);
-    setGame(result.state);
-    showActionFeedback({
-      status: "success",
-      title:
-        source === "roll"
-          ? `${DIE_LABELS[kind]} 주사위를 굴렸습니다`
-          : `${face} · ${FACE_LABELS[face]} 결과를 선택했습니다`,
-      detail: result.events.at(-1)?.summary,
-    });
-  }
-
   function dispatchAction(action: GameAction) {
     const result = transition(game, action);
     if (!result.ok) {
@@ -210,11 +171,6 @@ export default function BaseballGameDebug() {
       title: gameActionLabel(action, game),
       detail: result.events.at(-1)?.summary,
     });
-  }
-
-  function rollCurrentDie() {
-    if (!currentDie) return;
-    dispatchResult(currentDie, rollDie(currentDie), "roll");
   }
 
   async function startGame(event: FormEvent<HTMLFormElement>) {
@@ -297,14 +253,12 @@ export default function BaseballGameDebug() {
           <span>
             <strong>야구 게임</strong>
             <small>
-              PRO-CARDS-V1 ·{" "}
+              PITCH-DUEL-V1 ·{" "}
               {session.mode === "solo_ai"
                 ? "SOLO AI"
-                : session.mode === "local_two_player"
-                  ? "LOCAL 2P"
-                  : session.mode === "multiplayer"
-                    ? "MULTIPLAYER"
-                    : "PARTY"}
+                : session.mode === "multiplayer"
+                  ? "MULTIPLAYER"
+                  : "PARTY"}
             </small>
           </span>
         </Link>
@@ -313,23 +267,19 @@ export default function BaseballGameDebug() {
             aria-label={`게임 모드 변경, 현재 ${
               session.mode === "solo_ai"
                 ? `AI 대전 ${teamNameFor(game, session.humanTeam)}`
-                : session.mode === "local_two_player"
-                  ? "로컬 2인"
-                  : session.mode === "multiplayer"
-                    ? "멀티플레이"
-                    : "파티플레이"
+                : session.mode === "multiplayer"
+                  ? "멀티플레이"
+                  : "파티플레이"
             }`}
-            className="bbg-local-badge"
+            className="bbg-mode-badge"
             onClick={openGameSetup}
             type="button"
           >
             {session.mode === "solo_ai"
               ? `AI 대전 · ${teamNameFor(game, session.humanTeam)}`
-              : session.mode === "local_two_player"
-                ? "로컬 2인"
-                : session.mode === "multiplayer"
-                  ? "멀티플레이"
-                  : "파티플레이"}
+              : session.mode === "multiplayer"
+                ? "멀티플레이"
+                : "파티플레이"}
           </button>
           <WorkbenchAccountControl />
         </div>
@@ -354,7 +304,7 @@ export default function BaseballGameDebug() {
 
               <div className="bbg-field-content">
                 <BaseballStadium
-                  face={lastRoll?.face}
+                  face={lastResult?.face}
                   game={game}
                   key={`field-${game.revision}`}
                 />
@@ -366,7 +316,7 @@ export default function BaseballGameDebug() {
 
               <PlayResult
                 events={currentRevisionEvents}
-                face={lastRoll?.face}
+                face={lastResult?.face}
                 game={game}
                 key={game.revision}
               />
@@ -382,7 +332,7 @@ export default function BaseballGameDebug() {
                 <p>ON DECK</p>
                 <h2 id="control-heading">현재 판정</h2>
               </div>
-              {currentDie ? <span>D12 · {DIE_LABELS[currentDie]}</span> : null}
+              {game.phase !== "finished" ? <span>PITCH DUEL</span> : null}
             </div>
 
             <div className="bbg-phase-copy" aria-live="polite">
@@ -414,13 +364,12 @@ export default function BaseballGameDebug() {
                 game={game}
                 onPass={() => dispatchAction({ type: "PASS_CARD_WINDOW" })}
               />
-            ) : currentDie ? (
-              <QuickRollButton
-                actionOwnerLabel={actionOwnerLabel}
-                currentDie={currentDie}
-                face={lastRoll?.face}
-                key={`${game.revision}-${currentDie}`}
-                onRoll={rollCurrentDie}
+            ) : game.phase === "awaiting_pitch" ||
+              game.phase === "awaiting_swing" ? (
+              <BaseballDuelControl
+                game={game}
+                key={`${game.revision}-${game.phase}`}
+                onAction={dispatchAction}
               />
             ) : null}
 
@@ -436,28 +385,6 @@ export default function BaseballGameDebug() {
                 dispatchAction({ type: "PLAY_CARD", cardInstanceId })
               }
             />
-
-            {game.phase !== "finished" && !isAiTurn ? (
-              <details className="bbg-force-panel">
-                <summary>특정 면 강제 입력</summary>
-                <div className="bbg-face-grid">
-                  {currentFaces.map((face, index) => (
-                    <button
-                      aria-label={`${index + 1}번 면 ${face} ${FACE_LABELS[face]}`}
-                      key={`${face}-${index}`}
-                      onClick={() =>
-                        currentDie && dispatchResult(currentDie, face)
-                      }
-                      type="button"
-                    >
-                      <small>{String(index + 1).padStart(2, "0")}</small>
-                      <strong>{face}</strong>
-                      <span>{FACE_LABELS[face]}</span>
-                    </button>
-                  ))}
-                </div>
-              </details>
-            ) : null}
 
             {error ? (
               <p className="bbg-error" role="alert">
@@ -515,7 +442,6 @@ export default function BaseballGameDebug() {
                   value={draftSession.mode}
                 >
                   <option value="solo_ai">싱글플레이 · AI 대전</option>
-                  <option value="local_two_player">로컬 2인 · 한 기기</option>
                   <option value="multiplayer">멀티플레이 · 두 기기</option>
                   <option value="party">
                     파티플레이 · 공용 화면 + 두 기기
@@ -796,7 +722,9 @@ function AiTurnIndicator({ game, team }: { game: GameState; team: TeamSide }) {
         <p>
           {isCardDecision
             ? `${role === "offense" ? "공격" : "수비"} 전략카드를 검토하고 있습니다.`
-            : `${DIE_LABELS[PHASE_DIE[game.phase] ?? "pitch"]} 주사위를 굴립니다.`}
+            : game.phase === "awaiting_pitch"
+              ? "투구 코스를 고르고 있습니다."
+              : "공의 궤적을 읽고 타격을 판단하고 있습니다."}
         </p>
       </div>
       <i aria-hidden="true" />
@@ -849,7 +777,7 @@ function CardHands({
     game.phase === "awaiting_card" ? currentCardRole(game) : null;
   const visibleRole = viewer ? roleForTeam(game, viewer) : null;
   return (
-    <div className="bbg-card-hands" aria-label="한 기기 전략카드 손패">
+    <div className="bbg-card-hands" aria-label="싱글플레이 전략카드 손패">
       {(["offense", "defense"] as const).map((role) => (
         <CardHand
           active={activeRole === role && visibleRole === role}
@@ -963,11 +891,14 @@ function GameProgress({ game }: { game: GameState }) {
         ? "hit"
         : game.phase === "awaiting_batting"
           ? "batting"
-          : game.phase === "finished"
-            ? "finished"
-            : "pitch";
+          : game.phase === "awaiting_swing"
+            ? "swing"
+            : game.phase === "finished"
+              ? "finished"
+              : "pitch";
   const steps = [
     ["pitch", "투구"],
+    ["swing", "판단"],
     ["batting", "타구"],
     ["hit", "안타"],
     ["finished", "종료"],
@@ -1033,14 +964,6 @@ function createRandomSeed() {
   const values = new Uint32Array(1);
   globalThis.crypto.getRandomValues(values);
   return values[0];
-}
-
-function actionFor(kind: DieKind, face: DieFace): GameAction {
-  if (kind === "pitch")
-    return { type: "PITCH_RESULT", face: face as PitchFace };
-  if (kind === "batting")
-    return { type: "BATTING_RESULT", face: face as BattingFace };
-  return { type: "HIT_RESULT", face: face as HitFace };
 }
 
 function BroadcastScoreboard({ game }: { game: GameState }) {
@@ -1580,11 +1503,14 @@ function PlayResult({
     events.findLast((item) => item.kind === "half_inning") ??
     events.at(-1);
   const sideChange = events.some((item) => item.kind === "half_inning");
-  const lastDieIndex = game.eventLog.findLastIndex(
-    (item) => item.kind === "die_roll",
+  const pitchReveal = game.eventLog.findLast(
+    (item) => item.kind === "pitch_result",
+  );
+  const lastDecisionIndex = game.eventLog.findLastIndex(
+    (item) => item.kind === "pitch_result" || item.kind === "die_roll",
   );
   const cardChain = game.eventLog
-    .slice(lastDieIndex + 1)
+    .slice(lastDecisionIndex + 1)
     .filter((item) => item.kind === "card_play")
     .slice(-4);
   const resolutionChain = events
@@ -1615,7 +1541,7 @@ function PlayResult({
       data-testid="play-result"
     >
       <div className="bbg-result-die" aria-hidden="true">
-        <small>{event?.cardId ? "CARD" : face ? "D12" : "NEXT"}</small>
+        <small>{event?.cardId ? "CARD" : face ? "PLAY" : "NEXT"}</small>
         <strong>{displayToken ?? "▶"}</strong>
       </div>
       <div className="bbg-result-copy">
@@ -1626,9 +1552,19 @@ function PlayResult({
             ? CARD_DEFINITIONS[event.cardId].description
             : face
               ? `${face} · ${FACE_LABELS[face]}`
-              : "투구 주사위부터 경기 흐름을 시작합니다."}
+              : "투수가 첫 코스를 선택하면 경기가 시작됩니다."}
         </p>
         <div className="bbg-impact-list">
+          {pitchReveal?.pitchTarget ? (
+            <b className="is-pitch">
+              투수 {PITCH_TARGET_LABELS[pitchReveal.pitchTarget]}
+            </b>
+          ) : null}
+          {pitchReveal?.swingDecision ? (
+            <b className="is-pitch">
+              타자 {pitchReveal.swingDecision === "swing" ? "스윙" : "지켜보기"}
+            </b>
+          ) : null}
           {event?.runs ? <b className="is-score">+{event.runs}점</b> : null}
           {event?.outsRecorded ? (
             <b className="is-out">+{event.outsRecorded}아웃</b>
@@ -1676,43 +1612,6 @@ function PlayResult({
         </p>
       </div>
     </div>
-  );
-}
-
-function QuickRollButton({
-  actionOwnerLabel,
-  currentDie,
-  face,
-  onRoll,
-}: {
-  actionOwnerLabel: string;
-  currentDie: DieKind;
-  face?: DieFace;
-  onRoll: () => void;
-}) {
-  return (
-    <button
-      aria-label={`${DIE_LABELS[currentDie]} 주사위 굴리기`}
-      className="bbg-d12-button"
-      onClick={onRoll}
-      type="button"
-    >
-      <span className="bbg-d12" aria-hidden="true">
-        <i className="bbg-d12-facet bbg-d12-facet--one" />
-        <i className="bbg-d12-facet bbg-d12-facet--two" />
-        <i className="bbg-d12-facet bbg-d12-facet--three" />
-        <i className="bbg-d12-facet bbg-d12-facet--four" />
-        <small>D12</small>
-        <strong>{face ?? "?"}</strong>
-      </span>
-      <span className="bbg-roll-caption">
-        <small>{actionOwnerLabel}</small>
-        <strong>
-          <Dices aria-hidden="true" size={18} />
-          {DIE_LABELS[currentDie]} 주사위 굴리기
-        </strong>
-      </span>
-    </button>
   );
 }
 
@@ -1774,6 +1673,12 @@ function gameActionLabel(action: GameAction, game: GameState) {
     return card
       ? `${CARD_DEFINITIONS[card.cardId].name} 카드를 사용했습니다`
       : "전략카드를 사용했습니다";
+  }
+  if (action.type === "SELECT_PITCH") return "투구 코스를 선택했습니다";
+  if (action.type === "SELECT_SWING") {
+    return action.decision === "swing"
+      ? "스윙을 선택했습니다"
+      : "공을 지켜봤습니다";
   }
   return `${action.face} · ${FACE_LABELS[action.face]} 판정을 선택했습니다`;
 }

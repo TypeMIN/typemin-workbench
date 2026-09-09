@@ -4,10 +4,16 @@ import { createGame, transition } from "../engine";
 import { commandToGameAction, parseMultiplayerCommand } from "./command";
 
 describe("multiplayer commands", () => {
-  it("accepts only the three public multiplayer command shapes", () => {
-    expect(parseMultiplayerCommand({ type: "ROLL_DIE" })).toEqual({
-      type: "ROLL_DIE",
+  it("accepts only the four public multiplayer command shapes", () => {
+    expect(
+      parseMultiplayerCommand({ type: "SELECT_PITCH", target: "low_outside" }),
+    ).toEqual({
+      type: "SELECT_PITCH",
+      target: "low_outside",
     });
+    expect(
+      parseMultiplayerCommand({ type: "SELECT_SWING", decision: "take" }),
+    ).toEqual({ type: "SELECT_SWING", decision: "take" });
     expect(parseMultiplayerCommand({ type: "PASS_CARD_WINDOW" })).toEqual({
       type: "PASS_CARD_WINDOW",
     });
@@ -17,25 +23,36 @@ describe("multiplayer commands", () => {
     expect(
       parseMultiplayerCommand({ type: "PITCH_RESULT", face: "HR" }),
     ).toBeNull();
+    expect(parseMultiplayerCommand({ type: "ROLL_DIE" })).toBeNull();
     expect(parseMultiplayerCommand({ type: "PLAY_CARD" })).toBeNull();
     expect(parseMultiplayerCommand(null)).toBeNull();
   });
 
-  it("rolls the exact die required by the server state", () => {
+  it("maps private player choices directly to engine actions", () => {
     const pitch = createGame({
       innings: 3,
       awayTeamName: "원정",
       homeTeamName: "홈",
     });
-    expect(commandToGameAction(pitch, { type: "ROLL_DIE" }, () => 0)).toEqual({
-      type: "PITCH_RESULT",
-      face: "S",
-    });
-
-    const contact = transition(pitch, { type: "PITCH_RESULT", face: "C" });
-    if (!contact.ok) throw new Error("컨택 전환 실패");
     expect(
-      commandToGameAction(contact.state, { type: "ROLL_DIE" }, () => 0.999999),
-    ).toEqual({ type: "BATTING_RESULT", face: "HR" });
+      commandToGameAction(pitch, {
+        type: "SELECT_PITCH",
+        target: "high_inside",
+      }),
+    ).toEqual({
+      type: "SELECT_PITCH",
+      target: "high_inside",
+    });
+    const locked = transition(pitch, {
+      type: "SELECT_PITCH",
+      target: "high_inside",
+    });
+    if (!locked.ok) throw new Error("투구 선택 실패");
+    expect(
+      commandToGameAction(locked.state, {
+        type: "SELECT_SWING",
+        decision: "swing",
+      }),
+    ).toEqual({ type: "SELECT_SWING", decision: "swing" });
   });
 });

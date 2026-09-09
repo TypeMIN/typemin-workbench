@@ -19,7 +19,7 @@ test("두 기기가 방을 만들고 비공개 손패로 같은 경기를 진행
   );
   await host.goto(`${baseURL}/baseball-game`);
   await host
-    .getByRole("button", { name: "게임 모드 변경, 현재 로컬 2인" })
+    .getByRole("button", { name: "게임 모드 변경, 현재 AI 대전 홈팀" })
     .click();
   await host
     .getByLabel("게임 모드", { exact: true })
@@ -74,7 +74,7 @@ test("두 기기가 방을 만들고 비공개 손패로 같은 경기를 진행
     home.getByRole("region", { name: "홈팀 수비 손패" }),
   ).toBeVisible();
   await expect(
-    home.getByRole("button", { name: "투구 주사위 굴리기" }),
+    home.getByRole("region", { name: "투구 코스 선택" }),
   ).toBeVisible();
   await expect(host.getByText("상대 팀의 결정을 기다리는 중")).toBeVisible({
     timeout: 4_000,
@@ -103,7 +103,7 @@ test("두 기기가 방을 만들고 비공개 손패로 같은 경기를 진행
         method: "POST",
         headers: { "content-type": "application/json" },
         body: JSON.stringify({
-          command: { type: "ROLL_DIE" },
+          command: { type: "SELECT_PITCH", target: "low_outside" },
           expectedRevision: 0,
           idempotencyKey,
         }),
@@ -126,7 +126,7 @@ test("두 기기가 방을 만들고 비공개 손패로 같은 경기를 진행
         method: "POST",
         headers: { "content-type": "application/json" },
         body: JSON.stringify({
-          command: { type: "ROLL_DIE" },
+          command: { type: "SELECT_PITCH", target: "low_outside" },
           expectedRevision: 0,
           idempotencyKey,
         }),
@@ -137,10 +137,6 @@ test("두 기기가 방을 만들고 비공개 손패로 같은 경기를 진행
   );
   expect(retry.status).toBe(200);
   expect(retry.payload.snapshot.view.revision).toBe(1);
-  await expect(
-    home.locator(".bbg-pitch-marker[data-current='true']"),
-  ).toBeVisible();
-
   const syncStartedAt = Date.now();
   await expect
     .poll(async () => {
@@ -153,13 +149,40 @@ test("두 기기가 방을 만들고 비공개 손패로 같은 경기를 진행
     .toBe(1);
   expect(Date.now() - syncStartedAt).toBeLessThan(1_800);
 
+  const lockedViews = await Promise.all([
+    host.evaluate(
+      async (code) =>
+        (await fetch(`/api/baseball-game/rooms/${code}/view`)).json(),
+      roomCode,
+    ),
+    home.evaluate(
+      async (code) =>
+        (await fetch(`/api/baseball-game/rooms/${code}/view`)).json(),
+      roomCode,
+    ),
+  ]);
+  expect(lockedViews[0].snapshot.view.pitchDuel.pitcherChoice).toBeNull();
+  expect(lockedViews[0].snapshot.view.pitchDuel.hint).not.toBeNull();
+  expect(lockedViews[0].snapshot.view.pitchDuel.actualLocation).toBeNull();
+  expect(lockedViews[1].snapshot.view.pitchDuel.pitcherChoice).toBe(
+    "low_outside",
+  );
+  expect(lockedViews[1].snapshot.view.pitchDuel.hint).toBeNull();
+  expect(lockedViews[1].snapshot.view.pitchDuel.actualLocation).toBeNull();
+
+  await expect(host.getByRole("region", { name: "타격 판단" })).toBeVisible();
+  await host.getByRole("button", { name: /지켜보기/ }).click();
+  await expect(
+    host.locator(".bbg-pitch-marker[data-current='true']"),
+  ).toBeVisible();
+
   const directFace = await home.evaluate(async (code) => {
     const response = await fetch(`/api/baseball-game/rooms/${code}/actions`, {
       method: "POST",
       headers: { "content-type": "application/json" },
       body: JSON.stringify({
         command: { type: "PITCH_RESULT", face: "HR" },
-        expectedRevision: 1,
+        expectedRevision: 2,
         idempotencyKey: crypto.randomUUID(),
       }),
     });

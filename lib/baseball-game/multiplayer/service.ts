@@ -170,7 +170,7 @@ export async function submitMultiplayerCommand(
   if (!action) {
     throw new MultiplayerServiceError(
       "INVALID_ACTION",
-      "현재 단계에서는 주사위를 굴릴 수 없습니다.",
+      "현재 단계에서는 이 결정을 내릴 수 없습니다.",
     );
   }
   const result = transition(room.state, action);

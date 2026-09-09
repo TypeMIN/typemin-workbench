@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import { chooseAiAction } from "./ai";
-import { createGame } from "./engine";
+import { createGame, transition } from "./engine";
 import type { GameState } from "./types";
 
 const CONFIG = {
@@ -15,26 +15,44 @@ describe("baseball game AI", () => {
     const state = createGame(CONFIG);
     expect(chooseAiAction(state, "away", () => 0)).toBeNull();
     expect(chooseAiAction(state, "home", () => 0)).toEqual({
-      type: "PITCH_RESULT",
-      face: "S",
+      type: "SELECT_PITCH",
+      target: "ball",
     });
   });
 
-  it("uses the exact game dice and accepts an injected random source", () => {
+  it("chooses a pitch and swing through the same one-step actions as a player", () => {
     const pitch = createGame(CONFIG);
     expect(chooseAiAction(pitch, "home", () => 0.999_999)).toEqual({
-      type: "PITCH_RESULT",
-      face: "C",
+      type: "SELECT_PITCH",
+      target: "low_outside",
     });
 
-    const batting = {
-      ...pitch,
-      phase: "awaiting_batting",
-    } as GameState;
-    expect(chooseAiAction(batting, "away", () => 0.999_999)).toEqual({
-      type: "BATTING_RESULT",
-      face: "HR",
+    const locked = transition(pitch, {
+      type: "SELECT_PITCH",
+      target: "high_inside",
     });
+    if (!locked.ok) throw new Error("투구 선택 실패");
+    expect(chooseAiAction(locked.state, "away", () => 0)).toEqual({
+      type: "SELECT_SWING",
+      decision: "swing",
+    });
+  });
+
+  it("bases the batter decision on the visible hint, not the hidden pitch choice", () => {
+    const initial = createGame(CONFIG);
+    const locked = transition(initial, {
+      type: "SELECT_PITCH",
+      target: "high_inside",
+    });
+    if (!locked.ok || !locked.state.pitchDuel)
+      throw new Error("투구 선택 실패");
+    const alteredSecret = {
+      ...locked.state,
+      pitchDuel: { ...locked.state.pitchDuel, pitcherChoice: "ball" },
+    } as GameState;
+    expect(chooseAiAction(locked.state, "away", () => 0.4)).toEqual(
+      chooseAiAction(alteredSecret, "away", () => 0.4),
+    );
   });
 
   it("selects a legal high-value strategy card without mutating state", () => {

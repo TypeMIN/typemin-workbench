@@ -3,7 +3,7 @@
 ## 구현 현황 — 2026-09-07
 
 - 완료: 두 기기용 방 생성·홈팀 참가·HTTP 전용 좌석 쿠키
-- 완료: 서버 권위형 주사위·카드 행동과 revision 충돌·중복 요청 방지
+- 완료: 서버 권위형 투타 심리전·카드 행동과 revision 충돌·중복 요청 방지
 - 완료: 좌석별 `GameView`와 상대 손패·RNG 비노출
 - 완료: Supabase 경기·좌석·행동 로그 및 서버 전용 RLS
 - 완료: 0.9초 동기화와 재접속
@@ -20,7 +20,7 @@
 | 멀티플레이 | 원정팀 기기 1대 + 홈팀 기기 1대     | 각 기기에 자기 팀 손패만 전송           |
 | 파티플레이 | 공용 경기장 1대 + 원정·홈 개인 기기 | 공용 화면에는 손패를 전혀 전송하지 않음 |
 
-현재 순수 `transition(state, action)` 엔진을 규칙의 단일 기준으로 유지한다. 클라이언트는 주사위 면 대신 `ROLL_DIE`, 카드 인스턴스 ID, 카드 패스 같은 `MultiplayerCommand`만 제출한다. 서버가 주사위 결과를 생성하고 `GameAction`으로 변환한 뒤 상태를 계산한다.
+현재 순수 `transition(state, action)` 엔진을 규칙의 단일 기준으로 유지한다. 클라이언트는 `SELECT_PITCH`, `SELECT_SWING`, 카드 인스턴스 ID, 카드 패스 같은 `MultiplayerCommand`만 제출한다. 서버는 비공개 투구 선택을 저장하고 타자의 선택이 도착하면 자동 판정한 뒤 상태를 계산한다.
 
 ## 서버 권위형 흐름
 
@@ -94,7 +94,7 @@ Next.js Route Handler
 - `POST /api/baseball-game/rooms/[code]/actions` — 행동 제출
 - `POST /api/baseball-game/rooms/[code]/heartbeat` — 연결 상태와 만료 연장
 
-행동 API는 `expectedRevision`이 현재 값과 다르면 `409 REVISION_CONFLICT`와 최신 revision을 반환한다. 재시도는 동일한 `idempotencyKey`를 사용해 카드 중복 사용이나 주사위 중복 반영을 막는다.
+행동 API는 `expectedRevision`이 현재 값과 다르면 `409 REVISION_CONFLICT`와 최신 revision을 반환한다. 재시도는 동일한 `idempotencyKey`를 사용해 카드나 투타 선택의 중복 반영을 막는다.
 
 ## 실시간 동기화
 
@@ -112,7 +112,7 @@ Supabase는 2026년 7월부터 `realtime` 스키마 자체 변경을 차단한�
 
 ### 공용 화면
 
-- 점수, 이닝, 카운트, 주자, 경기장, 주사위·타구 결과, 공개 카드 연쇄만 표시
+- 점수, 이닝, 카운트, 주자, 경기장, 공개된 투타·타구 결과와 카드 연쇄만 표시
 - 손패, 덱 순서, 사용 가능 카드, 개인 참가 토큰은 포함하지 않음
 - 행동 제출 권한 없이 읽기 전용
 

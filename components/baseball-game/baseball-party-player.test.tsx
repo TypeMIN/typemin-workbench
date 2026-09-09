@@ -57,7 +57,7 @@ describe("BaseballPartyPlayer", () => {
     vi.unstubAllGlobals();
   });
 
-  it("shows the shared team hand while only the active defender can roll", async () => {
+  it("shows the shared team hand while only the active defender can choose a pitch", async () => {
     vi.stubGlobal(
       "fetch",
       vi.fn().mockResolvedValue(response({ snapshot: snapshot(true) })),
@@ -66,7 +66,7 @@ describe("BaseballPartyPlayer", () => {
     expect(
       await screen.findByRole("region", { name: "홈팀 수비 공용 손패" }),
     ).toBeVisible();
-    expect(screen.getByRole("button", { name: "주사위 굴리기" })).toBeEnabled();
+    expect(screen.getByRole("button", { name: /^높은 몸쪽/ })).toBeEnabled();
     expect(screen.queryByText("공격 카드")).not.toBeInTheDocument();
   });
 
@@ -80,20 +80,22 @@ describe("BaseballPartyPlayer", () => {
       await screen.findByRole("heading", { name: "현재 투수님의 차례" }),
     ).toBeVisible();
     expect(
-      screen.queryByRole("button", { name: "주사위 굴리기" }),
+      screen.queryByRole("button", { name: /^높은 몸쪽/ }),
     ).not.toBeInTheDocument();
   });
 
   it("confirms a player action before and after a delayed server response", async () => {
     const current = snapshot(true);
     const result = transition(createGame(current.view.config), {
-      type: "PITCH_RESULT",
-      face: "B",
+      type: "SELECT_PITCH",
+      target: "low_outside",
     });
     if (!result.ok) throw new Error("테스트 경기 진행 실패");
     const updated = {
       ...current,
       roomRevision: current.roomRevision + 1,
+      actionOwner: "away" as const,
+      canAct: false,
       view: getGameView(result.state, "home"),
     } satisfies PartyPlayerSnapshot;
     let resolveAction: ((value: Response) => void) | undefined;
@@ -111,15 +113,15 @@ describe("BaseballPartyPlayer", () => {
 
     render(<BaseballPartyPlayer roomCode="ABC234" />);
     fireEvent.click(
-      await screen.findByRole("button", { name: "주사위 굴리기" }),
+      await screen.findByRole("button", { name: /^낮은 바깥쪽/ }),
     );
-    expect(screen.getByRole("status")).toHaveTextContent("투구 주사위 요청 중");
-    expect(
-      screen.getByRole("button", { name: "서버 판정 확인 중…" }),
-    ).toBeDisabled();
+    expect(screen.getByRole("status")).toHaveTextContent(
+      "투구 코스 선택 요청 중",
+    );
+    expect(screen.getByRole("button", { name: /^낮은 바깥쪽/ })).toBeDisabled();
 
     resolveAction?.(response({ snapshot: updated }));
-    expect(await screen.findByText("투구 주사위 반영 완료")).toBeVisible();
-    expect(screen.getByRole("status")).toHaveTextContent("B");
+    expect(await screen.findByText("투구 코스 선택 반영 완료")).toBeVisible();
+    expect(screen.getByText("팀원의 결정을 기다리는 중")).toBeVisible();
   });
 });

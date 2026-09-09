@@ -1,12 +1,14 @@
 import { expect, test, type Page } from "@playwright/test";
 
-async function startNextHalf(page: Page) {
-  await page.getByRole("button", { name: "다음 공격 준비" }).click();
+async function passCardWindows(page: Page) {
+  for (let step = 0; step < 8; step += 1) {
+    const pass = page.getByRole("button", { name: "카드 없이 진행" });
+    if (!(await pass.isVisible().catch(() => false))) break;
+    await pass.click();
+  }
 }
 
-test("야구 게임에서 강제 주사위 판정과 새 경기를 진행한다", async ({
-  page,
-}) => {
+test("야구 게임에서 투타 심리전과 새 경기를 진행한다", async ({ page }) => {
   const browserErrors: string[] = [];
   page.on("console", (message) => {
     if (message.type() === "error") browserErrors.push(message.text());
@@ -22,7 +24,8 @@ test("야구 게임에서 강제 주사위 판정과 새 경기를 진행한다"
   await expect(
     page.getByRole("heading", { name: "야구 게임 라이브" }),
   ).toBeVisible();
-  await expect(page.getByText("PRO-CARDS-V1 · LOCAL 2P")).toBeVisible();
+  await expect(page.getByText("PITCH-DUEL-V1 · SOLO AI")).toBeVisible();
+  await expect(page.getByText("AI 대전 · 홈팀")).toBeVisible();
   await expect(
     page.getByRole("dialog", { name: /기기를 넘겨주세요/ }),
   ).toHaveCount(0);
@@ -40,9 +43,10 @@ test("야구 게임에서 강제 주사위 판정과 새 경기를 진행한다"
     page.getByRole("button", { name: "경기 음향 끄기" }),
   ).toBeVisible();
   await expect(
-    page.getByRole("button", { name: "투구 주사위 굴리기" }),
+    page.getByRole("region", { name: "투구 코스 선택" }),
   ).toBeVisible();
-  await expect(page.locator(".bbg-d12")).toBeVisible();
+  await expect(page.locator(".bbg-d12")).toHaveCount(0);
+  await expect(page.locator(".bbg-pitch-choice")).toHaveCount(5);
   await expect(
     page.getByRole("region", { name: "원정팀 공격 비공개 손패" }),
   ).toBeVisible();
@@ -158,60 +162,20 @@ test("야구 게임에서 강제 주사위 판정과 새 경기를 진행한다"
   );
   expect(scoreRows[1].top).toBeGreaterThanOrEqual(scoreRows[0].bottom - 1);
 
-  await page.getByText("특정 면 강제 입력").click();
-  await page.getByRole("button", { name: /9번 면 C 컨택/ }).click();
-  await expect(page.getByRole("status")).toContainText(
-    "C · 컨택 결과를 선택했습니다",
-  );
+  await page.getByRole("button", { name: "볼 선택" }).click();
+  await expect(page.getByText("원정팀 판단 중")).toBeVisible();
+  await expect(page.getByTestId("play-result")).toContainText("타자", {
+    timeout: 3_000,
+  });
+  await passCardWindows(page);
   await expect(
     page.locator(".bbg-pitch-marker[data-current='true']"),
   ).toHaveText("1");
-  await expect(page.locator(".bbg-pitch-flight")).toBeVisible();
-  await expect(
-    page.getByRole("button", { name: "타격 주사위 굴리기" }),
-  ).toBeVisible();
-  await page.getByRole("button", { name: /9번 면 HIT 안타/ }).click();
-  await expect(
-    page.getByRole("button", { name: "안타 주사위 굴리기" }),
-  ).toBeVisible();
-  await page.getByRole("button", { name: /1번 면 IH 내야 안타/ }).click();
-  await expect(
-    page.locator('.bbg-ball-flight[aria-label*="IH"]'),
-  ).toBeVisible();
-  await expect(page.locator(".bbg-flight-label")).toContainText("내야 안타");
-  await expect(page.getByRole("img", { name: /1루 주자 있음/ })).toBeVisible();
-  await expect(
-    page.getByTestId("play-result").getByRole("heading", { name: "IH 단타" }),
-  ).toBeVisible();
-  await expect(page.getByTestId("play-result")).toContainText("타자");
-  await expect(page.getByTestId("play-result")).toContainText("1루");
-
-  const playableCard = page.getByRole("button", {
-    name: /BK 보크 사용 가능/,
-  });
-  await expect(playableCard).toHaveAttribute("data-playable", "true");
-  await expect(playableCard.locator("xpath=ancestor::section[1]")).toHaveClass(
-    /is-active/,
-  );
-  await expect(
-    playableCard.locator("xpath=ancestor::section[1]").getByText("선택 가능"),
-  ).toBeVisible();
-  expect(
-    await playableCard.evaluate((element) =>
-      getComputedStyle(element).boxShadow.includes("rgba"),
-    ),
-  ).toBe(true);
-  await expect(page.getByRole("button", { name: "BK 사용" })).toHaveCount(0);
-  await playableCard.click();
-  await expect(page.getByRole("img", { name: /2루 주자 있음/ })).toBeVisible();
-  for (let step = 0; step < 8; step += 1) {
-    const pass = page.getByRole("button", { name: "카드 없이 진행" });
-    if (!(await pass.isVisible().catch(() => false))) break;
-    await pass.click();
-  }
+  await expect(page.getByTestId("play-result")).toContainText("투수 볼");
+  await expect(page.getByText("특정 면 강제 입력")).toHaveCount(0);
 
   await page
-    .getByRole("button", { name: "게임 모드 변경, 현재 로컬 2인" })
+    .getByRole("button", { name: "게임 모드 변경, 현재 AI 대전 홈팀" })
     .click();
   await page.getByRole("textbox", { name: "원정팀" }).fill("블루");
   await page.getByRole("textbox", { name: "홈팀" }).fill("레드");
@@ -263,84 +227,41 @@ test("야구 게임에서 강제 주사위 판정과 새 경기를 진행한다"
   expect(browserErrors).toEqual([]);
 });
 
-test("중계 화면에서 득점부터 공수교대와 경기 종료까지 이어진다", async ({
-  page,
-}) => {
+test("싱글플레이에서 AI가 타격 판단을 이어서 진행한다", async ({ page }) => {
   await page.route("**/api/workbench/auth/me", (route) =>
     route.fulfill({ status: 200, json: { account: null } }),
   );
   await page.goto("/baseball-game");
-  await page.getByText("특정 면 강제 입력").click();
-
-  await page.getByRole("button", { name: /9번 면 C 컨택/ }).click();
-  await page.getByRole("button", { name: /12번 면 HR 홈런/ }).click();
-  await expect(page.getByTestId("play-result")).toContainText("+1점");
-  await expect(page.locator(".bbg-stadium-highlight")).toContainText(
-    "HOME RUN",
+  await page.getByRole("button", { name: /^낮은 바깥쪽/ }).click();
+  await expect(page.getByText("원정팀 판단 중")).toBeVisible();
+  await expect(page.getByTestId("play-result")).toContainText("타자", {
+    timeout: 3_000,
+  });
+  await expect(page.locator(".bbg-log-panel summary strong")).not.toHaveText(
+    "0",
   );
-  await expect(page.getByRole("region", { name: /경기 점수판/ })).toContainText(
-    "1",
-  );
-
-  const strikeOutSide = async () => {
-    for (let pitch = 0; pitch < 9; pitch += 1) {
-      await page.getByRole("button", { name: /1번 면 S 스트라이크/ }).click();
-    }
-  };
-
-  await strikeOutSide();
-  await expect(page.getByRole("dialog", { name: "공수 교대" })).toBeVisible();
-  await startNextHalf(page);
-  await expect(
-    page.getByRole("region", { name: /경기 점수판, 1회말/ }),
-  ).toBeVisible();
-  await expect(page.locator(".bbg-team-score.is-batting")).toContainText(
-    "홈팀",
-  );
-  await expect(page.getByTestId("play-result")).toContainText(
-    "홈팀 첫 타자에게 투구",
-  );
-
-  for (let side = 0; side < 4; side += 1) {
-    await strikeOutSide();
-    await expect(page.getByRole("dialog", { name: "공수 교대" })).toBeVisible();
-    await startNextHalf(page);
-  }
-  await strikeOutSide();
-
-  const finalDialog = page.getByRole("dialog", { name: "원정팀 승리" });
-  await expect(finalDialog).toBeVisible();
-  await expect(finalDialog.getByText("FINAL", { exact: true })).toBeVisible();
-  await expect(finalDialog).toContainText("원정팀 1 : 0 홈팀");
-  await expect(page.getByRole("button", { name: /주사위 굴리기/ })).toHaveCount(
-    0,
-  );
-  await finalDialog
-    .getByRole("button", { name: /같은 설정으로 재경기/ })
-    .click();
-  await expect(
-    page.getByRole("region", { name: /경기 점수판, 1회초/ }),
-  ).toBeVisible();
-  await expect(
-    page.getByRole("dialog", { name: /기기를 넘겨주세요/ }),
-  ).toHaveCount(0);
+  await expect(page.locator(".bbg-d12")).toHaveCount(0);
 });
 
-test("새 경기 설정에서 싱글 AI와 로컬 2인 모드를 전환한다", async ({
-  page,
-}) => {
+test("새 경기 설정은 싱글 AI·멀티·파티 모드만 제공한다", async ({ page }) => {
   await page.route("**/api/workbench/auth/me", (route) =>
     route.fulfill({ status: 200, json: { account: null } }),
   );
   await page.goto("/baseball-game");
 
   await page.getByText("새 경기 설정", { exact: true }).click();
-  await page.getByLabel("게임 모드", { exact: true }).selectOption("solo_ai");
+  await expect(page.getByLabel("게임 모드", { exact: true })).toHaveValue(
+    "solo_ai",
+  );
+  await expect(
+    page.getByLabel("게임 모드", { exact: true }).locator("option"),
+  ).toHaveCount(3);
+  await expect(page.getByRole("option", { name: /로컬 2인/ })).toHaveCount(0);
   await expect(page.getByLabel("내 팀")).toBeVisible();
   await page.getByLabel("내 팀").selectOption("home");
   await page.getByRole("button", { name: /새 경기 시작/ }).click();
 
-  await expect(page.getByText("PRO-CARDS-V1 · SOLO AI")).toBeVisible();
+  await expect(page.getByText("PITCH-DUEL-V1 · SOLO AI")).toBeVisible();
   await expect(page.getByText("AI 대전 · 홈팀")).toBeVisible();
   await expect(
     page.getByRole("region", { name: "홈팀 수비 손패" }),
@@ -349,7 +270,7 @@ test("새 경기 설정에서 싱글 AI와 로컬 2인 모드를 전환한다", 
     page.getByRole("region", { name: "원정팀 공격 비공개 손패" }),
   ).toBeVisible();
   await expect(
-    page.getByRole("button", { name: "투구 주사위 굴리기" }),
+    page.getByRole("region", { name: "투구 코스 선택" }),
   ).toBeVisible();
 
   await page.getByText("새 경기 설정", { exact: true }).click();
@@ -357,22 +278,11 @@ test("새 경기 설정에서 싱글 AI와 로컬 2인 모드를 전환한다", 
   await page.getByLabel("내 팀").selectOption("away");
   await page.getByRole("button", { name: /새 경기 시작/ }).click();
   await expect(page.getByRole("status")).toContainText("홈팀 판단 중");
-  await expect(page.getByRole("button", { name: /주사위 굴리기/ })).toHaveCount(
-    0,
-  );
+  await expect(page.locator(".bbg-d12")).toHaveCount(0);
   await expect(page.locator(".bbg-log-panel summary strong")).not.toHaveText(
     "0",
     { timeout: 3_000 },
   );
-
-  await page.getByText("새 경기 설정", { exact: true }).click();
-  await page
-    .getByLabel("게임 모드", { exact: true })
-    .selectOption("local_two_player");
-  await expect(page.getByLabel("내 팀")).toHaveCount(0);
-  await page.getByRole("button", { name: /새 경기 시작/ }).click();
-  await expect(page.getByText("PRO-CARDS-V1 · LOCAL 2P")).toBeVisible();
-  await expect(page.getByText("로컬 2인", { exact: true })).toBeVisible();
 });
 
 test("주요 데스크톱·태블릿·모바일 화면비율에서 게임 UI가 잘리지 않는다", async ({
