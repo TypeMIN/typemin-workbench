@@ -9143,7 +9143,7 @@
   }
 }
 
-@media (max-height: 700px) and (min-width: 681px) {
+@media (max-height: 820px) and (min-width: 681px) {
   .bbg-game-console {
     height: calc(100dvh - 145px);
   }
@@ -9165,6 +9165,339 @@
   }
 }
 
+/* Pitch duel v2 — balanced broadcast bar, readable odds, visible batter read. */
+.bbg-game-console .bbg-broadcast-heading {
+  display: grid;
+  height: 68px;
+  grid-template-columns: minmax(0, 1fr) 68px;
+  align-items: start;
+  gap: 8px;
+  padding: 8px 10px;
+}
+
+.bbg-broadcast-heading > .bbg-scoreboard {
+  display: grid;
+  width: 100%;
+  grid-column: 1;
+  grid-row: 1;
+  grid-template-columns: minmax(0, 1fr) 210px;
+  align-items: stretch;
+  gap: 8px;
+}
+
+.bbg-broadcast-heading > .bbg-scoreboard .bbg-live-channel {
+  display: none;
+}
+
+.bbg-broadcast-heading > .bbg-scoreboard .bbg-score-teams {
+  width: auto;
+  height: 54px;
+  min-width: 0;
+}
+
+.bbg-broadcast-heading > .bbg-scoreboard .bbg-score-status {
+  width: 210px;
+  height: 54px;
+  grid-template-columns: 64px 52px minmax(84px, 1fr);
+}
+
+.bbg-broadcast-heading > .bbg-audio-control {
+  position: static;
+  width: 68px;
+  height: 54px;
+  grid-column: 2;
+  grid-row: 1;
+}
+
+.bbg-pitch-choice {
+  min-height: 76px;
+  gap: 4px;
+  padding: 7px;
+}
+
+.bbg-pitch-choice.is-ball {
+  min-height: 62px;
+}
+
+.bbg-pitch-choice-head {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  gap: 6px;
+}
+
+.bbg-pitch-choice-head > strong {
+  overflow: hidden;
+  font-size: 10px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.bbg-target-icon {
+  position: relative;
+  width: 22px;
+  height: 18px;
+  flex: 0 0 auto;
+  border: 1px solid rgb(220 237 246 / 42%);
+  border-radius: 3px;
+  background:
+    linear-gradient(
+      90deg,
+      transparent 49%,
+      rgb(255 255 255 / 14%) 50% 52%,
+      transparent 53%
+    ),
+    linear-gradient(
+      transparent 49%,
+      rgb(255 255 255 / 14%) 50% 52%,
+      transparent 53%
+    );
+}
+
+.bbg-target-icon b {
+  position: absolute;
+  width: 5px;
+  height: 5px;
+  translate: -50% -50%;
+  border-radius: 50%;
+  background: #7af0c1;
+  box-shadow: 0 0 8px rgb(122 240 193 / 74%);
+}
+
+.bbg-pitch-choice.is-high-inside .bbg-target-icon b {
+  top: 28%;
+  left: 28%;
+}
+
+.bbg-pitch-choice.is-high-outside .bbg-target-icon b {
+  top: 28%;
+  left: 72%;
+}
+
+.bbg-pitch-choice.is-low-inside .bbg-target-icon b {
+  top: 72%;
+  left: 28%;
+}
+
+.bbg-pitch-choice.is-low-outside .bbg-target-icon b {
+  top: 72%;
+  left: 72%;
+}
+
+.bbg-pitch-choice.is-ball .bbg-target-icon {
+  border-style: dashed;
+  border-color: rgb(255 209 102 / 50%);
+}
+
+.bbg-pitch-choice.is-ball .bbg-target-icon b {
+  top: 12%;
+  left: 104%;
+  background: #ffd166;
+  box-shadow: 0 0 8px rgb(255 209 102 / 70%);
+}
+
+.bbg-pitch-probability {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 4px;
+}
+
+.bbg-pitch-probability i {
+  color: #8199aa;
+  font-size: 6px;
+  font-style: normal;
+  white-space: nowrap;
+}
+
+.bbg-pitch-probability b {
+  color: #e8f4f8;
+  font-size: 7px;
+}
+
+.bbg-tendency-bars i {
+  padding: 3px;
+  font-size: 6px;
+  text-align: center;
+}
+
+.bbg-pitch-compact {
+  display: none;
+}
+
+.bbg-situation-tip {
+  margin: 0;
+  color: #8299a9;
+  font-size: 7px;
+  line-height: 1.35;
+}
+
+.bbg-duel-bonus {
+  padding: 5px 7px;
+  border: 1px solid rgb(255 209 102 / 25%);
+  border-radius: 7px;
+  color: #c7d8e1;
+  background: rgb(255 209 102 / 6%);
+  font-size: 7px;
+}
+
+.bbg-duel-bonus b {
+  margin-right: 5px;
+  color: #ffd166;
+  font-size: 6px;
+  letter-spacing: 0.08em;
+}
+
+.bbg-read-crosshair {
+  position: absolute;
+  width: 10px;
+  height: 10px;
+  translate: -50% -50%;
+  border: 1px solid #f4fffb;
+  border-radius: 50%;
+  box-shadow: 0 0 8px rgb(255 255 255 / 62%);
+}
+
+.bbg-read-crosshair::before,
+.bbg-read-crosshair::after {
+  position: absolute;
+  background: #f4fffb;
+  content: "";
+}
+
+.bbg-read-crosshair::before {
+  top: 4px;
+  left: -4px;
+  width: 16px;
+  height: 1px;
+}
+
+.bbg-read-crosshair::after {
+  top: -4px;
+  left: 4px;
+  width: 1px;
+  height: 16px;
+}
+
+.bbg-pitch-hint-marker {
+  position: absolute;
+  z-index: 1;
+  aspect-ratio: 1;
+  translate: -50% -50%;
+  border: 1px dashed #78efbe;
+  border-radius: 50%;
+  background: rgb(120 239 190 / 16%);
+  box-shadow: 0 0 14px rgb(120 239 190 / 32%);
+  animation: bbg-hint-breathe 900ms ease-in-out infinite alternate;
+}
+
+.bbg-pitch-hint-marker[data-read="likely_ball"] {
+  border-color: #ffd166;
+  background: rgb(255 209 102 / 14%);
+  box-shadow: 0 0 14px rgb(255 209 102 / 28%);
+}
+
+.bbg-pitch-hint-marker > i {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 5px;
+  height: 5px;
+  translate: -50% -50%;
+  border: 1px solid white;
+  border-radius: 50%;
+}
+
+.bbg-impact-list .is-duel {
+  border-color: rgb(255 209 102 / 32%);
+  color: #ffe49a;
+  background: rgb(255 209 102 / 10%);
+}
+
+.bbg-impact-list .is-duel[data-winner="batter"] {
+  border-color: rgb(112 240 186 / 40%);
+  color: #8ff4cc;
+  background: rgb(112 240 186 / 10%);
+}
+
+@keyframes bbg-hint-breathe {
+  from {
+    opacity: 0.62;
+    transform: scale(0.92);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1.06);
+  }
+}
+
+@media (max-width: 760px) {
+  .bbg-game-console .bbg-broadcast-heading {
+    height: 62px;
+    grid-template-columns: minmax(0, 1fr) 38px;
+    gap: 5px;
+    padding: 6px;
+  }
+
+  .bbg-broadcast-heading > .bbg-scoreboard {
+    grid-template-columns: minmax(0, 1fr) 138px;
+    gap: 5px;
+  }
+
+  .bbg-broadcast-heading > .bbg-scoreboard .bbg-score-teams,
+  .bbg-broadcast-heading > .bbg-scoreboard .bbg-score-status {
+    height: 50px;
+  }
+
+  .bbg-broadcast-heading > .bbg-scoreboard .bbg-line-score-grid {
+    grid-template-columns: minmax(46px, 1fr) repeat(4, minmax(16px, 1fr));
+  }
+
+  .bbg-broadcast-heading > .bbg-scoreboard .bbg-score-status {
+    width: 138px;
+    grid-template-columns: 42px 36px 60px;
+  }
+
+  .bbg-broadcast-heading > .bbg-audio-control {
+    width: 38px;
+    height: 50px;
+  }
+}
+
+@media (max-height: 820px) and (min-width: 681px) {
+  .bbg-control-panel--broadcast .bbg-pitch-choice,
+  .bbg-control-panel--broadcast .bbg-pitch-choice.is-ball {
+    min-height: 50px;
+    gap: 2px;
+  }
+
+  .bbg-control-panel--broadcast .bbg-pitch-choice-head {
+    justify-content: center;
+  }
+
+  .bbg-control-panel--broadcast .bbg-target-icon,
+  .bbg-control-panel--broadcast .bbg-pitch-probability,
+  .bbg-control-panel--broadcast .bbg-tendency-bars {
+    display: none;
+  }
+
+  .bbg-control-panel--broadcast .bbg-pitch-compact {
+    display: block;
+    color: #91a8b6;
+    font-size: 6px;
+    white-space: nowrap;
+  }
+
+  .bbg-control-panel--broadcast .bbg-situation-tip {
+    display: none;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .bbg-pitch-hint-marker {
+    animation: none;
+  }
+}
+
 @media (prefers-reduced-motion: reduce) {
   .bbg-action-feedback,
   .bbg-action-feedback-indicator {
@@ -9172,7 +9505,7 @@
   }
 }
 
-@media (max-height: 700px) and (min-width: 681px) {
+@media (max-height: 820px) and (min-width: 681px) {
   .bbg-control-panel--broadcast .bbg-game-progress,
   .bbg-control-panel--broadcast .bbg-control-feedback-slot {
     display: none;
@@ -9209,5 +9542,46 @@
 
   .bbg-control-panel--broadcast .bbg-swing-actions button {
     min-height: 38px;
+  }
+
+  .bbg-control-panel--broadcast .bbg-card-hands {
+    min-height: 158px;
+  }
+}
+
+@media (min-width: 681px) and (max-width: 1100px) {
+  .bbg-game-console .bbg-broadcast-heading {
+    grid-template-columns: minmax(0, 1fr) 38px;
+    gap: 5px;
+    padding: 7px;
+  }
+
+  .bbg-broadcast-heading > .bbg-scoreboard {
+    grid-template-columns: minmax(0, 1fr) 140px;
+    gap: 5px;
+  }
+
+  .bbg-broadcast-heading > .bbg-scoreboard .bbg-score-status {
+    width: 140px;
+    grid-template-columns: 42px 36px 62px;
+  }
+
+  .bbg-broadcast-heading > .bbg-audio-control {
+    width: 38px;
+  }
+
+  .bbg-broadcast-heading .bbg-volume-control,
+  .bbg-broadcast-heading .bbg-sound-toggle span:last-child {
+    display: none;
+  }
+
+  .bbg-broadcast-heading .bbg-audio-control {
+    grid-template-rows: 1fr;
+  }
+
+  .bbg-line-score-grid {
+    grid-template-columns:
+      minmax(50px, 1fr) repeat(var(--inning-count), minmax(10px, 14px))
+      repeat(4, minmax(15px, 18px));
   }
 }

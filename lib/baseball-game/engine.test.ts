@@ -181,6 +181,7 @@ describe("pitch and phase flow", () => {
       pitchTarget: "low_outside",
       swingDecision: "take",
       face: "S",
+      duelWinner: "pitcher",
     });
     expect(reveal?.pitchLocation).toMatchObject({ zone: "strike" });
   });
@@ -194,6 +195,20 @@ describe("pitch and phase flow", () => {
     const play = () =>
       actions.reduce((state, action) => apply(state, action), initial);
     expect(play()).toEqual(play());
+  });
+
+  it("records a batter win when the hitter attacks a strike", () => {
+    const locked = apply(game({ phase: "awaiting_pitch" }), {
+      type: "SELECT_PITCH",
+      target: "high_inside",
+    });
+    const resolved = apply(locked, {
+      type: "SELECT_SWING",
+      decision: "swing",
+    });
+    expect(
+      resolved.eventLog.findLast((event) => event.kind === "pitch_result"),
+    ).toMatchObject({ duelWinner: "batter" });
   });
 
   it.each([
@@ -1114,9 +1129,9 @@ describe("advanced strategy and automatic pro rules", () => {
 });
 
 describe("broadcast-v2 box score", () => {
-  it("initializes schema 5 and keeps structured inning totals", () => {
+  it("initializes schema 6 and keeps structured inning totals", () => {
     const state = createGame(CONFIG);
-    expect(state.schemaVersion).toBe(5);
+    expect(state.schemaVersion).toBe(6);
     expect(state.presentationVersion).toBe("broadcast-v2");
     expect(state.boxScore).toEqual({
       innings: [{ away: 0, home: null }],

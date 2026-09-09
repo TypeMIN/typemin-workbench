@@ -16,6 +16,7 @@ export type PitchTarget =
   "high_inside" | "high_outside" | "low_inside" | "low_outside" | "ball";
 
 export type SwingDecision = "swing" | "take";
+export type DuelWinner = "batter" | "pitcher";
 
 export type PitchHint = FieldPoint & {
   radius: number;
@@ -28,6 +29,7 @@ export type PitchDuelState = {
   pitcherChoice: PitchTarget;
   hint: PitchHint;
   batterDecision: SwingDecision | null;
+  duelWinner: DuelWinner | null;
   actualLocation: PitchLocation | null;
   result: PitchFace | null;
 };
@@ -254,11 +256,12 @@ export type GameEvent = {
   swingDecision?: SwingDecision;
   pitchLocation?: PitchLocation;
   pitchHint?: PitchHint;
+  duelWinner?: DuelWinner;
 };
 
 export type GameState = {
-  schemaVersion: 5;
-  rulesetVersion: "pitch-duel-v1";
+  schemaVersion: 6;
+  rulesetVersion: "pitch-duel-v2";
   presentationVersion: "broadcast-v2";
   revision: number;
   config: GameConfig;

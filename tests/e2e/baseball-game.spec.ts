@@ -24,7 +24,7 @@ test("야구 게임에서 투타 심리전과 새 경기를 진행한다", async
   await expect(
     page.getByRole("heading", { name: "야구 게임 라이브" }),
   ).toBeVisible();
-  await expect(page.getByText("PITCH-DUEL-V1 · SOLO AI")).toBeVisible();
+  await expect(page.getByText("PITCH-DUEL-V2 · SOLO AI")).toBeVisible();
   await expect(page.getByText("AI 대전 · 홈팀")).toBeVisible();
   await expect(
     page.getByRole("dialog", { name: /기기를 넘겨주세요/ }),
@@ -47,6 +47,12 @@ test("야구 게임에서 투타 심리전과 새 경기를 진행한다", async
   ).toBeVisible();
   await expect(page.locator(".bbg-d12")).toHaveCount(0);
   await expect(page.locator(".bbg-pitch-choice")).toHaveCount(5);
+  await expect(
+    page.getByRole("button", { name: "높은 몸쪽 선택" }),
+  ).toContainText("컨택 68%");
+  await expect(
+    page.getByRole("button", { name: "높은 몸쪽 선택" }),
+  ).toContainText("안타 25");
   await expect(
     page.getByRole("region", { name: "원정팀 공격 비공개 손패" }),
   ).toBeVisible();
@@ -172,6 +178,7 @@ test("야구 게임에서 투타 심리전과 새 경기를 진행한다", async
     page.locator(".bbg-pitch-marker[data-current='true']"),
   ).toHaveText("1");
   await expect(page.getByTestId("play-result")).toContainText("투수 볼");
+  await expect(page.getByTestId("play-result")).toContainText("승부 성공");
   await expect(page.getByText("특정 면 강제 입력")).toHaveCount(0);
 
   await page
@@ -194,7 +201,7 @@ test("야구 게임에서 투타 심리전과 새 경기를 진행한다", async
         document.documentElement.scrollHeight <= window.innerHeight,
     ),
   ).toBe(true);
-  await expect(page.locator(".bbg-game-progress")).toBeVisible();
+  await expect(page.locator(".bbg-game-progress")).toBeHidden();
 
   await page.setViewportSize({ width: 390, height: 844 });
   await expect(page.getByRole("heading", { name: "현재 판정" })).toBeVisible();
@@ -261,7 +268,7 @@ test("새 경기 설정은 싱글 AI·멀티·파티 모드만 제공한다", as
   await page.getByLabel("내 팀").selectOption("home");
   await page.getByRole("button", { name: /새 경기 시작/ }).click();
 
-  await expect(page.getByText("PITCH-DUEL-V1 · SOLO AI")).toBeVisible();
+  await expect(page.getByText("PITCH-DUEL-V2 · SOLO AI")).toBeVisible();
   await expect(page.getByText("AI 대전 · 홈팀")).toBeVisible();
   await expect(
     page.getByRole("region", { name: "홈팀 수비 손패" }),
@@ -278,6 +285,9 @@ test("새 경기 설정은 싱글 AI·멀티·파티 모드만 제공한다", as
   await page.getByLabel("내 팀").selectOption("away");
   await page.getByRole("button", { name: /새 경기 시작/ }).click();
   await expect(page.getByRole("status")).toContainText("홈팀 판단 중");
+  await expect(page.getByRole("img", { name: /예상 투구 위치/ })).toBeVisible({
+    timeout: 3_000,
+  });
   await expect(page.locator(".bbg-d12")).toHaveCount(0);
   await expect(page.locator(".bbg-log-panel summary strong")).not.toHaveText(
     "0",
@@ -292,6 +302,9 @@ test("주요 데스크톱·태블릿·모바일 화면비율에서 게임 UI가 
     route.fulfill({ status: 200, json: { account: null } }),
   );
   await page.goto("/baseball-game");
+  await page.getByText("새 경기 설정", { exact: true }).click();
+  await page.getByLabel("경기 길이").selectOption("9");
+  await page.getByRole("button", { name: /새 경기 시작/ }).click();
 
   const viewports = [
     { width: 360, height: 800 },
@@ -336,6 +349,12 @@ test("주요 데스크톱·태블릿·모바일 화면비율에서 게임 UI가 
         scoreboard: bounds(".bbg-scoreboard"),
         controls: bounds(".bbg-control-panel"),
         hands: bounds(".bbg-card-hands"),
+        lineScoreFits: (() => {
+          const lineScore = document.querySelector(".bbg-line-score-grid");
+          return lineScore
+            ? lineScore.scrollWidth <= lineScore.clientWidth + 1
+            : false;
+        })(),
         inningColumns: [
           ...document.querySelectorAll(".bbg-line-score-head.bbg-line-inning"),
         ].filter((element) => getComputedStyle(element).display !== "none")
@@ -347,7 +366,6 @@ test("주요 데스크톱·태블릿·모바일 화면비율에서 게임 UI가 
           .map((element) => element.textContent),
       };
     });
-
     expect(layout.document.width, JSON.stringify(viewport)).toBeLessThanOrEqual(
       layout.viewport.width,
     );
@@ -356,22 +374,24 @@ test("주요 데스크톱·태블릿·모바일 화면비율에서 게임 UI가 
       JSON.stringify(viewport),
     ).toBeLessThanOrEqual(layout.viewport.height);
     expect(layout.totalHeaders).toEqual(["R", "H", "E", "B"]);
+    expect(layout.lineScoreFits, JSON.stringify(viewport)).toBe(true);
     expect(layout.inningColumns > 0).toBe(viewport.width > 639);
-    for (const region of [
-      layout.console,
-      layout.scoreboard,
-      layout.controls,
-      layout.hands,
-    ]) {
-      expect(region.left, JSON.stringify(viewport)).toBeGreaterThanOrEqual(-1);
-      expect(region.right, JSON.stringify(viewport)).toBeLessThanOrEqual(
+    for (const [name, region] of [
+      ["console", layout.console],
+      ["scoreboard", layout.scoreboard],
+      ["controls", layout.controls],
+      ["hands", layout.hands],
+    ] as const) {
+      const context = `${name} ${JSON.stringify(viewport)}`;
+      expect(region.left, context).toBeGreaterThanOrEqual(-1);
+      expect(region.right, context).toBeLessThanOrEqual(
         layout.viewport.width + 1,
       );
-      expect(region.bottom, JSON.stringify(viewport)).toBeLessThanOrEqual(
+      expect(region.bottom, context).toBeLessThanOrEqual(
         layout.viewport.height + 1,
       );
-      expect(region.width, JSON.stringify(viewport)).toBeGreaterThan(0);
-      expect(region.height, JSON.stringify(viewport)).toBeGreaterThan(0);
+      expect(region.width, context).toBeGreaterThan(0);
+      expect(region.height, context).toBeGreaterThan(0);
     }
   }
 });

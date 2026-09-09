@@ -35,7 +35,7 @@ describe("BaseballGameDebug", () => {
   it("starts in solo AI mode with five one-tap pitch choices", () => {
     const { container } = render(<BaseballGameDebug />);
 
-    expect(screen.getByText("PITCH-DUEL-V1 · SOLO AI")).toBeVisible();
+    expect(screen.getByText("PITCH-DUEL-V2 · SOLO AI")).toBeVisible();
     expect(screen.getByText("AI 대전 · 홈팀")).toBeVisible();
     expect(
       screen.getByRole("button", {
@@ -69,6 +69,9 @@ describe("BaseballGameDebug", () => {
     ).toBeVisible();
     expect(container.querySelector(".bbg-d12")).not.toBeInTheDocument();
     expect(container.querySelectorAll(".bbg-pitch-choice")).toHaveLength(5);
+    expect(
+      screen.getByRole("button", { name: "높은 몸쪽 선택" }),
+    ).toHaveTextContent(/컨택 68%.*헛스윙 15%.*안타 25/);
     expect(screen.getByRole("img", { name: /주자 없음/ })).toBeVisible();
     expect(
       container.querySelector(".bbg-team-score.is-batting"),
@@ -118,16 +121,23 @@ describe("BaseballGameDebug", () => {
 
   it("resolves a private player pitch and the AI batter decision without dice", () => {
     vi.useFakeTimers();
+    vi.spyOn(Math, "random").mockReturnValue(0);
     render(<BaseballGameDebug />);
 
     fireEvent.click(screen.getByRole("button", { name: "볼 선택" }));
     expect(screen.getByText("투구 코스를 선택했습니다")).toBeVisible();
     expect(screen.getByText("원정팀 판단 중")).toBeVisible();
+    expect(
+      screen.queryByRole("img", { name: /예상 투구 위치/ }),
+    ).not.toBeInTheDocument();
     act(() => {
       vi.advanceTimersByTime(650);
     });
     expect(screen.getByTestId("play-result")).toHaveTextContent("투수 볼");
     expect(screen.getByTestId("play-result")).toHaveTextContent(/타자/);
+    expect(screen.getByTestId("play-result")).toHaveTextContent(
+      "투수 승부 성공",
+    );
     expect(screen.queryByText(/특정 면 강제 입력/)).not.toBeInTheDocument();
   });
 
@@ -178,7 +188,7 @@ describe("BaseballGameDebug", () => {
     });
     fireEvent.click(form.getByRole("button", { name: /새 경기 시작/ }));
 
-    expect(screen.getByText("PITCH-DUEL-V1 · SOLO AI")).toBeVisible();
+    expect(screen.getByText("PITCH-DUEL-V2 · SOLO AI")).toBeVisible();
     expect(screen.getByText("AI 대전 · 원정팀")).toBeVisible();
     expect(screen.getByRole("status")).toHaveTextContent("홈팀 판단 중");
     expect(
@@ -196,6 +206,7 @@ describe("BaseballGameDebug", () => {
     });
 
     expect(screen.getByRole("region", { name: "타격 판단" })).toBeVisible();
+    expect(screen.getByRole("img", { name: /예상 투구 위치/ })).toBeVisible();
   });
 
   it("lets a solo player choose the home team and take the first pitch turn", () => {

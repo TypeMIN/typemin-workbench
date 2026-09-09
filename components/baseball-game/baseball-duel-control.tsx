@@ -1,6 +1,7 @@
 "use client";
 
 import {
+  BATTER_DUEL_HIT_BONUS,
   PITCH_TARGET_LABELS,
   PITCH_TARGETS,
   PITCH_TENDENCIES,
@@ -40,16 +41,19 @@ export function BaseballDuelControl({
           </div>
         </div>
         {canAct ? (
-          <div className="bbg-pitch-choice-grid">
-            {PITCH_TARGETS.map((target) => (
-              <PitchChoice
-                disabled={busy}
-                key={target}
-                onSelect={() => onAction({ type: "SELECT_PITCH", target })}
-                target={target}
-              />
-            ))}
-          </div>
+          <>
+            <div className="bbg-pitch-choice-grid">
+              {PITCH_TARGETS.map((target) => (
+                <PitchChoice
+                  disabled={busy}
+                  key={target}
+                  onSelect={() => onAction({ type: "SELECT_PITCH", target })}
+                  target={target}
+                />
+              ))}
+            </div>
+            <SituationTip game={game} role="pitcher" />
+          </>
         ) : (
           <WaitingPulse label="투수가 코스를 고르고 있습니다" />
         )}
@@ -75,6 +79,10 @@ export function BaseballDuelControl({
         {canAct ? (
           <>
             <PitchRead hint={hint} />
+            <div className="bbg-duel-bonus">
+              <b>READ BONUS</b>
+              스트라이크에 스윙하면 안타 확률 +{BATTER_DUEL_HIT_BONUS}%p
+            </div>
             <div className="bbg-swing-actions">
               <button
                 className="is-swing"
@@ -99,6 +107,7 @@ export function BaseballDuelControl({
                 <strong>지켜보기</strong>
               </button>
             </div>
+            <SituationTip game={game} role="batter" />
           </>
         ) : (
           <WaitingPulse label="타자가 공을 읽고 있습니다" />
@@ -120,6 +129,7 @@ function PitchChoice({
   target: PitchTarget;
 }) {
   const tendency = PITCH_TENDENCIES[target];
+  const hitRisk = tendency.hit + tendency.homeRun;
   return (
     <button
       aria-label={`${PITCH_TARGET_LABELS[target]} 선택`}
@@ -128,12 +138,37 @@ function PitchChoice({
       onClick={onSelect}
       type="button"
     >
-      <strong>{PITCH_TARGET_LABELS[target]}</strong>
-      <span className="bbg-tendency-bars" aria-hidden="true">
-        <i style={{ "--value": `${tendency.ground}%` } as CSSProperties}>땅</i>
-        <i style={{ "--value": `${tendency.air}%` } as CSSProperties}>뜬</i>
-        <i style={{ "--value": `${tendency.whiff}%` } as CSSProperties}>헛</i>
+      <span className="bbg-pitch-choice-head">
+        <i className="bbg-target-icon" aria-hidden="true">
+          <b />
+        </i>
+        <strong>{PITCH_TARGET_LABELS[target]}</strong>
       </span>
+      <span
+        className="bbg-pitch-probability"
+        aria-label={`스윙 시 컨택 ${tendency.contact}%, 헛스윙 ${tendency.whiff}%. 인플레이 시 땅볼 ${tendency.ground}%, 뜬공 ${tendency.air}%, 안타 ${hitRisk}%`}
+      >
+        <i>
+          컨택 <b>{tendency.contact}%</b>
+        </i>
+        <i>
+          헛스윙 <b>{tendency.whiff}%</b>
+        </i>
+      </span>
+      <span className="bbg-tendency-bars" aria-hidden="true">
+        <i style={{ "--value": `${tendency.ground}%` } as CSSProperties}>
+          땅 {tendency.ground}
+        </i>
+        <i style={{ "--value": `${tendency.air}%` } as CSSProperties}>
+          뜬 {tendency.air}
+        </i>
+        <i style={{ "--value": `${hitRisk}%` } as CSSProperties}>
+          안타 {hitRisk}
+        </i>
+      </span>
+      <small className="bbg-pitch-compact" aria-hidden="true">
+        헛 {tendency.whiff}% · 안타 {hitRisk}%
+      </small>
     </button>
   );
 }
@@ -146,19 +181,51 @@ function PitchRead({ hint }: { hint: PitchHint | null }) {
     >
       <span className="bbg-read-zone" aria-hidden="true" />
       {hint ? (
-        <span
-          className="bbg-read-halo"
-          data-read={hint.read}
-          style={{
-            left: `${hint.x}%`,
-            top: `${hint.y}%`,
-            width: `${hint.radius * 2}%`,
-          }}
-        />
+        <>
+          <span
+            className="bbg-read-halo"
+            data-read={hint.read}
+            style={{
+              left: `${hint.x}%`,
+              top: `${hint.y}%`,
+              width: `${hint.radius * 2}%`,
+            }}
+          />
+          <span
+            aria-hidden="true"
+            className="bbg-read-crosshair"
+            style={{ left: `${hint.x}%`, top: `${hint.y}%` }}
+          />
+        </>
       ) : null}
       <small>{hint ? hintLabel(hint) : "위치 분석 중"}</small>
     </div>
   );
+}
+
+function SituationTip({
+  game,
+  role,
+}: {
+  game: DuelGame;
+  role: "pitcher" | "batter";
+}) {
+  let copy =
+    role === "pitcher"
+      ? "코스마다 스윙 결과와 맞은 뒤 타구 성향이 달라집니다."
+      : "예상 원의 중심과 존의 겹침을 보고 한 번에 결정하세요.";
+  if (game.strikes === 2) {
+    copy =
+      role === "pitcher"
+        ? "2스트라이크 · 볼 유인과 낮은 코스의 가치가 높습니다."
+        : "2스트라이크 · 지켜보면 삼진 위험, 스윙은 파울로 버틸 수 있습니다.";
+  } else if (game.balls === 3) {
+    copy =
+      role === "pitcher"
+        ? "3볼 · 볼을 한 번 더 고르면 볼넷입니다."
+        : "3볼 · 존 밖을 읽고 참으면 볼넷입니다.";
+  }
+  return <p className="bbg-situation-tip">{copy}</p>;
 }
 
 function WaitingPulse({ label }: { label: string }) {

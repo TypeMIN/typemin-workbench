@@ -1,5 +1,6 @@
 import type {
   BattingFace,
+  DuelWinner,
   HitFace,
   PitchFace,
   PitchHint,
@@ -81,6 +82,41 @@ export const PITCH_TENDENCIES: Record<PitchTarget, PitchTendency> = {
     homeRun: 0,
   },
 };
+
+/** A correct swing/take read transfers 12 percentage points to hit outcomes. */
+export const BATTER_DUEL_HIT_BONUS = 12;
+
+export function resolveDuelWinner(
+  target: PitchTarget,
+  decision: SwingDecision,
+): DuelWinner {
+  const isStrike = target !== "ball";
+  return (isStrike && decision === "swing") ||
+    (!isStrike && decision === "take")
+    ? "batter"
+    : "pitcher";
+}
+
+export function getBattedBallTendency(
+  target: PitchTarget,
+  duelWinner: DuelWinner | null = null,
+): Pick<PitchTendency, "ground" | "air" | "hit" | "homeRun"> {
+  const tendency = PITCH_TENDENCIES[target];
+  if (duelWinner !== "batter") {
+    return {
+      ground: tendency.ground,
+      air: tendency.air,
+      hit: tendency.hit,
+      homeRun: tendency.homeRun,
+    };
+  }
+  return {
+    ground: tendency.ground - 7,
+    air: tendency.air - 5,
+    hit: tendency.hit + 9,
+    homeRun: tendency.homeRun + 3,
+  };
+}
 
 const GROUND_OUTCOMES = [
   ["GF", 40],
@@ -194,8 +230,9 @@ export function resolvePitchFace(
 export function resolveBattedBall(
   target: PitchTarget,
   random: () => number,
+  duelWinner: DuelWinner | null = null,
 ): BattingFace {
-  const tendency = PITCH_TENDENCIES[target];
+  const tendency = getBattedBallTendency(target, duelWinner);
   const roll = random() * 100;
   if (roll < tendency.ground) return weighted(GROUND_OUTCOMES, random());
   if (roll < tendency.ground + tendency.air)

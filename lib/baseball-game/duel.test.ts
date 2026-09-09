@@ -1,11 +1,14 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  BATTER_DUEL_HIT_BONUS,
   createActualPitchLocation,
   createPitchHint,
+  getBattedBallTendency,
   PITCH_TARGETS,
   PITCH_TENDENCIES,
   resolveBattedBall,
+  resolveDuelWinner,
   resolvePitchFace,
 } from "./duel";
 
@@ -15,7 +18,42 @@ describe("pitch duel balance", () => {
       const row = PITCH_TENDENCIES[target];
       expect(row.contact + row.foul + row.whiff).toBe(100);
       expect(row.ground + row.air + row.hit + row.homeRun).toBe(100);
+      const rewarded = getBattedBallTendency(target, "batter");
+      expect(
+        rewarded.ground + rewarded.air + rewarded.hit + rewarded.homeRun,
+      ).toBe(100);
     }
+  });
+
+  it("awards the simple 2x2 mind game to the correct side", () => {
+    expect(resolveDuelWinner("high_inside", "swing")).toBe("batter");
+    expect(resolveDuelWinner("high_inside", "take")).toBe("pitcher");
+    expect(resolveDuelWinner("ball", "swing")).toBe("pitcher");
+    expect(resolveDuelWinner("ball", "take")).toBe("batter");
+  });
+
+  it("moves twelve percentage points into hits after a batter win", () => {
+    for (const target of PITCH_TARGETS) {
+      const normal = getBattedBallTendency(target);
+      const rewarded = getBattedBallTendency(target, "batter");
+      expect(rewarded.hit + rewarded.homeRun).toBe(
+        normal.hit + normal.homeRun + BATTER_DUEL_HIT_BONUS,
+      );
+    }
+
+    const values = [0.7, 0];
+    let normalIndex = 0;
+    let rewardedIndex = 0;
+    expect(
+      resolveBattedBall("high_inside", () => values[normalIndex++]!),
+    ).not.toBe("HIT");
+    expect(
+      resolveBattedBall(
+        "high_inside",
+        () => values[rewardedIndex++]!,
+        "batter",
+      ),
+    ).toBe("HIT");
   });
 
   it("makes takes deterministic and swings target-dependent", () => {

@@ -6,6 +6,7 @@ import {
   PITCH_TARGET_LABELS,
   PITCH_TARGETS,
   resolveBattedBall,
+  resolveDuelWinner,
   resolveHitOutcome,
   resolvePitchFace as resolveDuelPitchFace,
 } from "./duel";
@@ -82,8 +83,8 @@ export function createGame(
   drawToFour(cards.defense, rng);
 
   const state: GameState = {
-    schemaVersion: 5,
-    rulesetVersion: "pitch-duel-v1",
+    schemaVersion: 6,
+    rulesetVersion: "pitch-duel-v2",
     presentationVersion: "broadcast-v2",
     revision: 0,
     config: {
@@ -394,6 +395,7 @@ function emit(
     swingDecision?: GameEvent["swingDecision"];
     pitchLocation?: PitchLocation;
     pitchHint?: PitchHint;
+    duelWinner?: GameEvent["duelWinner"];
   },
 ) {
   events.push({
@@ -415,6 +417,7 @@ function emit(
     swingDecision: event.swingDecision,
     pitchLocation: event.pitchLocation,
     pitchHint: event.pitchHint,
+    duelWinner: event.duelWinner,
   });
 }
 
@@ -488,6 +491,7 @@ function selectPitch(
     pitcherChoice: target,
     hint,
     batterDecision: null,
+    duelWinner: null,
     actualLocation,
     result: null,
   };
@@ -530,16 +534,18 @@ function revealPitchDuel(
   if (!duel) return;
   duel.status = "revealed";
   duel.batterDecision = decision;
+  duel.duelWinner = resolveDuelWinner(duel.pitcherChoice, decision);
   duel.actualLocation = actualLocation;
   duel.result = face;
   emit(state, events, {
     kind: "pitch_result",
-    summary: `${PITCH_TARGET_LABELS[duel.pitcherChoice]} · ${decision === "swing" ? "스윙" : "지켜보기"} · ${pitchFaceSummary(face)}`,
+    summary: `${PITCH_TARGET_LABELS[duel.pitcherChoice]} · ${decision === "swing" ? "스윙" : "지켜보기"} · ${duel.duelWinner === "batter" ? "타자 승부 성공" : "투수 승부 성공"} · ${pitchFaceSummary(face)}`,
     face,
     pitchTarget: duel.pitcherChoice,
     swingDecision: decision,
     pitchLocation: actualLocation,
     pitchHint: { ...duel.hint },
+    duelWinner: duel.duelWinner,
   });
 }
 
@@ -555,8 +561,10 @@ function continueDuelAutomation(state: GameState, events: GameEvent[]) {
   ) {
     guard += 1;
     if (state.phase === "awaiting_batting") {
-      const face = resolveBattedBall(state.pitchDuel.pitcherChoice, () =>
-        nextRandom(state.rng),
+      const face = resolveBattedBall(
+        state.pitchDuel.pitcherChoice,
+        () => nextRandom(state.rng),
+        state.pitchDuel.duelWinner ?? null,
       );
       emit(state, events, {
         kind: "batted_ball",
@@ -2373,6 +2381,7 @@ function pitchDuelView(
     pitcherChoice: canSeeChoice ? duel.pitcherChoice : null,
     hint: canSeeHint ? { ...duel.hint } : null,
     batterDecision: revealed ? duel.batterDecision : null,
+    duelWinner: revealed ? (duel.duelWinner ?? null) : null,
     actualLocation:
       (revealed || viewer === "debug") && duel.actualLocation
         ? { ...duel.actualLocation }

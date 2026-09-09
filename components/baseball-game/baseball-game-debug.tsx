@@ -18,10 +18,14 @@ import {
 import { BaseballDuelControl } from "@/components/baseball-game/baseball-duel-control";
 import { chooseAiAction } from "@/lib/baseball-game/ai";
 import { CARD_DEFINITIONS } from "@/lib/baseball-game/cards";
-import { PITCH_TARGET_LABELS } from "@/lib/baseball-game/duel";
+import {
+  BATTER_DUEL_HIT_BONUS,
+  PITCH_TARGET_LABELS,
+} from "@/lib/baseball-game/duel";
 import {
   createGame,
   getActionOwner,
+  getGameView,
   getLegalCards,
   transition,
 } from "@/lib/baseball-game/engine";
@@ -36,6 +40,7 @@ import type {
   GameEvent,
   GamePhase,
   GameState,
+  PitchHint,
   PresentationCue,
   RunnerDestination,
   RunnerOrigin,
@@ -61,7 +66,7 @@ const DEFAULT_SESSION: SessionConfig = {
   humanTeam: "home",
 };
 
-const AI_TURN_DELAY_MS = 650;
+const AI_TURN_DELAY_MS = 420;
 
 const PHASE_COPY: Record<GamePhase, string> = {
   awaiting_pitch:
@@ -109,6 +114,7 @@ export default function BaseballGameDebug() {
     ["pitch_result", "batted_ball", "die_roll"].includes(event.kind),
   );
   const actionOwner = getActionOwner(game);
+  const playerView = getGameView(game, session.humanTeam);
   const aiTeam =
     session.mode === "solo_ai" ? oppositeTeam(session.humanTeam) : null;
   const actionOwnerLabel = actionOwner
@@ -253,7 +259,7 @@ export default function BaseballGameDebug() {
           <span>
             <strong>야구 게임</strong>
             <small>
-              PITCH-DUEL-V1 ·{" "}
+              PITCH-DUEL-V2 ·{" "}
               {session.mode === "solo_ai"
                 ? "SOLO AI"
                 : session.mode === "multiplayer"
@@ -305,7 +311,7 @@ export default function BaseballGameDebug() {
               <div className="bbg-field-content">
                 <BaseballStadium
                   face={lastResult?.face}
-                  game={game}
+                  game={playerView}
                   key={`field-${game.revision}`}
                 />
                 <StadiumHighlight
@@ -367,7 +373,7 @@ export default function BaseballGameDebug() {
             ) : game.phase === "awaiting_pitch" ||
               game.phase === "awaiting_swing" ? (
               <BaseballDuelControl
-                game={game}
+                game={playerView}
                 key={`${game.revision}-${game.phase}`}
                 onAction={dispatchAction}
               />
@@ -1095,7 +1101,13 @@ export function BaseballStadium({
   game,
 }: {
   face?: DieFace;
-  game: Pick<GameState, "bases" | "battingTeam" | "config" | "eventLog">;
+  game: Pick<GameState, "bases" | "battingTeam" | "config" | "eventLog"> & {
+    phase?: GamePhase;
+    pitchDuel?: {
+      hint: PitchHint | null;
+      status: "pitch_locked" | "revealed";
+    } | null;
+  };
 }) {
   const occupied = [
     game.bases.first ? "1루" : null,
@@ -1104,6 +1116,8 @@ export function BaseballStadium({
   ].filter(Boolean);
   const flight = getBallFlight(face);
   const pitchHistory = getPlateAppearancePitchHistory(game.eventLog);
+  const pitchHint =
+    game.phase === "awaiting_swing" ? (game.pitchDuel?.hint ?? null) : null;
   const { cue, skip } = usePresentation(game.eventLog);
   const battingTeamName =
     game.config[game.battingTeam === "away" ? "awayTeamName" : "homeTeamName"];
@@ -1251,6 +1265,21 @@ export function BaseballStadium({
       <div className="bbg-strike-zone" aria-label="투구 위치">
         <span className="bbg-strike-zone-label">PITCH MAP</span>
         <div aria-hidden="true" className="bbg-zone-grid" />
+        {pitchHint ? (
+          <span
+            aria-label={`예상 투구 위치, ${pitchHintLabel(pitchHint)}`}
+            className="bbg-pitch-hint-marker"
+            data-read={pitchHint.read}
+            role="img"
+            style={{
+              left: `${pitchHint.x}%`,
+              top: `${pitchHint.y}%`,
+              width: `${pitchHint.radius * 2}%`,
+            }}
+          >
+            <i aria-hidden="true" />
+          </span>
+        ) : null}
         {pitchHistory.map(({ event, face: pitchFace, location }, index) => (
           <i
             aria-label={`${location.pitchNumber}구 ${pitchFace}`}
@@ -1277,6 +1306,12 @@ export function BaseballStadium({
       ) : null}
     </div>
   );
+}
+
+function pitchHintLabel(hint: PitchHint) {
+  if (hint.read === "likely_strike") return "스트라이크 우세";
+  if (hint.read === "likely_ball") return "볼 우세";
+  return "존 경계";
 }
 
 function BallFlightVisual({
@@ -1563,6 +1598,15 @@ function PlayResult({
           {pitchReveal?.swingDecision ? (
             <b className="is-pitch">
               타자 {pitchReveal.swingDecision === "swing" ? "스윙" : "지켜보기"}
+            </b>
+          ) : null}
+          {pitchReveal?.duelWinner ? (
+            <b className="is-duel" data-winner={pitchReveal.duelWinner}>
+              {pitchReveal.duelWinner === "batter"
+                ? pitchReveal.swingDecision === "swing"
+                  ? `타자 승부 성공 · 안타 +${BATTER_DUEL_HIT_BONUS}%p`
+                  : "타자 승부 성공"
+                : "투수 승부 성공"}
             </b>
           ) : null}
           {event?.runs ? <b className="is-score">+{event.runs}점</b> : null}
