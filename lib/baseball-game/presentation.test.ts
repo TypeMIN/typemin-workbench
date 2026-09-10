@@ -64,6 +64,24 @@ describe("catcher-view-v1 presentation", () => {
     expect(history.map((pitch) => pitch.face)).toEqual(["S", "F"]);
   });
 
+  it("keeps the completed at-bat visible until the next pitch starts", () => {
+    const completed = [
+      event({ sequence: 1, kind: "pitch_result", face: "S" }),
+      event({ sequence: 2, kind: "pitch_result", face: "B" }),
+      event({ sequence: 3, kind: "plate_appearance", outsRecorded: 1 }),
+    ];
+
+    expect(
+      getPlateAppearancePitchHistory(completed).map((pitch) => pitch.face),
+    ).toEqual(["S", "B"]);
+    expect(
+      getPlateAppearancePitchHistory([
+        ...completed,
+        event({ sequence: 4, kind: "pitch_commit" }),
+      ]),
+    ).toEqual([]);
+  });
+
   it("orders pitch, call, throw and out for a strikeout", () => {
     const cues = buildPresentationCues([
       event({ sequence: 1, die: "pitch", face: "S" }),

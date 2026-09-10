@@ -10565,6 +10565,215 @@
 
 @media (prefers-reduced-motion: reduce) {
   .bbg-choice-flash {
-    animation: bbg-choice-flash 800ms linear both;
+    animation: bbg-choice-flash 560ms linear both;
+  }
+}
+
+/* Pitch readout cleanup: the zone itself carries the whole at-bat story. */
+.bbg-catcher-zone {
+  width: clamp(190px, 33.333%, 300px);
+  aspect-ratio: 1;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+}
+
+.bbg-catcher-zone .bbg-zone-grid {
+  inset: 20% 24%;
+  border: 3px solid rgb(242 250 251 / 88%);
+  border-radius: 6px;
+  background:
+    linear-gradient(
+      90deg,
+      transparent 32%,
+      rgb(238 248 255 / 24%) 33% 34%,
+      transparent 35% 65%,
+      rgb(238 248 255 / 24%) 66% 67%,
+      transparent 68%
+    ),
+    linear-gradient(
+      transparent 32%,
+      rgb(238 248 255 / 24%) 33% 34%,
+      transparent 35% 65%,
+      rgb(238 248 255 / 24%) 66% 67%,
+      transparent 68%
+    );
+  box-shadow:
+    0 0 0 1px rgb(3 10 15 / 62%),
+    0 0 26px rgb(3 10 15 / 30%);
+}
+
+.bbg-catcher-zone .bbg-pitch-marker {
+  z-index: 5;
+  width: 22px;
+  height: 22px;
+  border: 2px solid rgb(255 255 255 / 78%);
+  color: #f5fbf9;
+  background: #385a6d;
+  box-shadow: 0 2px 9px rgb(0 0 0 / 48%);
+  font-size: 8px;
+  opacity: 0.7;
+}
+
+.bbg-catcher-zone .bbg-pitch-marker[data-zone="ball"] {
+  background: #b4862f;
+}
+
+.bbg-catcher-zone .bbg-pitch-marker > b {
+  font-size: inherit;
+  line-height: 1;
+}
+
+.bbg-catcher-zone .bbg-pitch-marker > span {
+  display: none;
+}
+
+.bbg-catcher-zone .bbg-pitch-marker[data-current="true"] {
+  width: 36px;
+  height: 36px;
+  border-width: 3px;
+  color: #06130e;
+  background: #79f0c2;
+  box-shadow:
+    0 0 0 7px rgb(121 240 194 / 16%),
+    0 0 28px rgb(121 240 194 / 74%);
+  font-size: 12px;
+  opacity: 1;
+  animation: bbg-pitch-impact 420ms cubic-bezier(0.2, 0.85, 0.25, 1.18) both;
+}
+
+.bbg-catcher-zone .bbg-pitch-marker[data-current="true"] > span {
+  position: absolute;
+  top: calc(100% + 6px);
+  left: 50%;
+  display: block;
+  min-width: 28px;
+  translate: -50% 0;
+  padding: 2px 5px;
+  border-radius: 999px;
+  color: #eef9f5;
+  background: rgb(3 12 19 / 88%);
+  box-shadow: 0 4px 12px rgb(0 0 0 / 30%);
+  font-size: 8px;
+  font-weight: 950;
+  line-height: 1;
+}
+
+.bbg-last-pitch-path {
+  fill: none;
+  stroke: rgb(221 248 255 / 38%);
+  stroke-width: 3;
+  stroke-linecap: round;
+  stroke-dasharray: 9 10;
+}
+
+.bbg-pitch-sequence {
+  right: auto;
+  bottom: 14px;
+  left: 14px;
+  max-width: min(260px, calc(100% - 28px));
+  flex-wrap: nowrap;
+  justify-content: flex-start;
+  gap: 5px;
+  padding: 5px;
+  border-color: rgb(215 234 242 / 24%);
+  background: rgb(3 12 19 / 86%);
+}
+
+.bbg-pitch-sequence li {
+  min-width: 46px;
+  justify-content: flex-start;
+  padding: 4px 7px 4px 4px;
+  font-size: 8px;
+}
+
+.bbg-pitch-sequence li b {
+  width: 20px;
+  height: 20px;
+  font-size: 8px;
+}
+
+.bbg-game-console .bbg-play-result {
+  height: 52px;
+  grid-template-columns: 36px minmax(0, 1fr);
+  gap: 9px;
+  padding: 6px 10px;
+}
+
+.bbg-game-console .bbg-result-die {
+  width: 34px;
+  height: 34px;
+}
+
+.bbg-choice-flash {
+  animation-duration: 560ms;
+}
+
+@keyframes bbg-pitch-impact {
+  from {
+    opacity: 0;
+    transform: scale(2.2);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+@media (max-width: 760px) {
+  .bbg-catcher-zone {
+    width: clamp(176px, 54vw, 210px);
+  }
+
+  .bbg-catcher-zone .bbg-pitch-marker {
+    width: 20px;
+    height: 20px;
+  }
+
+  .bbg-catcher-zone .bbg-pitch-marker[data-current="true"] {
+    width: 32px;
+    height: 32px;
+    font-size: 11px;
+  }
+
+  .bbg-pitch-sequence {
+    right: auto;
+    bottom: 62px;
+    left: 7px;
+    max-width: calc(100% - 14px);
+    gap: 3px;
+    padding: 4px;
+    overflow: hidden;
+  }
+
+  .bbg-pitch-sequence li {
+    min-width: 39px;
+    padding: 3px 5px 3px 3px;
+    font-size: 7px;
+  }
+
+  .bbg-pitch-sequence li b {
+    width: 17px;
+    height: 17px;
+    font-size: 7px;
+  }
+
+  .bbg-game-console .bbg-play-result {
+    height: 48px;
+    grid-template-columns: 30px minmax(0, 1fr);
+    gap: 7px;
+    padding: 5px 8px;
+  }
+
+  .bbg-game-console .bbg-result-die {
+    width: 29px;
+    height: 29px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .bbg-catcher-zone .bbg-pitch-marker[data-current="true"] {
+    animation: none;
   }
 }

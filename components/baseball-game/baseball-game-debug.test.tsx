@@ -137,8 +137,8 @@ describe("BaseballGameDebug", () => {
     expect(document.querySelector(".bbg-choice-flash")).toHaveTextContent("볼");
     expect(document.querySelector(".bbg-choice-dock")).not.toBeInTheDocument();
     expect(
-      screen.getByRole("region", { name: "이번 승부 선택 기록" }),
-    ).toHaveTextContent(/투수.*볼.*타자.*판단 중.*카드.*개입 없음/);
+      screen.queryByRole("region", { name: "이번 승부 선택 기록" }),
+    ).not.toBeInTheDocument();
     expect(
       screen.queryByRole("img", { name: /예상 투구 위치/ }),
     ).not.toBeInTheDocument();
@@ -146,19 +146,25 @@ describe("BaseballGameDebug", () => {
       vi.advanceTimersByTime(950);
     });
     expect(screen.getByTestId("play-result")).toBeVisible();
-    const trace = screen.getByRole("region", {
-      name: "이번 승부 선택 기록",
-    });
-    expect(trace).toHaveTextContent(/투수.*볼.*타자.*스윙/);
-    expect(trace).toHaveTextContent("투수가 잡았다");
+    expect(screen.getByTestId("play-result")).toHaveTextContent(
+      "F3 희생플라이",
+    );
+    expect(
+      screen.getByRole("list", { name: "현재 타자 누적 투구" }),
+    ).toBeVisible();
+    expect(
+      document.querySelector(".bbg-pitch-marker[data-current='true']"),
+    ).toBeVisible();
     act(() => {
       vi.advanceTimersByTime(3_000);
     });
-    expect(trace).toBeVisible();
+    expect(
+      screen.queryByRole("button", { name: "현재 연출 빠르게 넘기기" }),
+    ).not.toBeInTheDocument();
     expect(screen.queryByText(/특정 면 강제 입력/)).not.toBeInTheDocument();
   });
 
-  it("keeps card use and both choices visible for the completed event", () => {
+  it("removes the persistent choice strip while keeping the pitch on the zone", () => {
     const game = createGame({
       innings: 3,
       awayTeamName: "원정팀",
@@ -209,13 +215,13 @@ describe("BaseballGameDebug", () => {
 
     render(<BaseballStadium face="S" game={game} />);
 
-    const trace = screen.getByRole("region", {
-      name: "이번 승부 선택 기록",
-    });
-    expect(trace).toHaveTextContent(/투수.*스트라이크.*타자.*지켜보기/);
-    expect(trace).toHaveTextContent(/카드.*보크/);
-    expect(trace).toHaveTextContent(/투수가 잡았다.*스트라이크/);
-    expect(trace.querySelector('[data-used="true"]')).toBeVisible();
+    expect(
+      screen.queryByRole("region", { name: "이번 승부 선택 기록" }),
+    ).not.toBeInTheDocument();
+    expect(screen.getByLabelText("1구 S")).toBeVisible();
+    expect(
+      screen.getByRole("list", { name: "현재 타자 누적 투구" }),
+    ).toHaveTextContent("1스트라이크");
   });
 
   it("keeps every pitch of the current plate appearance on screen", () => {

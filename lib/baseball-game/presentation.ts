@@ -120,8 +120,31 @@ export function getPlateAppearancePitchHistory(events: GameEvent[]) {
     (last, event, index) => (event.kind === "plate_appearance" ? index : last),
     -1,
   );
-  const pitchEvents = events
+  const nextPitchStarted = events
     .slice(latestPlateAppearance + 1)
+    .some(
+      (event) =>
+        event.kind === "pitch_commit" ||
+        event.kind === "pitch_result" ||
+        (event.kind === "die_roll" && event.die === "pitch"),
+    );
+  const previousPlateAppearance = events.reduce(
+    (last, event, index) =>
+      index < latestPlateAppearance && event.kind === "plate_appearance"
+        ? index
+        : last,
+    -1,
+  );
+  const historyStart =
+    latestPlateAppearance >= 0 && !nextPitchStarted
+      ? previousPlateAppearance + 1
+      : latestPlateAppearance + 1;
+  const historyEnd =
+    latestPlateAppearance >= 0 && !nextPitchStarted
+      ? latestPlateAppearance
+      : events.length;
+  const pitchEvents = events
+    .slice(historyStart, historyEnd)
     .filter(
       (event) =>
         event.kind === "pitch_result" ||

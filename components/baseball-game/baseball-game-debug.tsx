@@ -38,6 +38,7 @@ import type {
   GamePhase,
   GameState,
   GameView,
+  PitchFace,
   PitchLocation,
   PresentationCue,
   RunnerDestination,
@@ -64,22 +65,13 @@ const DEFAULT_SESSION: SessionConfig = {
   humanTeam: "home",
 };
 
-const AI_TURN_DELAY_MS = 900;
-const CHOICE_FLASH_MS = 800;
+const AI_TURN_DELAY_MS = 650;
+const CHOICE_FLASH_MS = 560;
 
 type ChoiceFlash = {
   id: number;
   label: string;
   tone: "pitch" | "swing" | "card";
-};
-
-const PHASE_TITLE: Record<GamePhase, string> = {
-  awaiting_pitch: "투구 선택",
-  awaiting_swing: "타격 선택",
-  awaiting_batting: "타구 판정",
-  awaiting_hit: "주루 판정",
-  awaiting_card: "전략카드 결정",
-  finished: "경기 종료",
 };
 
 export default function BaseballGameDebug() {
@@ -1073,11 +1065,6 @@ export function BaseballStadium({
   const flight = getBallFlight(face);
   const pitchHistory = getPlateAppearancePitchHistory(game.eventLog);
   const { cue, skip } = usePresentation(game.eventLog);
-  const playTrace = getActivePlayTrace(
-    game.eventLog,
-    game.pitchDuel,
-    game.phase,
-  );
   const catcherView = shouldUseCatcherView(game.phase, face);
   const battingTeamName =
     game.config[game.battingTeam === "away" ? "awayTeamName" : "homeTeamName"];
@@ -1091,7 +1078,6 @@ export function BaseballStadium({
       className="bbg-diamond bbg-stadium"
       data-camera={catcherView ? "catcher" : "field"}
       data-cue={cue?.type ?? "idle"}
-      data-duel-winner={playTrace?.winner ?? undefined}
     >
       {catcherView ? (
         <CatcherPitchStage cue={cue} pitchHistory={pitchHistory} />
@@ -1235,13 +1221,6 @@ export function BaseballStadium({
           <PitchMarkers pitchHistory={pitchHistory} />
         </div>
       ) : null}
-      {playTrace ? (
-        <BaseballPlayTrace
-          key={playTrace.key}
-          phase={game.phase}
-          trace={playTrace}
-        />
-      ) : null}
       {cue ? (
         <button
           aria-label="현재 연출 빠르게 넘기기"
@@ -1254,119 +1233,6 @@ export function BaseballStadium({
         </button>
       ) : null}
     </div>
-  );
-}
-
-type ActivePlayTrace = {
-  key: string;
-  pitcherChoice: string;
-  batterChoice: string;
-  cards: string;
-  cardUsed: boolean;
-  result: string | null;
-  winner: "batter" | "pitcher" | null;
-};
-
-function getActivePlayTrace(
-  events: GameEvent[],
-  pitchDuel: GameState["pitchDuel"] | GameView["pitchDuel"] | undefined,
-  phase: GamePhase | undefined,
-): ActivePlayTrace | null {
-  const commitIndex = events.findLastIndex(
-    (event) => event.kind === "pitch_commit",
-  );
-  const resultIndex = events.findLastIndex(
-    (event) => event.kind === "pitch_result",
-  );
-  const focusIndex = Math.max(commitIndex, resultIndex);
-  const boundaryIndex = events.findLastIndex(
-    (event, index) =>
-      index < focusIndex &&
-      (event.kind === "pitch_result" || event.kind === "plate_appearance"),
-  );
-  const segment = events.slice(boundaryIndex + 1);
-  const commit = segment.findLast((event) => event.kind === "pitch_commit");
-  const reveal = segment.findLast((event) => event.kind === "pitch_result");
-  const cardEvents = segment.filter(
-    (event) => event.kind === "card_play" && event.cardId,
-  );
-
-  if (!commit && !reveal && cardEvents.length === 0) return null;
-
-  const visiblePitch = reveal?.pitchTarget ?? pitchDuel?.pitcherChoice;
-  const cardNames = cardEvents.map(
-    (event) => CARD_DEFINITIONS[event.cardId!].name,
-  );
-  const uniqueCardNames = [...new Set(cardNames)];
-  const cardSummary = uniqueCardNames.length
-    ? `${uniqueCardNames.slice(0, 2).join(" · ")}${uniqueCardNames.length > 2 ? ` +${uniqueCardNames.length - 2}` : ""}`
-    : phase === "awaiting_card"
-      ? "선택 중"
-      : segment.some((event) => event.kind === "card_pass")
-        ? "사용 안 함"
-        : "개입 없음";
-  const lastEvent = segment.at(-1);
-
-  return {
-    key: `${commit?.sequence ?? reveal?.sequence ?? "card"}-${lastEvent?.sequence ?? 0}`,
-    pitcherChoice: visiblePitch
-      ? PITCH_TARGET_LABELS[visiblePitch]
-      : "선택 완료",
-    batterChoice: reveal?.swingDecision
-      ? reveal.swingDecision === "swing"
-        ? "스윙"
-        : "지켜보기"
-      : phase === "awaiting_swing"
-        ? "판단 중"
-        : "선택 대기",
-    cards: cardSummary,
-    cardUsed: cardEvents.length > 0,
-    result: reveal?.face ? FACE_LABELS[reveal.face] : null,
-    winner: reveal?.duelWinner ?? null,
-  };
-}
-
-function BaseballPlayTrace({
-  phase,
-  trace,
-}: {
-  phase: GamePhase | undefined;
-  trace: ActivePlayTrace;
-}) {
-  const completed = Boolean(trace.result);
-  return (
-    <section
-      aria-label="이번 승부 선택 기록"
-      className="bbg-play-trace"
-      data-completed={completed}
-      data-winner={trace.winner ?? "pending"}
-    >
-      <div className="bbg-play-trace-choice is-pitcher">
-        <small>투수</small>
-        <strong>{trace.pitcherChoice}</strong>
-      </div>
-      <i aria-hidden="true" className="bbg-play-trace-link" />
-      <div className="bbg-play-trace-choice is-batter">
-        <small>타자</small>
-        <strong>{trace.batterChoice}</strong>
-      </div>
-      <div className="bbg-play-trace-card" data-used={trace.cardUsed}>
-        <small>카드</small>
-        <strong>{trace.cards}</strong>
-      </div>
-      {trace.result ? (
-        <p className="bbg-play-trace-result">
-          <b>{trace.winner === "batter" ? "타자가 읽었다" : "투수가 잡았다"}</b>
-          <span>{trace.result}</span>
-        </p>
-      ) : (
-        <p className="bbg-play-trace-result is-pending">
-          <b>
-            {phase === "awaiting_swing" ? "타자 선택 대기" : "승부 진행 중"}
-          </b>
-        </p>
-      )}
-    </section>
   );
 }
 
@@ -1389,9 +1255,17 @@ function PitchMarkers({
       key={event.sequence}
       style={{ left: `${location.x}%`, top: `${location.y}%` }}
     >
-      {location.pitchNumber}
+      <b>{location.pitchNumber}</b>
+      <span>{shortPitchCall(face)}</span>
     </i>
   ));
+}
+
+function shortPitchCall(face: PitchFace) {
+  if (face === "B") return "B";
+  if (face === "F") return "F";
+  if (face === "C") return "IN";
+  return "S";
 }
 
 function CatcherPitchStage({
@@ -1405,6 +1279,10 @@ function CatcherPitchStage({
   const endPoint = pitchCue
     ? catcherPitchPoint(pitchCue.location)
     : { x: 450, y: 410 };
+  const latestPitch = pitchHistory.at(-1);
+  const latestPoint = latestPitch
+    ? catcherPitchPoint(latestPitch.location)
+    : null;
   return (
     <div
       aria-label="포수 시점 스트라이크존"
@@ -1482,6 +1360,12 @@ function CatcherPitchStage({
             </circle>
           </g>
         ) : null}
+        {!pitchCue && latestPoint ? (
+          <path
+            className="bbg-last-pitch-path"
+            d={`M450 285 Q${410 + latestPoint.x * 0.08} 320 ${latestPoint.x} ${latestPoint.y}`}
+          />
+        ) : null}
       </svg>
       <div className="bbg-catcher-zone" aria-label="투구 위치">
         <span aria-hidden="true" className="bbg-zone-grid" />
@@ -1515,8 +1399,8 @@ function PitchSequence({
 
 function catcherPitchPoint(location: PitchLocation) {
   return {
-    x: 340 + location.x * 2.2,
-    y: 350 + location.y * 2.25,
+    x: 300 + location.x * 3,
+    y: 235 + location.y * 3,
   };
 }
 
@@ -1789,23 +1673,6 @@ function PlayResult({
           ) : null}
         </div>
       </div>
-      <div className="bbg-result-side">
-        <div className="bbg-move-list">
-          {event?.moves.length
-            ? event.moves.map((move, index) => (
-                <span key={`${move.runner}-${move.to}-${index}`}>
-                  {formatRunner(move.from)}
-                  <ArrowRight aria-hidden="true" size={14} />
-                  <strong>{formatDestination(move.to)}</strong>
-                </span>
-              ))
-            : null}
-        </div>
-        <p className="bbg-next-play">
-          <span>NEXT</span>
-          <strong>{formatNextPlay(event, game, sideChange)}</strong>
-        </p>
-      </div>
     </div>
   );
 }
@@ -1824,39 +1691,6 @@ function formatBases(game: GameState) {
   if (bases.length === 0) return "주자 없음";
   if (bases.length === 3) return "만루";
   return `${bases.join("·")}루`;
-}
-
-function formatRunner(origin: "batter" | "first" | "second" | "third") {
-  if (origin === "batter") return "타자";
-  return `${origin === "first" ? "1" : origin === "second" ? "2" : "3"}루 주자`;
-}
-
-function formatDestination(
-  destination: "first" | "second" | "third" | "home" | "out",
-) {
-  if (destination === "home") return "홈인";
-  if (destination === "out") return "아웃";
-  return `${destination === "first" ? "1" : destination === "second" ? "2" : "3"}루`;
-}
-
-function formatNextPlay(
-  event: GameEvent | undefined,
-  game: GameState,
-  sideChange: boolean,
-) {
-  if (!event) return "경기 시작 대기";
-  if (game.phase === "finished") return "경기 종료";
-  if (game.phase !== "awaiting_pitch") return PHASE_TITLE[game.phase];
-  if (sideChange) {
-    const teamName =
-      game.config[
-        game.battingTeam === "away" ? "awayTeamName" : "homeTeamName"
-      ];
-    return `${teamName} 첫 타자에게 투구`;
-  }
-  return event.kind === "count"
-    ? "같은 타자에게 다음 투구"
-    : "다음 타자에게 투구";
 }
 
 function gameActionLabel(action: GameAction, game: GameState) {

@@ -165,22 +165,19 @@ test("두 기기가 방을 만들고 비공개 손패로 같은 경기를 진행
   expect(lockedViews[1].snapshot.view.pitchDuel.actualLocation).toBeNull();
   await expect(
     host.getByRole("region", { name: "이번 승부 선택 기록" }),
-  ).toContainText("투수선택 완료");
+  ).toHaveCount(0);
   await expect(
     home.getByRole("region", { name: "이번 승부 선택 기록" }),
-  ).toContainText("투수스트라이크");
+  ).toHaveCount(0);
 
   await expect(host.getByRole("region", { name: "타격 선택" })).toBeVisible();
   await host.getByRole("button", { name: /지켜보기/ }).click();
   await expect(
     host.locator(".bbg-pitch-marker[data-current='true']"),
   ).toBeVisible();
-  const resolvedTrace = host.getByRole("region", {
-    name: "이번 승부 선택 기록",
-  });
-  await expect(resolvedTrace).toContainText("투수스트라이크");
-  await expect(resolvedTrace).toContainText("타자지켜보기");
-  await expect(resolvedTrace).toContainText("카드개입 없음");
+  await expect(
+    host.getByRole("list", { name: "현재 타자 누적 투구" }),
+  ).toBeVisible();
 
   const directFace = await home.evaluate(async (code) => {
     const response = await fetch(`/api/baseball-game/rooms/${code}/actions`, {

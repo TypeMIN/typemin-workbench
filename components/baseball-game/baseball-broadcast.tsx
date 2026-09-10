@@ -258,16 +258,16 @@ export function usePresentation(events: GameEvent[]) {
   const cueIndex = progress.revision === latestRevision ? progress.index : 0;
 
   useEffect(() => {
-    if (cues.length < 2) return;
-    const interval = Math.min(360, 2600 / cues.length);
+    if (cues.length === 0) return;
+    const interval = Math.min(420, 2600 / cues.length);
     let nextIndex = 0;
     const timer = window.setInterval(() => {
       nextIndex += 1;
       setProgress({
         revision: latestRevision,
-        index: Math.min(nextIndex, cues.length - 1),
+        index: Math.min(nextIndex, cues.length),
       });
-      if (nextIndex >= cues.length - 1) window.clearInterval(timer);
+      if (nextIndex >= cues.length) window.clearInterval(timer);
     }, interval);
     return () => window.clearInterval(timer);
   }, [cues, latestRevision]);
@@ -278,7 +278,7 @@ export function usePresentation(events: GameEvent[]) {
     skip: () =>
       setProgress({
         revision: latestRevision,
-        index: Math.max(0, cues.length - 1),
+        index: cues.length,
       }),
   };
 }

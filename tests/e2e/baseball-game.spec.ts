@@ -121,7 +121,6 @@ test("야구 게임에서 투타 심리전과 새 경기를 진행한다", async
       field: bounds(".bbg-field-content"),
       result: bounds(".bbg-play-result"),
       resultCopy: bounds(".bbg-result-copy"),
-      resultSide: bounds(".bbg-result-side"),
     };
   });
   expect(broadcastFit.console.bottom).toBeLessThanOrEqual(
@@ -144,9 +143,6 @@ test("야구 게임에서 투타 심리전과 새 경기를 진행한다", async
   expect(broadcastFit.resultCopy.bottom).toBeLessThanOrEqual(
     broadcastFit.result.bottom + 1,
   );
-  expect(broadcastFit.resultSide.bottom).toBeLessThanOrEqual(
-    broadcastFit.result.bottom + 1,
-  );
   const scoreRows = await page.locator(".bbg-team-score").evaluateAll((rows) =>
     rows.map((row) => {
       const rect = row.getBoundingClientRect();
@@ -161,18 +157,19 @@ test("야구 게임에서 투타 심리전과 새 경기를 진행한다", async
   await expect(page.getByText("원정팀 판단 중")).toBeVisible();
   await expect(
     page.getByRole("region", { name: "이번 승부 선택 기록" }),
-  ).toContainText("투수스트라이크");
+  ).toHaveCount(0);
   await expect(
-    page.locator(".bbg-pitch-marker[data-current='true']"),
+    page.locator(".bbg-pitch-marker[data-current='true'] b"),
   ).toHaveText("1");
   await passCardWindows(page);
-  const playTrace = page.getByRole("region", {
-    name: "이번 승부 선택 기록",
-  });
-  await expect(playTrace).toContainText("타자지켜보기");
-  await expect(playTrace).toContainText("투수가 잡았다");
+  await expect(
+    page.getByRole("list", { name: "현재 타자 누적 투구" }),
+  ).toBeVisible();
+  await expect(page.locator(".bbg-last-pitch-path")).toBeVisible();
   await page.waitForTimeout(2_600);
-  await expect(playTrace).toBeVisible();
+  await expect(
+    page.getByRole("button", { name: "현재 연출 빠르게 넘기기" }),
+  ).toHaveCount(0);
   await expect(page.getByText("특정 면 강제 입력")).toHaveCount(0);
 
   await page
@@ -236,9 +233,14 @@ test("싱글플레이에서 AI가 타격 판단을 이어서 진행한다", asyn
   await page.goto("/baseball-game");
   await page.getByRole("button", { name: "스트라이크 선택" }).click();
   await expect(page.getByText("원정팀 판단 중")).toBeVisible();
-  await expect(page.getByTestId("play-result")).toContainText("타자", {
+  await expect(
+    page.locator(".bbg-pitch-marker[data-current='true']"),
+  ).toBeVisible({
     timeout: 3_000,
   });
+  await expect(
+    page.getByRole("list", { name: "현재 타자 누적 투구" }),
+  ).toBeVisible();
   await expect(page.locator(".bbg-log-panel summary strong")).not.toHaveText(
     "0",
   );
