@@ -1,12 +1,6 @@
 "use client";
 
-import {
-  BATTER_DUEL_HIT_BONUS,
-  PITCH_TARGET_LABELS,
-  PITCH_TARGETS,
-  PITCH_TENDENCIES,
-  PITCHER_DUEL_HIT_PENALTY,
-} from "@/lib/baseball-game/duel";
+import { PITCH_TARGET_LABELS, PITCH_TARGETS } from "@/lib/baseball-game/duel";
 import type {
   GameAction,
   GameState,
@@ -83,9 +77,9 @@ export function BaseballDuelControl({
                 }
                 type="button"
               >
-                <small>스트라이크 예상</small>
+                <small>공을 읽었다면</small>
                 <strong>스윙</strong>
-                <span>읽으면 컨택 82% · 안타성 54%</span>
+                <span>강한 타구를 노린다</span>
               </button>
               <button
                 className="is-take"
@@ -95,9 +89,9 @@ export function BaseballDuelControl({
                 }
                 type="button"
               >
-                <small>볼 예상</small>
+                <small>볼을 읽었다면</small>
                 <strong>지켜보기</strong>
-                <span>읽으면 볼 · 틀리면 스트라이크</span>
+                <span>차분하게 흘려보낸다</span>
               </button>
             </div>
             <DuelPayoff />
@@ -122,7 +116,6 @@ function PitchChoice({
   onSelect: () => void;
   target: PitchTarget;
 }) {
-  const tendency = PITCH_TENDENCIES[target];
   const isStrike = target === "strike";
   return (
     <button
@@ -132,13 +125,9 @@ function PitchChoice({
       onClick={onSelect}
       type="button"
     >
-      <small>{isStrike ? "정면 승부" : "스윙 유도"}</small>
+      <small>{isStrike ? "정면 승부" : "유인 승부"}</small>
       <strong>{PITCH_TARGET_LABELS[target]}</strong>
-      <span>
-        {isStrike
-          ? `스윙 시 컨택 ${tendency.contact}%`
-          : `속이면 헛스윙 ${tendency.whiff}%`}
-      </span>
+      <span>{isStrike ? "존 안으로 꽂는다" : "존 밖으로 흘린다"}</span>
     </button>
   );
 }
@@ -148,11 +137,11 @@ function DuelPayoff() {
     <div className="bbg-duel-payoff" aria-label="심리전 보상">
       <span>
         <b>타자 승리</b>
-        컨택 82% · 안타성 +{BATTER_DUEL_HIT_BONUS}%p
+        강한 타구 기회
       </span>
       <span>
         <b>투수 승리</b>
-        헛스윙 80% · 안타성 -{PITCHER_DUEL_HIT_PENALTY}%p
+        헛스윙과 카운트 우위
       </span>
     </div>
   );

@@ -47,10 +47,11 @@ test("야구 게임에서 투타 심리전과 새 경기를 진행한다", async
   await expect(page.locator(".bbg-pitch-choice")).toHaveCount(2);
   await expect(
     page.getByRole("button", { name: "스트라이크 선택" }),
-  ).toContainText("컨택 82%");
+  ).toContainText("존 안으로 꽂는다");
   await expect(page.getByRole("button", { name: "볼 선택" })).toContainText(
-    "헛스윙 80%",
+    "존 밖으로 흘린다",
   );
+  await expect(page.locator(".bbg-duel")).not.toContainText("%");
   await expect(
     page.getByRole("img", { name: "포수 시점 스트라이크존" }),
   ).toBeVisible();
@@ -156,6 +157,9 @@ test("야구 게임에서 투타 심리전과 새 경기를 진행한다", async
 
   await page.getByRole("button", { name: "스트라이크 선택" }).click();
   await expect(page.getByText("원정팀 판단 중")).toBeVisible();
+  await expect(
+    page.getByRole("region", { name: "이번 승부 선택 기록" }),
+  ).toContainText("투수스트라이크");
   await expect(page.getByTestId("play-result")).toContainText("타자", {
     timeout: 3_000,
   });
@@ -166,7 +170,14 @@ test("야구 게임에서 투타 심리전과 새 경기를 진행한다", async
   await expect(page.getByTestId("play-result")).toContainText(
     "투수 스트라이크",
   );
-  await expect(page.getByTestId("play-result")).toContainText("승부 성공");
+  await expect(page.getByTestId("play-result")).toContainText("투수가 잡았다");
+  const playTrace = page.getByRole("region", {
+    name: "이번 승부 선택 기록",
+  });
+  await expect(playTrace).toContainText("타자지켜보기");
+  await expect(playTrace).toContainText("투수가 잡았다");
+  await page.waitForTimeout(2_600);
+  await expect(playTrace).toBeVisible();
   await expect(page.getByText("특정 면 강제 입력")).toHaveCount(0);
 
   await page

@@ -9896,3 +9896,217 @@
     display: none;
   }
 }
+
+/* Persistent at-bat story: every choice stays visible until the next pitch begins. */
+.bbg-play-trace {
+  position: absolute;
+  z-index: 7;
+  top: 76px;
+  left: 50%;
+  display: grid;
+  width: min(560px, calc(100% - 32px));
+  grid-template-columns: minmax(82px, 1fr) 18px minmax(82px, 1fr) minmax(
+      118px,
+      1.25fr
+    );
+  grid-template-areas:
+    "pitcher link batter card"
+    "result result result result";
+  gap: 5px 4px;
+  translate: -50% 0;
+  padding: 5px;
+  border: 1px solid rgb(222 238 244 / 15%);
+  border-radius: 13px;
+  color: #eff8f5;
+  background: rgb(3 12 19 / 78%);
+  box-shadow: 0 14px 34px rgb(0 0 0 / 20%);
+  backdrop-filter: blur(12px);
+  animation: bbg-trace-in 240ms ease-out both;
+  pointer-events: none;
+}
+
+.bbg-play-trace-choice,
+.bbg-play-trace-card {
+  display: grid;
+  min-width: 0;
+  align-content: center;
+  gap: 1px;
+  min-height: 34px;
+  padding: 4px 8px;
+  border-radius: 8px;
+  background: rgb(255 255 255 / 5%);
+}
+
+.bbg-play-trace-choice.is-pitcher {
+  grid-area: pitcher;
+  box-shadow: inset 2px 0 #75ddbc;
+}
+
+.bbg-play-trace-choice.is-batter {
+  grid-area: batter;
+  box-shadow: inset 2px 0 #ffd76b;
+}
+
+.bbg-play-trace-card {
+  grid-area: card;
+}
+
+.bbg-play-trace-card[data-used="true"] {
+  color: #ffe49a;
+  background: rgb(255 215 107 / 11%);
+  box-shadow:
+    inset 0 0 0 1px rgb(255 215 107 / 24%),
+    0 0 20px rgb(255 198 70 / 10%);
+  animation: bbg-card-arrive 360ms cubic-bezier(0.2, 0.85, 0.25, 1.15) both;
+}
+
+.bbg-play-trace small {
+  color: #8299a5;
+  font-size: 6px;
+  font-weight: 900;
+  letter-spacing: 0.08em;
+}
+
+.bbg-play-trace strong {
+  overflow: hidden;
+  font-size: 10px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.bbg-play-trace-link {
+  position: relative;
+  grid-area: link;
+}
+
+.bbg-play-trace-link::before,
+.bbg-play-trace-link::after {
+  position: absolute;
+  top: 50%;
+  content: "";
+}
+
+.bbg-play-trace-link::before {
+  right: 1px;
+  left: 1px;
+  height: 1px;
+  background: rgb(219 234 240 / 22%);
+}
+
+.bbg-play-trace-link::after {
+  left: 50%;
+  width: 5px;
+  height: 5px;
+  translate: -50% -50%;
+  border: 1px solid rgb(221 237 243 / 45%);
+  border-radius: 50%;
+  background: #07141e;
+}
+
+.bbg-play-trace[data-completed="true"] .bbg-play-trace-link::after {
+  border-color: #dffbf1;
+  background: #72edbd;
+  box-shadow: 0 0 10px rgb(114 237 189 / 64%);
+}
+
+.bbg-play-trace-result {
+  display: flex;
+  min-width: 0;
+  min-height: 23px;
+  grid-area: result;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  margin: 0;
+  border-radius: 7px;
+  color: #b9cbd3;
+  background: rgb(255 255 255 / 4%);
+  font-size: 8px;
+}
+
+.bbg-play-trace-result b {
+  color: #f5fbf9;
+  font-size: 9px;
+}
+
+.bbg-play-trace-result span {
+  color: #07140f;
+  padding: 2px 7px;
+  border-radius: 999px;
+  background: #72edbd;
+  font-weight: 950;
+}
+
+.bbg-play-trace[data-winner="pitcher"] .bbg-play-trace-result span {
+  color: #161103;
+  background: #ffd76b;
+}
+
+.bbg-play-trace-result.is-pending {
+  color: #91a7b3;
+}
+
+.bbg-stadium[data-duel-winner="batter"] .bbg-catcher-view {
+  box-shadow: inset 0 0 80px rgb(80 224 165 / 12%);
+}
+
+.bbg-stadium[data-duel-winner="pitcher"] .bbg-catcher-view {
+  box-shadow: inset 0 0 80px rgb(255 205 92 / 10%);
+}
+
+@keyframes bbg-trace-in {
+  from {
+    opacity: 0;
+    transform: translateY(-7px) scale(0.98);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+@keyframes bbg-card-arrive {
+  from {
+    opacity: 0.25;
+    transform: translateY(-6px) scale(0.94);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+@media (max-width: 680px) {
+  .bbg-play-trace {
+    top: 66px;
+    width: calc(100% - 14px);
+    grid-template-columns: minmax(66px, 1fr) 12px minmax(66px, 1fr) minmax(
+        84px,
+        1.15fr
+      );
+    gap: 4px 2px;
+    padding: 4px;
+    border-radius: 10px;
+  }
+
+  .bbg-play-trace-choice,
+  .bbg-play-trace-card {
+    min-height: 29px;
+    padding: 3px 5px;
+  }
+
+  .bbg-play-trace strong {
+    font-size: 8px;
+  }
+
+  .bbg-play-trace-result {
+    min-height: 20px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .bbg-play-trace,
+  .bbg-play-trace-card[data-used="true"] {
+    animation: none;
+  }
+}

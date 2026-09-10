@@ -18,11 +18,7 @@ import {
 import { BaseballDuelControl } from "@/components/baseball-game/baseball-duel-control";
 import { chooseAiAction } from "@/lib/baseball-game/ai";
 import { CARD_DEFINITIONS } from "@/lib/baseball-game/cards";
-import {
-  BATTER_DUEL_HIT_BONUS,
-  PITCH_TARGET_LABELS,
-  PITCHER_DUEL_HIT_PENALTY,
-} from "@/lib/baseball-game/duel";
+import { PITCH_TARGET_LABELS } from "@/lib/baseball-game/duel";
 import {
   createGame,
   getActionOwner,
@@ -41,6 +37,7 @@ import type {
   GameEvent,
   GamePhase,
   GameState,
+  GameView,
   PitchLocation,
   PresentationCue,
   RunnerDestination,
@@ -1104,9 +1101,7 @@ export function BaseballStadium({
   face?: DieFace;
   game: Pick<GameState, "bases" | "battingTeam" | "config" | "eventLog"> & {
     phase?: GamePhase;
-    pitchDuel?: {
-      status: "pitch_locked" | "revealed";
-    } | null;
+    pitchDuel?: GameState["pitchDuel"] | GameView["pitchDuel"];
   };
 }) {
   const occupied = [
@@ -1117,6 +1112,11 @@ export function BaseballStadium({
   const flight = getBallFlight(face);
   const pitchHistory = getPlateAppearancePitchHistory(game.eventLog);
   const { cue, skip } = usePresentation(game.eventLog);
+  const playTrace = getActivePlayTrace(
+    game.eventLog,
+    game.pitchDuel,
+    game.phase,
+  );
   const catcherView = shouldUseCatcherView(game.phase, face);
   const battingTeamName =
     game.config[game.battingTeam === "away" ? "awayTeamName" : "homeTeamName"];
@@ -1130,6 +1130,7 @@ export function BaseballStadium({
       className="bbg-diamond bbg-stadium"
       data-camera={catcherView ? "catcher" : "field"}
       data-cue={cue?.type ?? "idle"}
+      data-duel-winner={playTrace?.winner ?? undefined}
     >
       {catcherView ? (
         <CatcherPitchStage
@@ -1277,6 +1278,13 @@ export function BaseballStadium({
           <PitchMarkers pitchHistory={pitchHistory} />
         </div>
       ) : null}
+      {playTrace ? (
+        <BaseballPlayTrace
+          key={playTrace.key}
+          phase={game.phase}
+          trace={playTrace}
+        />
+      ) : null}
       {cue ? (
         <button
           aria-label="현재 연출 빠르게 넘기기"
@@ -1289,6 +1297,119 @@ export function BaseballStadium({
         </button>
       ) : null}
     </div>
+  );
+}
+
+type ActivePlayTrace = {
+  key: string;
+  pitcherChoice: string;
+  batterChoice: string;
+  cards: string;
+  cardUsed: boolean;
+  result: string | null;
+  winner: "batter" | "pitcher" | null;
+};
+
+function getActivePlayTrace(
+  events: GameEvent[],
+  pitchDuel: GameState["pitchDuel"] | GameView["pitchDuel"] | undefined,
+  phase: GamePhase | undefined,
+): ActivePlayTrace | null {
+  const commitIndex = events.findLastIndex(
+    (event) => event.kind === "pitch_commit",
+  );
+  const resultIndex = events.findLastIndex(
+    (event) => event.kind === "pitch_result",
+  );
+  const focusIndex = Math.max(commitIndex, resultIndex);
+  const boundaryIndex = events.findLastIndex(
+    (event, index) =>
+      index < focusIndex &&
+      (event.kind === "pitch_result" || event.kind === "plate_appearance"),
+  );
+  const segment = events.slice(boundaryIndex + 1);
+  const commit = segment.findLast((event) => event.kind === "pitch_commit");
+  const reveal = segment.findLast((event) => event.kind === "pitch_result");
+  const cardEvents = segment.filter(
+    (event) => event.kind === "card_play" && event.cardId,
+  );
+
+  if (!commit && !reveal && cardEvents.length === 0) return null;
+
+  const visiblePitch = reveal?.pitchTarget ?? pitchDuel?.pitcherChoice;
+  const cardNames = cardEvents.map(
+    (event) => CARD_DEFINITIONS[event.cardId!].name,
+  );
+  const uniqueCardNames = [...new Set(cardNames)];
+  const cardSummary = uniqueCardNames.length
+    ? `${uniqueCardNames.slice(0, 2).join(" · ")}${uniqueCardNames.length > 2 ? ` +${uniqueCardNames.length - 2}` : ""}`
+    : phase === "awaiting_card"
+      ? "선택 중"
+      : segment.some((event) => event.kind === "card_pass")
+        ? "사용 안 함"
+        : "개입 없음";
+  const lastEvent = segment.at(-1);
+
+  return {
+    key: `${commit?.sequence ?? reveal?.sequence ?? "card"}-${lastEvent?.sequence ?? 0}`,
+    pitcherChoice: visiblePitch
+      ? PITCH_TARGET_LABELS[visiblePitch]
+      : "선택 완료",
+    batterChoice: reveal?.swingDecision
+      ? reveal.swingDecision === "swing"
+        ? "스윙"
+        : "지켜보기"
+      : phase === "awaiting_swing"
+        ? "판단 중"
+        : "선택 대기",
+    cards: cardSummary,
+    cardUsed: cardEvents.length > 0,
+    result: reveal?.face ? FACE_LABELS[reveal.face] : null,
+    winner: reveal?.duelWinner ?? null,
+  };
+}
+
+function BaseballPlayTrace({
+  phase,
+  trace,
+}: {
+  phase: GamePhase | undefined;
+  trace: ActivePlayTrace;
+}) {
+  const completed = Boolean(trace.result);
+  return (
+    <section
+      aria-label="이번 승부 선택 기록"
+      className="bbg-play-trace"
+      data-completed={completed}
+      data-winner={trace.winner ?? "pending"}
+    >
+      <div className="bbg-play-trace-choice is-pitcher">
+        <small>투수</small>
+        <strong>{trace.pitcherChoice}</strong>
+      </div>
+      <i aria-hidden="true" className="bbg-play-trace-link" />
+      <div className="bbg-play-trace-choice is-batter">
+        <small>타자</small>
+        <strong>{trace.batterChoice}</strong>
+      </div>
+      <div className="bbg-play-trace-card" data-used={trace.cardUsed}>
+        <small>카드</small>
+        <strong>{trace.cards}</strong>
+      </div>
+      {trace.result ? (
+        <p className="bbg-play-trace-result">
+          <b>{trace.winner === "batter" ? "타자가 읽었다" : "투수가 잡았다"}</b>
+          <span>{trace.result}</span>
+        </p>
+      ) : (
+        <p className="bbg-play-trace-result is-pending">
+          <b>
+            {phase === "awaiting_swing" ? "타자 선택 대기" : "승부 진행 중"}
+          </b>
+        </p>
+      )}
+    </section>
   );
 }
 
@@ -1720,11 +1841,11 @@ function PlayResult({
             <b className="is-duel" data-winner={pitchReveal.duelWinner}>
               {pitchReveal.duelWinner === "batter"
                 ? pitchReveal.swingDecision === "swing"
-                  ? `타자 승부 성공 · 안타성 +${BATTER_DUEL_HIT_BONUS}%p`
-                  : "타자 승부 성공 · 볼 획득"
+                  ? "타자가 읽었다 · 강한 타구 기회"
+                  : "타자가 읽었다 · 볼 획득"
                 : pitchReveal.swingDecision === "swing"
-                  ? `투수 승부 성공 · 헛스윙 80% · 안타성 -${PITCHER_DUEL_HIT_PENALTY}%p`
-                  : "투수 승부 성공 · 스트라이크 획득"}
+                  ? "투수가 속였다 · 헛스윙 기회"
+                  : "투수가 잡았다 · 스트라이크 획득"}
             </b>
           ) : null}
           {event?.runs ? <b className="is-score">+{event.runs}점</b> : null}
@@ -1836,7 +1957,11 @@ function gameActionLabel(action: GameAction, game: GameState) {
       ? `${CARD_DEFINITIONS[card.cardId].name} 카드를 사용했습니다`
       : "전략카드를 사용했습니다";
   }
-  if (action.type === "SELECT_PITCH") return "투구를 선택했습니다";
+  if (action.type === "SELECT_PITCH") {
+    return action.target === "ball"
+      ? "볼을 선택했습니다"
+      : "스트라이크를 선택했습니다";
+  }
   if (action.type === "SELECT_SWING") {
     return action.decision === "swing"
       ? "스윙을 선택했습니다"

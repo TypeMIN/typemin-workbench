@@ -117,13 +117,15 @@ describe("BaseballPartyPlayer", () => {
     fireEvent.click(
       await screen.findByRole("button", { name: "스트라이크 선택" }),
     );
-    expect(screen.getByRole("status")).toHaveTextContent("투구 선택 요청 중");
+    expect(screen.getByRole("status")).toHaveTextContent(
+      "스트라이크 선택 요청 중",
+    );
     expect(
       screen.getByRole("button", { name: "스트라이크 선택" }),
     ).toBeDisabled();
 
     resolveAction?.(response({ snapshot: updated }));
-    expect(await screen.findByText("투구 선택 반영 완료")).toBeVisible();
+    expect(await screen.findByText("스트라이크 선택 반영 완료")).toBeVisible();
     expect(screen.getByText("팀원의 결정을 기다리는 중")).toBeVisible();
   });
 });

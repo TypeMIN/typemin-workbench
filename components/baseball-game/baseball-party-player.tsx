@@ -10,6 +10,7 @@ import {
   useBaseballActionFeedback,
 } from "./baseball-action-feedback";
 import { CARD_DEFINITIONS } from "@/lib/baseball-game/cards";
+import { PITCH_TARGET_LABELS } from "@/lib/baseball-game/duel";
 import type { MultiplayerCommand } from "@/lib/baseball-game/multiplayer/types";
 import type { PartyPlayerSnapshot } from "@/lib/baseball-game/party/types";
 import { BaseballAudio, BroadcastLineScore } from "./baseball-broadcast";
@@ -436,7 +437,9 @@ function roomCodeLabel(value: string) {
 }
 
 function partyCommandLabel(command: MultiplayerCommand, game: GameView) {
-  if (command.type === "SELECT_PITCH") return "투구 선택";
+  if (command.type === "SELECT_PITCH") {
+    return `${PITCH_TARGET_LABELS[command.target]} 선택`;
+  }
   if (command.type === "SELECT_SWING") {
     return command.decision === "swing" ? "스윙 선택" : "지켜보기 선택";
   }
