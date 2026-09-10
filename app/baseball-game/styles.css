@@ -10111,38 +10111,100 @@
   }
 }
 
-/* Focus pass: keep only decisions and durable play information on the field. */
-.bbg-core-choice-overlay {
+/* Focus pass: decisions stay docked; the chosen action gets the center stage briefly. */
+.bbg-choice-dock {
   position: absolute;
   z-index: 9;
-  inset: 0;
-  display: grid;
-  place-items: center;
-  padding: 72px 16px 20px;
-  background: radial-gradient(circle, rgb(2 10 16 / 38%), transparent 64%);
+  bottom: 12px;
+  left: 50%;
+  width: min(360px, calc(100% - 24px));
+  translate: -50% 0;
   pointer-events: none;
 }
 
-.bbg-core-choice-overlay .bbg-duel {
-  width: min(430px, 100%);
-  gap: 14px;
-  padding: 16px;
+.bbg-choice-dock .bbg-duel {
+  width: 100%;
+  grid-template-columns: 76px minmax(0, 1fr);
+  align-items: center;
+  gap: 8px;
+  padding: 7px;
   border: 1px solid rgb(224 241 247 / 26%);
-  border-radius: 18px;
+  border-radius: 14px;
   background: rgb(4 14 23 / 92%);
-  box-shadow: 0 24px 72px rgb(0 0 0 / 46%);
-  backdrop-filter: blur(16px);
+  box-shadow: 0 14px 38px rgb(0 0 0 / 36%);
+  backdrop-filter: blur(12px);
   pointer-events: auto;
 }
 
-.bbg-core-choice-overlay .bbg-duel-heading {
+.bbg-choice-dock .bbg-duel-heading {
   justify-content: center;
 }
 
-.bbg-core-choice-overlay .bbg-duel-heading strong {
+.bbg-choice-dock .bbg-duel-heading strong {
   color: #f4fbf8;
-  font-size: 15px;
+  font-size: 10px;
   letter-spacing: -0.02em;
+}
+
+.bbg-choice-dock .bbg-pitch-choice-grid,
+.bbg-choice-dock .bbg-swing-actions {
+  gap: 6px;
+}
+
+.bbg-choice-dock .bbg-duel--simple .bbg-pitch-choice,
+.bbg-choice-dock .bbg-duel--simple .bbg-pitch-choice.is-ball,
+.bbg-choice-dock .bbg-duel--simple .bbg-swing-actions button {
+  min-height: 52px;
+  grid-template-columns: auto auto;
+  place-content: center;
+  gap: 7px;
+  padding: 7px 10px;
+  border-radius: 9px;
+}
+
+.bbg-choice-dock .bbg-duel--simple .bbg-pitch-choice > i,
+.bbg-choice-dock .bbg-duel--simple .bbg-swing-actions button > i {
+  width: 18px;
+  height: 18px;
+}
+
+.bbg-choice-dock .bbg-duel--simple .bbg-pitch-choice > strong,
+.bbg-choice-dock .bbg-duel--simple .bbg-swing-actions strong {
+  font-size: 13px;
+}
+
+.bbg-choice-flash {
+  position: absolute;
+  z-index: 11;
+  top: 50%;
+  left: 50%;
+  min-width: 180px;
+  translate: -50% -50%;
+  padding: 14px 24px;
+  border: 1px solid rgb(126 242 198 / 55%);
+  border-radius: 999px;
+  color: #effff9;
+  background: rgb(3 16 23 / 92%);
+  box-shadow:
+    0 18px 60px rgb(0 0 0 / 48%),
+    0 0 34px rgb(112 239 186 / 18%);
+  font-size: clamp(24px, 4vw, 42px);
+  font-weight: 950;
+  letter-spacing: -0.05em;
+  text-align: center;
+  pointer-events: none;
+  animation: bbg-choice-flash 800ms ease-out both;
+}
+
+.bbg-choice-flash[data-tone="swing"] {
+  border-color: rgb(255 215 107 / 58%);
+  box-shadow:
+    0 18px 60px rgb(0 0 0 / 48%),
+    0 0 34px rgb(255 215 107 / 16%);
+}
+
+.bbg-choice-flash[data-tone="card"] {
+  border-color: rgb(142 187 255 / 58%);
 }
 
 .bbg-duel--simple .bbg-pitch-choice,
@@ -10352,38 +10414,48 @@
 }
 
 @media (max-width: 760px) {
-  .bbg-core-choice-overlay {
-    padding: 62px 10px 12px;
+  .bbg-choice-dock {
+    right: 7px;
+    bottom: 7px;
+    left: 7px;
+    width: auto;
+    translate: none;
   }
 
-  .bbg-core-choice-overlay .bbg-duel {
-    width: min(330px, 100%);
-    gap: 10px;
-    padding: 11px;
-    border-radius: 15px;
+  .bbg-choice-dock .bbg-duel {
+    grid-template-columns: 64px minmax(0, 1fr);
+    gap: 5px;
+    padding: 5px;
+    border-radius: 11px;
   }
 
-  .bbg-core-choice-overlay .bbg-duel-heading strong {
-    font-size: 13px;
+  .bbg-choice-dock .bbg-duel-heading strong {
+    font-size: 9px;
   }
 
-  .bbg-duel--simple .bbg-pitch-choice,
-  .bbg-duel--simple .bbg-pitch-choice.is-ball,
-  .bbg-duel--simple .bbg-swing-actions button {
-    min-height: 82px;
-    gap: 7px;
-    padding: 10px;
+  .bbg-choice-dock .bbg-duel--simple .bbg-pitch-choice,
+  .bbg-choice-dock .bbg-duel--simple .bbg-pitch-choice.is-ball,
+  .bbg-choice-dock .bbg-duel--simple .bbg-swing-actions button {
+    min-height: 43px;
+    gap: 5px;
+    padding: 5px 7px;
   }
 
-  .bbg-duel--simple .bbg-pitch-choice > i,
-  .bbg-duel--simple .bbg-swing-actions button > i {
-    width: 27px;
-    height: 27px;
+  .bbg-choice-dock .bbg-duel--simple .bbg-pitch-choice > i,
+  .bbg-choice-dock .bbg-duel--simple .bbg-swing-actions button > i {
+    width: 15px;
+    height: 15px;
   }
 
-  .bbg-duel--simple .bbg-pitch-choice > strong,
-  .bbg-duel--simple .bbg-swing-actions strong {
-    font-size: 15px;
+  .bbg-choice-dock .bbg-duel--simple .bbg-pitch-choice > strong,
+  .bbg-choice-dock .bbg-duel--simple .bbg-swing-actions strong {
+    font-size: 11px;
+  }
+
+  .bbg-choice-flash {
+    min-width: 150px;
+    padding: 12px 20px;
+    font-size: 28px;
   }
 
   .bbg-play-trace {
@@ -10425,7 +10497,7 @@
 
   .bbg-pitch-sequence {
     right: 7px;
-    bottom: 7px;
+    bottom: 66px;
     gap: 3px;
     padding: 3px;
   }
@@ -10464,15 +10536,35 @@
 }
 
 @media (max-height: 720px) and (min-width: 681px) {
-  .bbg-core-choice-overlay .bbg-duel {
-    width: min(390px, 90%);
-    gap: 8px;
-    padding: 10px;
+  .bbg-choice-dock {
+    bottom: 8px;
   }
 
-  .bbg-duel--simple .bbg-pitch-choice,
-  .bbg-duel--simple .bbg-pitch-choice.is-ball,
-  .bbg-duel--simple .bbg-swing-actions button {
-    min-height: 76px;
+  .bbg-choice-dock .bbg-duel--simple .bbg-pitch-choice,
+  .bbg-choice-dock .bbg-duel--simple .bbg-pitch-choice.is-ball,
+  .bbg-choice-dock .bbg-duel--simple .bbg-swing-actions button {
+    min-height: 44px;
+  }
+}
+
+@keyframes bbg-choice-flash {
+  0% {
+    opacity: 0;
+    transform: scale(0.72);
+  }
+  16%,
+  72% {
+    opacity: 1;
+    transform: scale(1);
+  }
+  100% {
+    opacity: 0;
+    transform: scale(1.08);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .bbg-choice-flash {
+    animation: bbg-choice-flash 800ms linear both;
   }
 }

@@ -64,7 +64,14 @@ const DEFAULT_SESSION: SessionConfig = {
   humanTeam: "home",
 };
 
-const AI_TURN_DELAY_MS = 420;
+const AI_TURN_DELAY_MS = 900;
+const CHOICE_FLASH_MS = 800;
+
+type ChoiceFlash = {
+  id: number;
+  label: string;
+  tone: "pitch" | "swing" | "card";
+};
 
 const PHASE_TITLE: Record<GamePhase, string> = {
   awaiting_pitch: "투구 선택",
@@ -86,6 +93,7 @@ export default function BaseballGameDebug() {
   const [multiplayerCode, setMultiplayerCode] = useState("");
   const [creatingRoom, setCreatingRoom] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [choiceFlash, setChoiceFlash] = useState<ChoiceFlash | null>(null);
   const [acknowledgedInterlude, setAcknowledgedInterlude] = useState<
     number | null
   >(null);
@@ -116,6 +124,15 @@ export default function BaseballGameDebug() {
     session.mode === "solo_ai" ? session.humanTeam : actionOwner;
 
   useEffect(() => {
+    if (!choiceFlash) return;
+    const timer = window.setTimeout(
+      () => setChoiceFlash(null),
+      CHOICE_FLASH_MS,
+    );
+    return () => window.clearTimeout(timer);
+  }, [choiceFlash]);
+
+  useEffect(() => {
     if (!isAiTurn || !aiTeam || modalOpen) return;
     const action = chooseAiAction(game, aiTeam);
     if (!action) return;
@@ -133,6 +150,7 @@ export default function BaseballGameDebug() {
       }
       setError(null);
       setGame(result.state);
+      setChoiceFlash(choiceFlashForAction(action, game, true));
       showActionFeedback({
         status: "success",
         title: `${teamNameFor(game, aiTeam)}이 ${gameActionLabel(action, game)}`,
@@ -156,6 +174,7 @@ export default function BaseballGameDebug() {
     }
     setError(null);
     setGame(result.state);
+    setChoiceFlash(choiceFlashForAction(action, game, false));
     showActionFeedback({
       status: "success",
       title: gameActionLabel(action, game),
@@ -209,6 +228,7 @@ export default function BaseballGameDebug() {
 
     setGame(createGame(draft, { seed: createRandomSeed() }));
     setSession(draftSession);
+    setChoiceFlash(null);
     setError(null);
     clearActionFeedback();
     setAcknowledgedInterlude(null);
@@ -219,6 +239,7 @@ export default function BaseballGameDebug() {
     setGame(createGame(game.config, { seed: createRandomSeed() }));
     setDraft(game.config);
     setDraftSession(session);
+    setChoiceFlash(null);
     setError(null);
     clearActionFeedback();
     setAcknowledgedInterlude(null);
@@ -294,13 +315,21 @@ export default function BaseballGameDebug() {
                   events={currentRevisionEvents}
                   key={`highlight-${game.revision}`}
                 />
-                {!isAiTurn &&
-                (game.phase === "awaiting_pitch" ||
-                  game.phase === "awaiting_swing") ? (
-                  <div className="bbg-core-choice-overlay">
+                {choiceFlash ? (
+                  <div
+                    className="bbg-choice-flash"
+                    data-tone={choiceFlash.tone}
+                    key={choiceFlash.id}
+                    role="status"
+                  >
+                    {choiceFlash.label}
+                  </div>
+                ) : !isAiTurn &&
+                  (game.phase === "awaiting_pitch" ||
+                    game.phase === "awaiting_swing") ? (
+                  <div className="bbg-choice-dock">
                     <BaseballDuelControl
                       game={playerView}
-                      key={`${game.revision}-${game.phase}`}
                       onAction={dispatchAction}
                     />
                   </div>
@@ -867,6 +896,39 @@ function createRandomSeed() {
   const values = new Uint32Array(1);
   globalThis.crypto.getRandomValues(values);
   return values[0];
+}
+
+function choiceFlashForAction(
+  action: GameAction,
+  game: GameState,
+  isAi: boolean,
+): ChoiceFlash | null {
+  if (action.type === "SELECT_PITCH") {
+    return {
+      id: Date.now(),
+      label: isAi ? "투수 선택 완료" : PITCH_TARGET_LABELS[action.target],
+      tone: "pitch",
+    };
+  }
+  if (action.type === "SELECT_SWING") {
+    return {
+      id: Date.now(),
+      label: action.decision === "swing" ? "스윙" : "지켜보기",
+      tone: "swing",
+    };
+  }
+  if (action.type === "PLAY_CARD") {
+    const card = Object.values(game.cards)
+      .flatMap((zone) => zone.hand)
+      .find((item) => item.instanceId === action.cardInstanceId);
+    if (!card) return null;
+    return {
+      id: Date.now(),
+      label: CARD_DEFINITIONS[card.cardId].name,
+      tone: "card",
+    };
+  }
+  return null;
 }
 
 function BroadcastScoreboard({ game }: { game: GameState }) {

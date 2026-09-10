@@ -71,7 +71,7 @@ describe("BaseballGameDebug", () => {
     expect(screen.getByRole("button", { name: "볼 선택" })).toHaveTextContent(
       "볼",
     );
-    expect(container.querySelector(".bbg-core-choice-overlay")).toBeVisible();
+    expect(container.querySelector(".bbg-choice-dock")).toBeVisible();
     expect(container).not.toHaveTextContent("%");
     expect(
       screen.getByRole("img", { name: "포수 시점 스트라이크존" }),
@@ -134,6 +134,8 @@ describe("BaseballGameDebug", () => {
     fireEvent.click(screen.getByRole("button", { name: "볼 선택" }));
     expect(screen.getByText("볼을 선택했습니다")).toBeVisible();
     expect(screen.getByText("원정팀 판단 중")).toBeVisible();
+    expect(document.querySelector(".bbg-choice-flash")).toHaveTextContent("볼");
+    expect(document.querySelector(".bbg-choice-dock")).not.toBeInTheDocument();
     expect(
       screen.getByRole("region", { name: "이번 승부 선택 기록" }),
     ).toHaveTextContent(/투수.*볼.*타자.*판단 중.*카드.*개입 없음/);
@@ -141,7 +143,7 @@ describe("BaseballGameDebug", () => {
       screen.queryByRole("img", { name: /예상 투구 위치/ }),
     ).not.toBeInTheDocument();
     act(() => {
-      vi.advanceTimersByTime(650);
+      vi.advanceTimersByTime(950);
     });
     expect(screen.getByTestId("play-result")).toBeVisible();
     const trace = screen.getByRole("region", {
@@ -349,7 +351,18 @@ describe("BaseballGameDebug", () => {
     ).toBeVisible();
 
     act(() => {
-      vi.advanceTimersByTime(650);
+      vi.advanceTimersByTime(950);
+    });
+
+    expect(document.querySelector(".bbg-choice-flash")).toHaveTextContent(
+      "투수 선택 완료",
+    );
+    expect(
+      screen.queryByRole("region", { name: "타격 선택" }),
+    ).not.toBeInTheDocument();
+
+    act(() => {
+      vi.advanceTimersByTime(850);
     });
 
     expect(screen.getByRole("region", { name: "타격 선택" })).toBeVisible();

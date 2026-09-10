@@ -50,7 +50,7 @@ test("야구 게임에서 투타 심리전과 새 경기를 진행한다", async
     page.getByRole("button", { name: "스트라이크 선택" }),
   ).toHaveText("스트라이크");
   await expect(page.getByRole("button", { name: "볼 선택" })).toHaveText("볼");
-  await expect(page.locator(".bbg-core-choice-overlay")).toBeVisible();
+  await expect(page.locator(".bbg-choice-dock")).toBeVisible();
   await expect(page.locator(".bbg-duel")).not.toContainText("%");
   await expect(
     page.getByRole("img", { name: "포수 시점 스트라이크존" }),
@@ -156,6 +156,8 @@ test("야구 게임에서 투타 심리전과 새 경기를 진행한다", async
   expect(scoreRows[1].top).toBeGreaterThanOrEqual(scoreRows[0].bottom - 1);
 
   await page.getByRole("button", { name: "스트라이크 선택" }).click();
+  await expect(page.locator(".bbg-choice-flash")).toHaveText("스트라이크");
+  await expect(page.locator(".bbg-choice-dock")).toHaveCount(0);
   await expect(page.getByText("원정팀 판단 중")).toBeVisible();
   await expect(
     page.getByRole("region", { name: "이번 승부 선택 기록" }),

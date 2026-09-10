@@ -391,7 +391,7 @@ function MultiplayerBoard({
         {snapshot.status !== "lobby" &&
         snapshot.isYourTurn &&
         (game.phase === "awaiting_pitch" || game.phase === "awaiting_swing") ? (
-          <div className="bbg-core-choice-overlay">
+          <div className="bbg-choice-dock">
             <BaseballDuelControl
               busy={submitting}
               game={game}
