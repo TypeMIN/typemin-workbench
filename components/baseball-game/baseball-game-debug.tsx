@@ -66,17 +66,6 @@ const DEFAULT_SESSION: SessionConfig = {
 
 const AI_TURN_DELAY_MS = 420;
 
-const PHASE_COPY: Record<GamePhase, string> = {
-  awaiting_pitch:
-    "투수는 스트라이크 또는 볼을 한 번에 선택합니다. 선택은 타자에게 공개되지 않습니다.",
-  awaiting_swing:
-    "타자는 아무 위치 정보 없이 스윙하거나 지켜봅니다. 선택 즉시 판정됩니다.",
-  awaiting_batting: "컨택 결과를 자동으로 판정하고 있습니다.",
-  awaiting_hit: "안타 방향과 주자 진루를 자동으로 판정하고 있습니다.",
-  awaiting_card: "사용할 전략카드를 고르거나 카드 없이 진행하세요.",
-  finished: "경기가 종료되었습니다.",
-};
-
 const PHASE_TITLE: Record<GamePhase, string> = {
   awaiting_pitch: "투구 선택",
   awaiting_swing: "타격 선택",
@@ -115,9 +104,6 @@ export default function BaseballGameDebug() {
   const playerView = getGameView(game, session.humanTeam);
   const aiTeam =
     session.mode === "solo_ai" ? oppositeTeam(session.humanTeam) : null;
-  const actionOwnerLabel = actionOwner
-    ? `${game.config[actionOwner === "away" ? "awayTeamName" : "homeTeamName"]} ${actionOwner === game.battingTeam ? "공격" : "수비"}`
-    : "경기 종료";
   const interludeKind = getInterludeKind(
     currentRevisionEvents,
     acknowledgedInterlude === game.revision,
@@ -256,14 +242,6 @@ export default function BaseballGameDebug() {
           </span>
           <span>
             <strong>야구 게임</strong>
-            <small>
-              PITCH-DUEL-V3 ·{" "}
-              {session.mode === "solo_ai"
-                ? "SOLO AI"
-                : session.mode === "multiplayer"
-                  ? "MULTIPLAYER"
-                  : "PARTY"}
-            </small>
           </span>
         </Link>
         <div className="bbg-topbar-side">
@@ -316,11 +294,21 @@ export default function BaseballGameDebug() {
                   events={currentRevisionEvents}
                   key={`highlight-${game.revision}`}
                 />
+                {!isAiTurn &&
+                (game.phase === "awaiting_pitch" ||
+                  game.phase === "awaiting_swing") ? (
+                  <div className="bbg-core-choice-overlay">
+                    <BaseballDuelControl
+                      game={playerView}
+                      key={`${game.revision}-${game.phase}`}
+                      onAction={dispatchAction}
+                    />
+                  </div>
+                ) : null}
               </div>
 
               <PlayResult
                 events={currentRevisionEvents}
-                face={lastResult?.face}
                 game={game}
                 key={game.revision}
               />
@@ -329,26 +317,8 @@ export default function BaseballGameDebug() {
 
           <section
             className="bbg-control-panel bbg-control-panel--broadcast"
-            aria-labelledby="control-heading"
+            aria-label="전략카드와 경기 조작"
           >
-            <div className="bbg-panel-heading">
-              <div>
-                <p>ON DECK</p>
-                <h2 id="control-heading">현재 판정</h2>
-              </div>
-              {game.phase !== "finished" ? <span>PITCH DUEL</span> : null}
-            </div>
-
-            <div className="bbg-phase-copy" aria-live="polite">
-              <span>NOW</span>
-              <strong>
-                {game.phase === "finished" ? "경기 종료" : actionOwnerLabel}
-              </strong>
-              <p>{PHASE_TITLE[game.phase]}</p>
-            </div>
-
-            <GameProgress game={game} />
-
             {game.phase === "finished" ? (
               <div className="bbg-winner-card">
                 <span>FINAL</span>
@@ -368,17 +338,9 @@ export default function BaseballGameDebug() {
                 game={game}
                 onPass={() => dispatchAction({ type: "PASS_CARD_WINDOW" })}
               />
-            ) : game.phase === "awaiting_pitch" ||
-              game.phase === "awaiting_swing" ? (
-              <BaseballDuelControl
-                game={playerView}
-                key={`${game.revision}-${game.phase}`}
-                onAction={dispatchAction}
-              />
             ) : null}
 
             <div className="bbg-control-feedback-slot">
-              <p className="bbg-die-help">{PHASE_COPY[game.phase]}</p>
               <BaseballActionFeedback feedback={actionFeedback} />
             </div>
 
@@ -757,7 +719,6 @@ function CardDecision({
             ? `${CARD_DEFINITIONS[respondingTo.cardId].name} 대응`
             : `${role === "offense" ? "공격" : "수비"} 카드 선택`}
         </strong>
-        <p>{describeCardWindow(game)} 사용할 카드를 누르면 즉시 적용됩니다.</p>
       </div>
       <div className="bbg-card-decision-actions">
         <button onClick={onPass} type="button">
@@ -879,68 +840,6 @@ function CardHand({
       </div>
     </section>
   );
-}
-
-function GameProgress({ game }: { game: GameState }) {
-  const active =
-    game.phase === "awaiting_card"
-      ? game.pendingResolution?.kind === "hit"
-        ? "hit"
-        : game.pendingResolution?.kind === "batting"
-          ? "batting"
-          : game.pendingResolution?.kind === "contact"
-            ? "batting"
-            : "pitch"
-      : game.phase === "awaiting_hit"
-        ? "hit"
-        : game.phase === "awaiting_batting"
-          ? "batting"
-          : game.phase === "awaiting_swing"
-            ? "swing"
-            : game.phase === "finished"
-              ? "finished"
-              : "pitch";
-  const steps = [
-    ["pitch", "투구"],
-    ["swing", "판단"],
-    ["batting", "타구"],
-    ["hit", "안타"],
-    ["finished", "종료"],
-  ] as const;
-  return (
-    <div
-      className="bbg-game-progress"
-      aria-label={`현재 진행 단계 ${steps.find(([key]) => key === active)?.[1]}`}
-    >
-      {steps.map(([key, label], index) => (
-        <span data-active={key === active} key={key}>
-          <b>{index + 1}</b>
-          {label}
-        </span>
-      ))}
-      {game.activeStrategy ? (
-        <strong>{game.activeStrategy.cardId} 진행 중</strong>
-      ) : null}
-    </div>
-  );
-}
-
-function describeCardWindow(game: GameState) {
-  const respondingTo = game.cardWindow?.respondingTo;
-  if (respondingTo) {
-    return `${CARD_DEFINITIONS[respondingTo.cardId].name}에 대응할 차례입니다.`;
-  }
-  const timing = game.cardWindow?.timing;
-  const copy: Partial<Record<NonNullable<typeof timing>, string>> = {
-    before_pitch: "투구 전에 작전을 결정합니다.",
-    after_pitch: "방금 투구 결과에 개입할 수 있습니다.",
-    after_contact: "컨택 뒤 번트 작전을 결정합니다.",
-    after_batting: "타구 판정을 바꿀 수 있습니다.",
-    after_hit: "안타와 주자 진루 판정을 바꿀 수 있습니다.",
-  };
-  return timing
-    ? (copy[timing] ?? "전략카드를 결정합니다.")
-    : "전략카드를 결정합니다.";
 }
 
 function currentCardRole(game: GameState): CardRole {
@@ -1133,11 +1032,7 @@ export function BaseballStadium({
       data-duel-winner={playTrace?.winner ?? undefined}
     >
       {catcherView ? (
-        <CatcherPitchStage
-          cue={cue}
-          phase={game.phase}
-          pitchHistory={pitchHistory}
-        />
+        <CatcherPitchStage cue={cue} pitchHistory={pitchHistory} />
       ) : null}
       <svg
         aria-label={`${battingTeamName} 공격, ${baseLabel}${flight ? `, ${flight.label} 타구 표시` : ""}`}
@@ -1439,11 +1334,9 @@ function PitchMarkers({
 
 function CatcherPitchStage({
   cue,
-  phase,
   pitchHistory,
 }: {
   cue: PresentationCue | null | undefined;
-  phase: GamePhase | undefined;
   pitchHistory: ReturnType<typeof getPlateAppearancePitchHistory>;
 }) {
   const pitchCue = cue?.type === "pitch" ? cue : null;
@@ -1532,15 +1425,29 @@ function CatcherPitchStage({
         <span aria-hidden="true" className="bbg-zone-grid" />
         <PitchMarkers pitchHistory={pitchHistory} />
       </div>
-      <div className="bbg-catcher-state">
-        <small>
-          {phase === "awaiting_swing" ? "PITCH LOCKED" : "CATCHER VIEW"}
-        </small>
-        <strong>
-          {phase === "awaiting_swing" ? "타자의 선택 대기" : "투수의 선택 대기"}
-        </strong>
-      </div>
+      <PitchSequence pitchHistory={pitchHistory} />
     </div>
+  );
+}
+
+function PitchSequence({
+  pitchHistory,
+}: {
+  pitchHistory: ReturnType<typeof getPlateAppearancePitchHistory>;
+}) {
+  if (pitchHistory.length === 0) return null;
+  return (
+    <ol className="bbg-pitch-sequence" aria-label="현재 타자 누적 투구">
+      {pitchHistory.map(({ event, face, location }, index) => (
+        <li
+          data-current={index === pitchHistory.length - 1}
+          key={event.sequence}
+        >
+          <b>{location.pitchNumber}</b>
+          <span>{FACE_LABELS[face]}</span>
+        </li>
+      ))}
+    </ol>
   );
 }
 
@@ -1761,11 +1668,9 @@ function SvgBaseMarker({
 
 function PlayResult({
   events,
-  face,
   game,
 }: {
   events: GameEvent[];
-  face?: DieFace;
   game: GameState;
 }) {
   const event =
@@ -1775,24 +1680,6 @@ function PlayResult({
     events.findLast((item) => item.kind === "half_inning") ??
     events.at(-1);
   const sideChange = events.some((item) => item.kind === "half_inning");
-  const pitchReveal = game.eventLog.findLast(
-    (item) => item.kind === "pitch_result",
-  );
-  const lastDecisionIndex = game.eventLog.findLastIndex(
-    (item) => item.kind === "pitch_result" || item.kind === "die_roll",
-  );
-  const cardChain = game.eventLog
-    .slice(lastDecisionIndex + 1)
-    .filter((item) => item.kind === "card_play")
-    .slice(-4);
-  const resolutionChain = events
-    .filter((item) =>
-      ["card_play", "card_resolve", "rule", "plate_appearance"].includes(
-        item.kind,
-      ),
-    )
-    .slice(-4);
-  const displayToken = event?.cardId ?? face;
   const tone = !event
     ? "ready"
     : event.kind === "game_end"
@@ -1813,41 +1700,21 @@ function PlayResult({
       data-testid="play-result"
     >
       <div className="bbg-result-die" aria-hidden="true">
-        <small>{event?.cardId ? "CARD" : face ? "PLAY" : "NEXT"}</small>
-        <strong>{displayToken ?? "▶"}</strong>
+        <strong>
+          {!event
+            ? "▶"
+            : event.kind === "game_end"
+              ? "F"
+              : event.runs > 0
+                ? "+"
+                : event.outsRecorded > 0
+                  ? "O"
+                  : "•"}
+        </strong>
       </div>
       <div className="bbg-result-copy">
-        <span>{event ? "방금 판정" : "PLAY BALL"}</span>
         <h2>{event?.summary ?? "첫 투구를 준비하세요"}</h2>
-        <p>
-          {event?.cardId
-            ? CARD_DEFINITIONS[event.cardId].description
-            : face
-              ? `${face} · ${FACE_LABELS[face]}`
-              : "투수가 첫 코스를 선택하면 경기가 시작됩니다."}
-        </p>
         <div className="bbg-impact-list">
-          {pitchReveal?.pitchTarget ? (
-            <b className="is-pitch">
-              투수 {PITCH_TARGET_LABELS[pitchReveal.pitchTarget]}
-            </b>
-          ) : null}
-          {pitchReveal?.swingDecision ? (
-            <b className="is-pitch">
-              타자 {pitchReveal.swingDecision === "swing" ? "스윙" : "지켜보기"}
-            </b>
-          ) : null}
-          {pitchReveal?.duelWinner ? (
-            <b className="is-duel" data-winner={pitchReveal.duelWinner}>
-              {pitchReveal.duelWinner === "batter"
-                ? pitchReveal.swingDecision === "swing"
-                  ? "타자가 읽었다 · 강한 타구 기회"
-                  : "타자가 읽었다 · 볼 획득"
-                : pitchReveal.swingDecision === "swing"
-                  ? "투수가 속였다 · 헛스윙 기회"
-                  : "투수가 잡았다 · 스트라이크 획득"}
-            </b>
-          ) : null}
           {event?.runs ? <b className="is-score">+{event.runs}점</b> : null}
           {event?.outsRecorded ? (
             <b className="is-out">+{event.outsRecorded}아웃</b>
@@ -1858,24 +1725,7 @@ function PlayResult({
               B {game.balls} · S {game.strikes}
             </b>
           ) : null}
-          {cardChain.map((cardEvent) =>
-            cardEvent.cardId ? (
-              <b className="is-card" key={cardEvent.sequence}>
-                {cardEvent.cardId}
-              </b>
-            ) : null,
-          )}
         </div>
-        {resolutionChain.length > 1 ? (
-          <ol className="bbg-resolution-chain" aria-label="이번 판정 진행 순서">
-            {resolutionChain.map((item, index) => (
-              <li key={item.sequence}>
-                <b>{index + 1}</b>
-                <span>{item.summary}</span>
-              </li>
-            ))}
-          </ol>
-        ) : null}
       </div>
       <div className="bbg-result-side">
         <div className="bbg-move-list">

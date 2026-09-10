@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
+import { Volume2, VolumeX } from "lucide-react";
 import {
   buildPresentationCues,
   getAudioCues,
@@ -32,7 +33,7 @@ export function BroadcastLineScore({ game }: { game: BroadcastGame }) {
     },
   };
   const displayGame = { ...game, boxScore };
-  const inningCount = Math.max(game.config.innings, boxScore.innings.length);
+  const inningCount = Math.max(9, boxScore.innings.length);
   const innings = Array.from({ length: inningCount }, (_, index) => index + 1);
 
   return (
@@ -218,8 +219,11 @@ export function BaseballAudio({
         }}
         type="button"
       >
-        <span aria-hidden="true">{muted ? "🔇" : "🔊"}</span>
-        <span>{muted ? "음소거" : "사운드"}</span>
+        {muted ? (
+          <VolumeX aria-hidden="true" size={16} />
+        ) : (
+          <Volume2 aria-hidden="true" size={16} />
+        )}
       </button>
       <label className="bbg-volume-control">
         <span>볼륨</span>

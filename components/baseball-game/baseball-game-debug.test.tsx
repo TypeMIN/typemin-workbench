@@ -37,7 +37,7 @@ describe("BaseballGameDebug", () => {
   it("starts in solo AI mode with a two-choice catcher-view duel", () => {
     const { container } = render(<BaseballGameDebug />);
 
-    expect(screen.getByText("PITCH-DUEL-V3 · SOLO AI")).toBeVisible();
+    expect(screen.getByText("야구 게임")).toBeVisible();
     expect(screen.getByText("AI 대전 · 홈팀")).toBeVisible();
     expect(
       screen.getByRole("button", {
@@ -51,10 +51,6 @@ describe("BaseballGameDebug", () => {
 
     expect(
       screen.getByRole("heading", { name: "야구 게임 라이브" }),
-    ).toBeVisible();
-    expect(screen.getByLabelText("현재 진행 단계 투구")).toBeVisible();
-    expect(
-      screen.getByText(/투수는 스트라이크 또는 볼을 한 번에 선택합니다/),
     ).toBeVisible();
     expect(
       screen.getByRole("region", {
@@ -71,10 +67,11 @@ describe("BaseballGameDebug", () => {
     expect(container.querySelectorAll(".bbg-pitch-choice")).toHaveLength(2);
     expect(
       screen.getByRole("button", { name: "스트라이크 선택" }),
-    ).toHaveTextContent(/정면 승부.*스트라이크.*존 안으로 꽂는다/);
+    ).toHaveTextContent("스트라이크");
     expect(screen.getByRole("button", { name: "볼 선택" })).toHaveTextContent(
-      /유인 승부.*볼.*존 밖으로 흘린다/,
+      "볼",
     );
+    expect(container.querySelector(".bbg-core-choice-overlay")).toBeVisible();
     expect(container).not.toHaveTextContent("%");
     expect(
       screen.getByRole("img", { name: "포수 시점 스트라이크존" }),
@@ -146,11 +143,7 @@ describe("BaseballGameDebug", () => {
     act(() => {
       vi.advanceTimersByTime(650);
     });
-    expect(screen.getByTestId("play-result")).toHaveTextContent("투수 볼");
-    expect(screen.getByTestId("play-result")).toHaveTextContent(/타자/);
-    expect(screen.getByTestId("play-result")).toHaveTextContent(
-      "투수가 속였다",
-    );
+    expect(screen.getByTestId("play-result")).toBeVisible();
     const trace = screen.getByRole("region", {
       name: "이번 승부 선택 기록",
     });
@@ -223,6 +216,59 @@ describe("BaseballGameDebug", () => {
     expect(trace.querySelector('[data-used="true"]')).toBeVisible();
   });
 
+  it("keeps every pitch of the current plate appearance on screen", () => {
+    const game = createGame({
+      innings: 3,
+      awayTeamName: "원정팀",
+      homeTeamName: "홈팀",
+    });
+    game.phase = "awaiting_pitch";
+    game.eventLog = [
+      {
+        sequence: 1,
+        revision: 1,
+        inning: 1,
+        half: "top",
+        kind: "pitch_result",
+        summary: "스트라이크",
+        face: "S",
+        pitchTarget: "strike",
+        swingDecision: "take",
+        duelWinner: "pitcher",
+        runs: 0,
+        outsRecorded: 0,
+        moves: [],
+      },
+      {
+        sequence: 2,
+        revision: 2,
+        inning: 1,
+        half: "top",
+        kind: "pitch_result",
+        summary: "볼",
+        face: "B",
+        pitchTarget: "ball",
+        swingDecision: "take",
+        duelWinner: "batter",
+        runs: 0,
+        outsRecorded: 0,
+        moves: [],
+      },
+    ];
+
+    render(<BaseballStadium face="B" game={game} />);
+
+    const sequence = screen.getByRole("list", {
+      name: "현재 타자 누적 투구",
+    });
+    expect(sequence).toHaveTextContent("1스트라이크");
+    expect(sequence).toHaveTextContent("2볼");
+    expect(sequence.querySelectorAll("li")).toHaveLength(2);
+    expect(sequence.querySelector('li[data-current="true"]')).toHaveTextContent(
+      "2볼",
+    );
+  });
+
   it("switches from catcher view to the full field when a ball is put in play", () => {
     const game = createGame({
       innings: 3,
@@ -289,7 +335,7 @@ describe("BaseballGameDebug", () => {
     });
     fireEvent.click(form.getByRole("button", { name: /새 경기 시작/ }));
 
-    expect(screen.getByText("PITCH-DUEL-V3 · SOLO AI")).toBeVisible();
+    expect(screen.getByText("야구 게임")).toBeVisible();
     expect(screen.getByText("AI 대전 · 원정팀")).toBeVisible();
     expect(screen.getByRole("status")).toHaveTextContent("홈팀 판단 중");
     expect(

@@ -25,30 +25,21 @@ export function BaseballDuelControl({
     return (
       <section className="bbg-duel bbg-duel--simple" aria-label="투구 선택">
         <div className="bbg-duel-heading">
-          <span>CHOOSE</span>
-          <div>
-            <strong>
-              {canAct ? "스트라이크인가, 볼인가" : "투수의 선택을 기다리는 중"}
-            </strong>
-            <small>타자의 판단을 읽고 한 번에 선택하세요.</small>
-          </div>
+          <strong>{canAct ? "투구 선택" : "투수 선택 대기"}</strong>
         </div>
         {canAct ? (
-          <>
-            <div className="bbg-pitch-choice-grid">
-              {PITCH_TARGETS.map((target) => (
-                <PitchChoice
-                  disabled={busy}
-                  key={target}
-                  onSelect={() => onAction({ type: "SELECT_PITCH", target })}
-                  target={target}
-                />
-              ))}
-            </div>
-            <SituationTip game={game} role="pitcher" />
-          </>
+          <div className="bbg-pitch-choice-grid">
+            {PITCH_TARGETS.map((target) => (
+              <PitchChoice
+                disabled={busy}
+                key={target}
+                onSelect={() => onAction({ type: "SELECT_PITCH", target })}
+                target={target}
+              />
+            ))}
+          </div>
         ) : (
-          <WaitingPulse label="투수가 승부를 고르고 있습니다" />
+          <WaitingPulse label="투수 선택 대기" />
         )}
       </section>
     );
@@ -58,47 +49,35 @@ export function BaseballDuelControl({
     return (
       <section className="bbg-duel bbg-duel--simple" aria-label="타격 선택">
         <div className="bbg-duel-heading">
-          <span>DECIDE</span>
-          <div>
-            <strong>
-              {canAct ? "스윙할까, 지켜볼까" : "타자의 판단을 기다리는 중"}
-            </strong>
-            <small>투수의 선택은 판정 전까지 공개되지 않습니다.</small>
-          </div>
+          <strong>{canAct ? "타격 선택" : "타자 선택 대기"}</strong>
         </div>
         {canAct ? (
-          <>
-            <div className="bbg-swing-actions">
-              <button
-                className="is-swing"
-                disabled={busy}
-                onClick={() =>
-                  onAction({ type: "SELECT_SWING", decision: "swing" })
-                }
-                type="button"
-              >
-                <small>공을 읽었다면</small>
-                <strong>스윙</strong>
-                <span>강한 타구를 노린다</span>
-              </button>
-              <button
-                className="is-take"
-                disabled={busy}
-                onClick={() =>
-                  onAction({ type: "SELECT_SWING", decision: "take" })
-                }
-                type="button"
-              >
-                <small>볼을 읽었다면</small>
-                <strong>지켜보기</strong>
-                <span>차분하게 흘려보낸다</span>
-              </button>
-            </div>
-            <DuelPayoff />
-            <SituationTip game={game} role="batter" />
-          </>
+          <div className="bbg-swing-actions">
+            <button
+              className="is-swing"
+              disabled={busy}
+              onClick={() =>
+                onAction({ type: "SELECT_SWING", decision: "swing" })
+              }
+              type="button"
+            >
+              <i aria-hidden="true" />
+              <strong>스윙</strong>
+            </button>
+            <button
+              className="is-take"
+              disabled={busy}
+              onClick={() =>
+                onAction({ type: "SELECT_SWING", decision: "take" })
+              }
+              type="button"
+            >
+              <i aria-hidden="true" />
+              <strong>지켜보기</strong>
+            </button>
+          </div>
         ) : (
-          <WaitingPulse label="타자가 공을 읽고 있습니다" />
+          <WaitingPulse label="타자 선택 대기" />
         )}
       </section>
     );
@@ -116,7 +95,6 @@ function PitchChoice({
   onSelect: () => void;
   target: PitchTarget;
 }) {
-  const isStrike = target === "strike";
   return (
     <button
       aria-label={`${PITCH_TARGET_LABELS[target]} 선택`}
@@ -125,51 +103,10 @@ function PitchChoice({
       onClick={onSelect}
       type="button"
     >
-      <small>{isStrike ? "정면 승부" : "유인 승부"}</small>
+      <i aria-hidden="true" />
       <strong>{PITCH_TARGET_LABELS[target]}</strong>
-      <span>{isStrike ? "존 안으로 꽂는다" : "존 밖으로 흘린다"}</span>
     </button>
   );
-}
-
-function DuelPayoff() {
-  return (
-    <div className="bbg-duel-payoff" aria-label="심리전 보상">
-      <span>
-        <b>타자 승리</b>
-        강한 타구 기회
-      </span>
-      <span>
-        <b>투수 승리</b>
-        헛스윙과 카운트 우위
-      </span>
-    </div>
-  );
-}
-
-function SituationTip({
-  game,
-  role,
-}: {
-  game: DuelGame;
-  role: "pitcher" | "batter";
-}) {
-  let copy =
-    role === "pitcher"
-      ? "스윙을 예상하면 볼, 지켜보기를 예상하면 스트라이크가 강합니다."
-      : "스트라이크를 읽으면 스윙, 볼을 읽으면 지켜보기가 강합니다.";
-  if (game.strikes === 2) {
-    copy =
-      role === "pitcher"
-        ? "2스트라이크 · 볼 유인 성공은 곧 삼진 기회입니다."
-        : "2스트라이크 · 지켜보면 삼진 위험, 스윙은 파울로 버틸 수 있습니다.";
-  } else if (game.balls === 3) {
-    copy =
-      role === "pitcher"
-        ? "3볼 · 볼을 한 번 더 고르면 볼넷입니다."
-        : "3볼 · 존 밖을 읽고 참으면 볼넷입니다.";
-  }
-  return <p className="bbg-situation-tip">{copy}</p>;
 }
 
 function WaitingPulse({ label }: { label: string }) {

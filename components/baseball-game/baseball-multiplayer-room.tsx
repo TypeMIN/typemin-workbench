@@ -388,6 +388,24 @@ function MultiplayerBoard({
           game={game}
           key={`multiplayer-field-${game.revision}`}
         />
+        {snapshot.status !== "lobby" &&
+        snapshot.isYourTurn &&
+        (game.phase === "awaiting_pitch" || game.phase === "awaiting_swing") ? (
+          <div className="bbg-core-choice-overlay">
+            <BaseballDuelControl
+              busy={submitting}
+              game={game}
+              onAction={(action: GameAction) => {
+                if (
+                  action.type === "SELECT_PITCH" ||
+                  action.type === "SELECT_SWING"
+                ) {
+                  onSubmit(action);
+                }
+              }}
+            />
+          </div>
+        ) : null}
         <div className="bbg-mp-field-result" aria-live="polite">
           <span className="bbg-mp-result-token" aria-hidden="true">
             <small>{latestFace ? "PLAY" : "NEXT"}</small>
@@ -546,22 +564,7 @@ function TurnControl({
     );
   }
   if (game.phase === "awaiting_pitch" || game.phase === "awaiting_swing") {
-    return (
-      <div className="bbg-mp-turn is-yours bbg-mp-turn--duel">
-        <BaseballDuelControl
-          busy={disabled}
-          game={game}
-          onAction={(action: GameAction) => {
-            if (
-              action.type === "SELECT_PITCH" ||
-              action.type === "SELECT_SWING"
-            ) {
-              onSubmit(action);
-            }
-          }}
-        />
-      </div>
-    );
+    return null;
   }
   return (
     <div className="bbg-mp-turn is-waiting">

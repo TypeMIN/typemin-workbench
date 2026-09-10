@@ -24,12 +24,13 @@ test("야구 게임에서 투타 심리전과 새 경기를 진행한다", async
   await expect(
     page.getByRole("heading", { name: "야구 게임 라이브" }),
   ).toBeVisible();
-  await expect(page.getByText("PITCH-DUEL-V3 · SOLO AI")).toBeVisible();
+  await expect(
+    page.getByRole("link", { name: "Workbench 홈으로 돌아가기" }),
+  ).toContainText("야구 게임");
   await expect(page.getByText("AI 대전 · 홈팀")).toBeVisible();
   await expect(
     page.getByRole("dialog", { name: /기기를 넘겨주세요/ }),
   ).toHaveCount(0);
-  await expect(page.getByLabel("현재 진행 단계 투구")).toBeVisible();
   await expect(
     page.getByRole("region", {
       name: /경기 점수판, 1회초, 무사, 주자 없음/,
@@ -47,10 +48,9 @@ test("야구 게임에서 투타 심리전과 새 경기를 진행한다", async
   await expect(page.locator(".bbg-pitch-choice")).toHaveCount(2);
   await expect(
     page.getByRole("button", { name: "스트라이크 선택" }),
-  ).toContainText("존 안으로 꽂는다");
-  await expect(page.getByRole("button", { name: "볼 선택" })).toContainText(
-    "존 밖으로 흘린다",
-  );
+  ).toHaveText("스트라이크");
+  await expect(page.getByRole("button", { name: "볼 선택" })).toHaveText("볼");
+  await expect(page.locator(".bbg-core-choice-overlay")).toBeVisible();
   await expect(page.locator(".bbg-duel")).not.toContainText("%");
   await expect(
     page.getByRole("img", { name: "포수 시점 스트라이크존" }),
@@ -160,17 +160,10 @@ test("야구 게임에서 투타 심리전과 새 경기를 진행한다", async
   await expect(
     page.getByRole("region", { name: "이번 승부 선택 기록" }),
   ).toContainText("투수스트라이크");
-  await expect(page.getByTestId("play-result")).toContainText("타자", {
-    timeout: 3_000,
-  });
   await expect(
     page.locator(".bbg-pitch-marker[data-current='true']"),
   ).toHaveText("1");
   await passCardWindows(page);
-  await expect(page.getByTestId("play-result")).toContainText(
-    "투수 스트라이크",
-  );
-  await expect(page.getByTestId("play-result")).toContainText("투수가 잡았다");
   const playTrace = page.getByRole("region", {
     name: "이번 승부 선택 기록",
   });
@@ -268,7 +261,9 @@ test("새 경기 설정은 싱글 AI·멀티·파티 모드만 제공한다", as
   await page.getByLabel("내 팀").selectOption("home");
   await page.getByRole("button", { name: /새 경기 시작/ }).click();
 
-  await expect(page.getByText("PITCH-DUEL-V3 · SOLO AI")).toBeVisible();
+  await expect(
+    page.getByRole("link", { name: "Workbench 홈으로 돌아가기" }),
+  ).toContainText("야구 게임");
   await expect(page.getByText("AI 대전 · 홈팀")).toBeVisible();
   await expect(
     page.getByRole("region", { name: "홈팀 수비 손패" }),

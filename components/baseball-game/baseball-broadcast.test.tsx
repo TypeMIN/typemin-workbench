@@ -16,9 +16,10 @@ describe("broadcast UI", () => {
   it("renders two team rows with inning and R/H/E/B columns", () => {
     const game = createGame(CONFIG);
     render(<BroadcastLineScore game={game} />);
-    expect(screen.getByLabelText("이닝별 점수와 경기 기록")).toHaveTextContent(
-      "팀123RHEB원정이글스0--0000홈트윈스---0000",
-    );
+    const score = screen.getByLabelText("이닝별 점수와 경기 기록");
+    expect(score).toHaveTextContent("팀123456789RHEB");
+    expect(score).toHaveTextContent("원정이글스0--------0000");
+    expect(score).toHaveTextContent("홈트윈스---------0000");
   });
 
   it("persists mute and volume preferences", async () => {
