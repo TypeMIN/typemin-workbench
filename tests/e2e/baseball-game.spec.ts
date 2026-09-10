@@ -24,7 +24,7 @@ test("야구 게임에서 투타 심리전과 새 경기를 진행한다", async
   await expect(
     page.getByRole("heading", { name: "야구 게임 라이브" }),
   ).toBeVisible();
-  await expect(page.getByText("PITCH-DUEL-V2 · SOLO AI")).toBeVisible();
+  await expect(page.getByText("PITCH-DUEL-V3 · SOLO AI")).toBeVisible();
   await expect(page.getByText("AI 대전 · 홈팀")).toBeVisible();
   await expect(
     page.getByRole("dialog", { name: /기기를 넘겨주세요/ }),
@@ -42,17 +42,18 @@ test("야구 게임에서 투타 심리전과 새 경기를 진행한다", async
   await expect(
     page.getByRole("button", { name: "경기 음향 끄기" }),
   ).toBeVisible();
-  await expect(
-    page.getByRole("region", { name: "투구 코스 선택" }),
-  ).toBeVisible();
+  await expect(page.getByRole("region", { name: "투구 선택" })).toBeVisible();
   await expect(page.locator(".bbg-d12")).toHaveCount(0);
-  await expect(page.locator(".bbg-pitch-choice")).toHaveCount(5);
+  await expect(page.locator(".bbg-pitch-choice")).toHaveCount(2);
   await expect(
-    page.getByRole("button", { name: "높은 몸쪽 선택" }),
-  ).toContainText("컨택 68%");
+    page.getByRole("button", { name: "스트라이크 선택" }),
+  ).toContainText("컨택 82%");
+  await expect(page.getByRole("button", { name: "볼 선택" })).toContainText(
+    "헛스윙 80%",
+  );
   await expect(
-    page.getByRole("button", { name: "높은 몸쪽 선택" }),
-  ).toContainText("안타 25");
+    page.getByRole("img", { name: "포수 시점 스트라이크존" }),
+  ).toBeVisible();
   await expect(
     page.getByRole("region", { name: "원정팀 공격 비공개 손패" }),
   ).toBeVisible();
@@ -68,18 +69,22 @@ test("야구 게임에서 투타 심리전과 새 경기를 진행한다", async
   await expect(page.locator(".bbg-team-score.is-batting")).toContainText(
     "원정팀",
   );
-  await expect(page.locator(".bbg-fence")).toBeVisible();
+  await expect(page.locator(".bbg-field-overview")).toBeHidden();
   await expect(page.locator(".bbg-fielders")).toHaveCount(0);
   await expect(page.locator(".bbg-distance-marks")).toHaveCount(0);
-  await expect(page.locator(".bbg-stadium svg")).toHaveAttribute(
+  await expect(page.locator(".bbg-field-overview")).toHaveAttribute(
     "preserveAspectRatio",
     "xMidYMid meet",
   );
-  await expect(page.locator(".bbg-stadium svg")).toHaveAttribute(
+  await expect(page.locator(".bbg-field-overview")).toHaveAttribute(
     "viewBox",
     "0 0 900 700",
   );
-  await expect(page.getByRole("img", { name: /주자 없음/ })).toBeVisible();
+  await expect(
+    page.getByRole("region", {
+      name: /경기 점수판, 1회초, 무사, 주자 없음/,
+    }),
+  ).toBeVisible();
   await expect(
     page.locator('.bbg-count-line[data-tone="ball"] .bbg-count-lights i'),
   ).toHaveCount(3);
@@ -90,25 +95,6 @@ test("야구 게임에서 투타 심리전과 새 경기를 진행한다", async
     page.locator('.bbg-count-line[data-tone="out"] .bbg-count-lights i'),
   ).toHaveCount(2);
   await expect(page.locator("[data-nextjs-dialog]")).toHaveCount(0);
-
-  const baseLayout = await page.locator(".bbg-diamond").evaluate((diamond) => {
-    const center = (selector: string) => {
-      const rect = diamond.querySelector(selector)?.getBoundingClientRect();
-      if (!rect) throw new Error(`${selector} 위치를 찾지 못했습니다.`);
-      return { x: rect.x + rect.width / 2, y: rect.y + rect.height / 2 };
-    };
-    return {
-      first: center(".bbg-field-base--first"),
-      second: center(".bbg-field-base--second"),
-      third: center(".bbg-field-base--third"),
-      home: center(".bbg-field-home"),
-    };
-  });
-  expect(baseLayout.second.y).toBeLessThan(baseLayout.first.y);
-  expect(baseLayout.home.y).toBeGreaterThan(baseLayout.first.y);
-  expect(baseLayout.first.x).toBeGreaterThan(baseLayout.second.x);
-  expect(baseLayout.third.x).toBeLessThan(baseLayout.second.x);
-  expect(Math.abs(baseLayout.first.y - baseLayout.third.y)).toBeLessThan(4);
 
   const broadcastFit = await page.evaluate(() => {
     const bounds = (selector: string) => {
@@ -168,16 +154,18 @@ test("야구 게임에서 투타 심리전과 새 경기를 진행한다", async
   );
   expect(scoreRows[1].top).toBeGreaterThanOrEqual(scoreRows[0].bottom - 1);
 
-  await page.getByRole("button", { name: "볼 선택" }).click();
+  await page.getByRole("button", { name: "스트라이크 선택" }).click();
   await expect(page.getByText("원정팀 판단 중")).toBeVisible();
   await expect(page.getByTestId("play-result")).toContainText("타자", {
     timeout: 3_000,
   });
-  await passCardWindows(page);
   await expect(
     page.locator(".bbg-pitch-marker[data-current='true']"),
   ).toHaveText("1");
-  await expect(page.getByTestId("play-result")).toContainText("투수 볼");
+  await passCardWindows(page);
+  await expect(page.getByTestId("play-result")).toContainText(
+    "투수 스트라이크",
+  );
   await expect(page.getByTestId("play-result")).toContainText("승부 성공");
   await expect(page.getByText("특정 면 강제 입력")).toHaveCount(0);
 
@@ -204,7 +192,8 @@ test("야구 게임에서 투타 심리전과 새 경기를 진행한다", async
   await expect(page.locator(".bbg-game-progress")).toBeHidden();
 
   await page.setViewportSize({ width: 390, height: 844 });
-  await expect(page.getByRole("heading", { name: "현재 판정" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "현재 판정" })).toBeHidden();
+  await expect(page.getByRole("region", { name: "투구 선택" })).toBeVisible();
   await expect(page.locator(".bbg-card-hand button")).toHaveCount(4);
   await expect(page.locator(".bbg-card-back")).toHaveCount(4);
   await expect(page.locator(".bbg-game-progress")).toBeHidden();
@@ -239,7 +228,7 @@ test("싱글플레이에서 AI가 타격 판단을 이어서 진행한다", asyn
     route.fulfill({ status: 200, json: { account: null } }),
   );
   await page.goto("/baseball-game");
-  await page.getByRole("button", { name: /^낮은 바깥쪽/ }).click();
+  await page.getByRole("button", { name: "스트라이크 선택" }).click();
   await expect(page.getByText("원정팀 판단 중")).toBeVisible();
   await expect(page.getByTestId("play-result")).toContainText("타자", {
     timeout: 3_000,
@@ -268,7 +257,7 @@ test("새 경기 설정은 싱글 AI·멀티·파티 모드만 제공한다", as
   await page.getByLabel("내 팀").selectOption("home");
   await page.getByRole("button", { name: /새 경기 시작/ }).click();
 
-  await expect(page.getByText("PITCH-DUEL-V2 · SOLO AI")).toBeVisible();
+  await expect(page.getByText("PITCH-DUEL-V3 · SOLO AI")).toBeVisible();
   await expect(page.getByText("AI 대전 · 홈팀")).toBeVisible();
   await expect(
     page.getByRole("region", { name: "홈팀 수비 손패" }),
@@ -276,18 +265,17 @@ test("새 경기 설정은 싱글 AI·멀티·파티 모드만 제공한다", as
   await expect(
     page.getByRole("region", { name: "원정팀 공격 비공개 손패" }),
   ).toBeVisible();
-  await expect(
-    page.getByRole("region", { name: "투구 코스 선택" }),
-  ).toBeVisible();
+  await expect(page.getByRole("region", { name: "투구 선택" })).toBeVisible();
 
   await page.getByText("새 경기 설정", { exact: true }).click();
   await page.getByLabel("게임 모드", { exact: true }).selectOption("solo_ai");
   await page.getByLabel("내 팀").selectOption("away");
   await page.getByRole("button", { name: /새 경기 시작/ }).click();
   await expect(page.getByRole("status")).toContainText("홈팀 판단 중");
-  await expect(page.getByRole("img", { name: /예상 투구 위치/ })).toBeVisible({
+  await expect(page.getByRole("region", { name: "타격 선택" })).toBeVisible({
     timeout: 3_000,
   });
+  await expect(page.getByText(/예상 투구 위치/)).toHaveCount(0);
   await expect(page.locator(".bbg-d12")).toHaveCount(0);
   await expect(page.locator(".bbg-log-panel summary strong")).not.toHaveText(
     "0",

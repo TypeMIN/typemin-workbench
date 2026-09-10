@@ -22,7 +22,7 @@ function event(overrides: Partial<GameEvent>): GameEvent {
   };
 }
 
-describe("broadcast-v2 presentation", () => {
+describe("catcher-view-v1 presentation", () => {
   it("uses the server-recorded duel location without re-randomizing it", () => {
     const source = event({
       kind: "pitch_result",

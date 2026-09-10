@@ -634,7 +634,7 @@ function shouldReplaceSnapshot(
 }
 
 function multiplayerCommandLabel(command: MultiplayerCommand, game: GameView) {
-  if (command.type === "SELECT_PITCH") return "투구 코스 선택";
+  if (command.type === "SELECT_PITCH") return "투구 선택";
   if (command.type === "SELECT_SWING") {
     return command.decision === "swing" ? "스윙 선택" : "지켜보기 선택";
   }

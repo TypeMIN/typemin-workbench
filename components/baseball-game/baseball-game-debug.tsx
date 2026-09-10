@@ -21,6 +21,7 @@ import { CARD_DEFINITIONS } from "@/lib/baseball-game/cards";
 import {
   BATTER_DUEL_HIT_BONUS,
   PITCH_TARGET_LABELS,
+  PITCHER_DUEL_HIT_PENALTY,
 } from "@/lib/baseball-game/duel";
 import {
   createGame,
@@ -40,7 +41,7 @@ import type {
   GameEvent,
   GamePhase,
   GameState,
-  PitchHint,
+  PitchLocation,
   PresentationCue,
   RunnerDestination,
   RunnerOrigin,
@@ -70,9 +71,9 @@ const AI_TURN_DELAY_MS = 420;
 
 const PHASE_COPY: Record<GamePhase, string> = {
   awaiting_pitch:
-    "투수가 한 번의 선택으로 코스를 정합니다. 선택은 타자에게 공개되지 않습니다.",
+    "투수는 스트라이크 또는 볼을 한 번에 선택합니다. 선택은 타자에게 공개되지 않습니다.",
   awaiting_swing:
-    "타자는 예상 위치를 읽고 스윙하거나 지켜봅니다. 선택 즉시 판정됩니다.",
+    "타자는 아무 위치 정보 없이 스윙하거나 지켜봅니다. 선택 즉시 판정됩니다.",
   awaiting_batting: "컨택 결과를 자동으로 판정하고 있습니다.",
   awaiting_hit: "안타 방향과 주자 진루를 자동으로 판정하고 있습니다.",
   awaiting_card: "사용할 전략카드를 고르거나 카드 없이 진행하세요.",
@@ -80,8 +81,8 @@ const PHASE_COPY: Record<GamePhase, string> = {
 };
 
 const PHASE_TITLE: Record<GamePhase, string> = {
-  awaiting_pitch: "투구 코스 선택",
-  awaiting_swing: "타격 판단",
+  awaiting_pitch: "투구 선택",
+  awaiting_swing: "타격 선택",
   awaiting_batting: "타구 판정",
   awaiting_hit: "주루 판정",
   awaiting_card: "전략카드 결정",
@@ -259,7 +260,7 @@ export default function BaseballGameDebug() {
           <span>
             <strong>야구 게임</strong>
             <small>
-              PITCH-DUEL-V2 ·{" "}
+              PITCH-DUEL-V3 ·{" "}
               {session.mode === "solo_ai"
                 ? "SOLO AI"
                 : session.mode === "multiplayer"
@@ -729,8 +730,8 @@ function AiTurnIndicator({ game, team }: { game: GameState; team: TeamSide }) {
           {isCardDecision
             ? `${role === "offense" ? "공격" : "수비"} 전략카드를 검토하고 있습니다.`
             : game.phase === "awaiting_pitch"
-              ? "투구 코스를 고르고 있습니다."
-              : "공의 궤적을 읽고 타격을 판단하고 있습니다."}
+              ? "스트라이크와 볼 사이에서 승부를 고르고 있습니다."
+              : "스윙과 지켜보기 사이에서 판단하고 있습니다."}
         </p>
       </div>
       <i aria-hidden="true" />
@@ -1104,7 +1105,6 @@ export function BaseballStadium({
   game: Pick<GameState, "bases" | "battingTeam" | "config" | "eventLog"> & {
     phase?: GamePhase;
     pitchDuel?: {
-      hint: PitchHint | null;
       status: "pitch_locked" | "revealed";
     } | null;
   };
@@ -1116,9 +1116,8 @@ export function BaseballStadium({
   ].filter(Boolean);
   const flight = getBallFlight(face);
   const pitchHistory = getPlateAppearancePitchHistory(game.eventLog);
-  const pitchHint =
-    game.phase === "awaiting_swing" ? (game.pitchDuel?.hint ?? null) : null;
   const { cue, skip } = usePresentation(game.eventLog);
+  const catcherView = shouldUseCatcherView(game.phase, face);
   const battingTeamName =
     game.config[game.battingTeam === "away" ? "awayTeamName" : "homeTeamName"];
   const baseLabel = occupied.length
@@ -1129,12 +1128,21 @@ export function BaseballStadium({
     <div
       aria-label={`${battingTeamName} 공격, ${baseLabel}${flight ? `, ${flight.label} 타구 표시` : ""}`}
       className="bbg-diamond bbg-stadium"
+      data-camera={catcherView ? "catcher" : "field"}
       data-cue={cue?.type ?? "idle"}
     >
+      {catcherView ? (
+        <CatcherPitchStage
+          cue={cue}
+          phase={game.phase}
+          pitchHistory={pitchHistory}
+        />
+      ) : null}
       <svg
         aria-label={`${battingTeamName} 공격, ${baseLabel}${flight ? `, ${flight.label} 타구 표시` : ""}`}
         preserveAspectRatio="xMidYMid meet"
         role="img"
+        className="bbg-field-overview"
         viewBox="0 0 900 700"
       >
         <defs>
@@ -1262,37 +1270,13 @@ export function BaseballStadium({
           />
         ) : null}
       </svg>
-      <div className="bbg-strike-zone" aria-label="투구 위치">
-        <span className="bbg-strike-zone-label">PITCH MAP</span>
-        <div aria-hidden="true" className="bbg-zone-grid" />
-        {pitchHint ? (
-          <span
-            aria-label={`예상 투구 위치, ${pitchHintLabel(pitchHint)}`}
-            className="bbg-pitch-hint-marker"
-            data-read={pitchHint.read}
-            role="img"
-            style={{
-              left: `${pitchHint.x}%`,
-              top: `${pitchHint.y}%`,
-              width: `${pitchHint.radius * 2}%`,
-            }}
-          >
-            <i aria-hidden="true" />
-          </span>
-        ) : null}
-        {pitchHistory.map(({ event, face: pitchFace, location }, index) => (
-          <i
-            aria-label={`${location.pitchNumber}구 ${pitchFace}`}
-            className="bbg-pitch-marker"
-            data-current={index === pitchHistory.length - 1}
-            data-zone={location.zone}
-            key={event.sequence}
-            style={{ left: `${location.x}%`, top: `${location.y}%` }}
-          >
-            {location.pitchNumber}
-          </i>
-        ))}
-      </div>
+      {!catcherView ? (
+        <div className="bbg-strike-zone" aria-label="투구 위치">
+          <span className="bbg-strike-zone-label">PITCH MAP</span>
+          <div aria-hidden="true" className="bbg-zone-grid" />
+          <PitchMarkers pitchHistory={pitchHistory} />
+        </div>
+      ) : null}
       {cue ? (
         <button
           aria-label="현재 연출 빠르게 넘기기"
@@ -1308,10 +1292,142 @@ export function BaseballStadium({
   );
 }
 
-function pitchHintLabel(hint: PitchHint) {
-  if (hint.read === "likely_strike") return "스트라이크 우세";
-  if (hint.read === "likely_ball") return "볼 우세";
-  return "존 경계";
+function shouldUseCatcherView(phase: GamePhase | undefined, face?: DieFace) {
+  if (phase === "awaiting_pitch" || phase === "awaiting_swing") return true;
+  return !face || (["S", "SM", "F", "B"] as DieFace[]).includes(face);
+}
+
+function PitchMarkers({
+  pitchHistory,
+}: {
+  pitchHistory: ReturnType<typeof getPlateAppearancePitchHistory>;
+}) {
+  return pitchHistory.map(({ event, face, location }, index) => (
+    <i
+      aria-label={`${location.pitchNumber}구 ${face}`}
+      className="bbg-pitch-marker"
+      data-current={index === pitchHistory.length - 1}
+      data-zone={location.zone}
+      key={event.sequence}
+      style={{ left: `${location.x}%`, top: `${location.y}%` }}
+    >
+      {location.pitchNumber}
+    </i>
+  ));
+}
+
+function CatcherPitchStage({
+  cue,
+  phase,
+  pitchHistory,
+}: {
+  cue: PresentationCue | null | undefined;
+  phase: GamePhase | undefined;
+  pitchHistory: ReturnType<typeof getPlateAppearancePitchHistory>;
+}) {
+  const pitchCue = cue?.type === "pitch" ? cue : null;
+  const endPoint = pitchCue
+    ? catcherPitchPoint(pitchCue.location)
+    : { x: 450, y: 410 };
+  return (
+    <div
+      aria-label="포수 시점 스트라이크존"
+      className="bbg-catcher-view"
+      role="img"
+    >
+      <svg
+        aria-hidden="true"
+        preserveAspectRatio="xMidYMid slice"
+        viewBox="0 0 900 700"
+      >
+        <defs>
+          <radialGradient id="catcher-sky" cx="50%" cy="30%" r="76%">
+            <stop offset="0" stopColor="#23435c" />
+            <stop offset="0.54" stopColor="#10283a" />
+            <stop offset="1" stopColor="#06111b" />
+          </radialGradient>
+          <linearGradient id="catcher-dirt" x1="0" x2="0" y1="0" y2="1">
+            <stop offset="0" stopColor="#92623f" />
+            <stop offset="1" stopColor="#4c3024" />
+          </linearGradient>
+        </defs>
+        <rect fill="url(#catcher-sky)" height="700" width="900" />
+        <path
+          className="bbg-catcher-stands"
+          d="M0 245 Q450 105 900 245 V355 Q450 225 0 355 Z"
+        />
+        <path
+          className="bbg-catcher-grass"
+          d="M0 330 Q450 230 900 330 V700 H0 Z"
+        />
+        <path fill="url(#catcher-dirt)" d="M0 540 Q450 270 900 540 V700 H0 Z" />
+        <ellipse
+          className="bbg-catcher-mound"
+          cx="450"
+          cy="310"
+          rx="75"
+          ry="18"
+        />
+        <g className="bbg-catcher-pitcher" transform="translate(450 274)">
+          <circle cy="-28" r="13" />
+          <path d="M-13 -13 Q0 -24 13 -13 L18 26 L7 52 H-7 L-18 26 Z" />
+          <path d="M-9 48 L-28 92 M9 48 L28 92" />
+        </g>
+        <g className="bbg-catcher-batter" transform="translate(675 425)">
+          <circle cy="-92" r="24" />
+          <path d="M-26 -65 Q4 -82 28 -54 L40 60 H-22 Z" />
+          <path d="M-9 55 L-35 164 M25 54 L54 164" />
+          <path className="bbg-catcher-bat" d="M-8 -48 L80 -145" />
+        </g>
+        <path className="bbg-catcher-box" d="M310 690 L355 520 H545 L590 690" />
+        <path
+          className="bbg-catcher-plate"
+          d="M405 636 H495 L520 662 L450 696 L380 662 Z"
+        />
+        <path
+          className="bbg-catcher-mask is-left"
+          d="M0 540 Q72 485 130 540 L96 700 H0 Z"
+        />
+        <path
+          className="bbg-catcher-mask is-right"
+          d="M900 540 Q828 485 770 540 L804 700 H900 Z"
+        />
+        {pitchCue ? (
+          <g className="bbg-catcher-pitch-flight">
+            <path
+              d={`M450 285 Q${410 + endPoint.x * 0.08} 320 ${endPoint.x} ${endPoint.y}`}
+            />
+            <circle r="10">
+              <animateMotion
+                dur="440ms"
+                fill="freeze"
+                path={`M450 285 Q${410 + endPoint.x * 0.08} 320 ${endPoint.x} ${endPoint.y}`}
+              />
+            </circle>
+          </g>
+        ) : null}
+      </svg>
+      <div className="bbg-catcher-zone" aria-label="투구 위치">
+        <span aria-hidden="true" className="bbg-zone-grid" />
+        <PitchMarkers pitchHistory={pitchHistory} />
+      </div>
+      <div className="bbg-catcher-state">
+        <small>
+          {phase === "awaiting_swing" ? "PITCH LOCKED" : "CATCHER VIEW"}
+        </small>
+        <strong>
+          {phase === "awaiting_swing" ? "타자의 선택 대기" : "투수의 선택 대기"}
+        </strong>
+      </div>
+    </div>
+  );
+}
+
+function catcherPitchPoint(location: PitchLocation) {
+  return {
+    x: 340 + location.x * 2.2,
+    y: 350 + location.y * 2.25,
+  };
 }
 
 function BallFlightVisual({
@@ -1604,9 +1720,11 @@ function PlayResult({
             <b className="is-duel" data-winner={pitchReveal.duelWinner}>
               {pitchReveal.duelWinner === "batter"
                 ? pitchReveal.swingDecision === "swing"
-                  ? `타자 승부 성공 · 안타 +${BATTER_DUEL_HIT_BONUS}%p`
-                  : "타자 승부 성공"
-                : "투수 승부 성공"}
+                  ? `타자 승부 성공 · 안타성 +${BATTER_DUEL_HIT_BONUS}%p`
+                  : "타자 승부 성공 · 볼 획득"
+                : pitchReveal.swingDecision === "swing"
+                  ? `투수 승부 성공 · 헛스윙 80% · 안타성 -${PITCHER_DUEL_HIT_PENALTY}%p`
+                  : "투수 승부 성공 · 스트라이크 획득"}
             </b>
           ) : null}
           {event?.runs ? <b className="is-score">+{event.runs}점</b> : null}
@@ -1718,7 +1836,7 @@ function gameActionLabel(action: GameAction, game: GameState) {
       ? `${CARD_DEFINITIONS[card.cardId].name} 카드를 사용했습니다`
       : "전략카드를 사용했습니다";
   }
-  if (action.type === "SELECT_PITCH") return "투구 코스를 선택했습니다";
+  if (action.type === "SELECT_PITCH") return "투구를 선택했습니다";
   if (action.type === "SELECT_SWING") {
     return action.decision === "swing"
       ? "스윙을 선택했습니다"

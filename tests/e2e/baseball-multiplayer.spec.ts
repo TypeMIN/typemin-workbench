@@ -43,7 +43,7 @@ test("두 기기가 방을 만들고 비공개 손패로 같은 경기를 진행
 
   await host.setViewportSize({ width: 944, height: 1013 });
   const portraitField = await host.evaluate(() => {
-    const stadium = document.querySelector(".bbg-mp-field .bbg-stadium svg");
+    const stadium = document.querySelector(".bbg-mp-field .bbg-field-overview");
     return {
       pageWidthFits: document.documentElement.scrollWidth <= window.innerWidth,
       pageHeightFits:
@@ -73,9 +73,7 @@ test("두 기기가 방을 만들고 비공개 손패로 같은 경기를 진행
   await expect(
     home.getByRole("region", { name: "홈팀 수비 손패" }),
   ).toBeVisible();
-  await expect(
-    home.getByRole("region", { name: "투구 코스 선택" }),
-  ).toBeVisible();
+  await expect(home.getByRole("region", { name: "투구 선택" })).toBeVisible();
   await expect(host.getByText("상대 팀의 결정을 기다리는 중")).toBeVisible({
     timeout: 4_000,
   });
@@ -103,7 +101,7 @@ test("두 기기가 방을 만들고 비공개 손패로 같은 경기를 진행
         method: "POST",
         headers: { "content-type": "application/json" },
         body: JSON.stringify({
-          command: { type: "SELECT_PITCH", target: "low_outside" },
+          command: { type: "SELECT_PITCH", target: "strike" },
           expectedRevision: 0,
           idempotencyKey,
         }),
@@ -126,7 +124,7 @@ test("두 기기가 방을 만들고 비공개 손패로 같은 경기를 진행
         method: "POST",
         headers: { "content-type": "application/json" },
         body: JSON.stringify({
-          command: { type: "SELECT_PITCH", target: "low_outside" },
+          command: { type: "SELECT_PITCH", target: "strike" },
           expectedRevision: 0,
           idempotencyKey,
         }),
@@ -162,15 +160,11 @@ test("두 기기가 방을 만들고 비공개 손패로 같은 경기를 진행
     ),
   ]);
   expect(lockedViews[0].snapshot.view.pitchDuel.pitcherChoice).toBeNull();
-  expect(lockedViews[0].snapshot.view.pitchDuel.hint).not.toBeNull();
   expect(lockedViews[0].snapshot.view.pitchDuel.actualLocation).toBeNull();
-  expect(lockedViews[1].snapshot.view.pitchDuel.pitcherChoice).toBe(
-    "low_outside",
-  );
-  expect(lockedViews[1].snapshot.view.pitchDuel.hint).toBeNull();
+  expect(lockedViews[1].snapshot.view.pitchDuel.pitcherChoice).toBe("strike");
   expect(lockedViews[1].snapshot.view.pitchDuel.actualLocation).toBeNull();
 
-  await expect(host.getByRole("region", { name: "타격 판단" })).toBeVisible();
+  await expect(host.getByRole("region", { name: "타격 선택" })).toBeVisible();
   await host.getByRole("button", { name: /지켜보기/ }).click();
   await expect(
     host.locator(".bbg-pitch-marker[data-current='true']"),

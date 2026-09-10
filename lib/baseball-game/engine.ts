@@ -2,7 +2,7 @@ import { BATTING_DIE_FACES, HIT_DIE_FACES, PITCH_DIE_FACES } from "./rules";
 import { CARD_DECK_COUNTS, CARD_DEFINITIONS } from "./cards";
 import {
   createActualPitchLocation,
-  createPitchHint,
+  normalizePitchTarget,
   PITCH_TARGET_LABELS,
   PITCH_TARGETS,
   resolveBattedBall,
@@ -30,7 +30,6 @@ import {
   type GameViewer,
   type HitFace,
   type PitchFace,
-  type PitchHint,
   type PitchLocation,
   type PitchTarget,
   type RuleError,
@@ -83,9 +82,9 @@ export function createGame(
   drawToFour(cards.defense, rng);
 
   const state: GameState = {
-    schemaVersion: 6,
-    rulesetVersion: "pitch-duel-v2",
-    presentationVersion: "broadcast-v2",
+    schemaVersion: 7,
+    rulesetVersion: "pitch-duel-v3",
+    presentationVersion: "catcher-view-v1",
     revision: 0,
     config: {
       innings: config.innings,
@@ -364,13 +363,20 @@ function cloneState(state: GameState): GameState {
         : { ...state.pendingResolution }
       : null,
     activeStrategy: state.activeStrategy ? { ...state.activeStrategy } : null,
+    schemaVersion: 7,
+    rulesetVersion: "pitch-duel-v3",
+    presentationVersion: "catcher-view-v1",
     pitchDuel: state.pitchDuel
       ? {
-          ...state.pitchDuel,
-          hint: { ...state.pitchDuel.hint },
+          sequence: state.pitchDuel.sequence,
+          status: state.pitchDuel.status,
+          pitcherChoice: normalizePitchTarget(state.pitchDuel.pitcherChoice),
+          batterDecision: state.pitchDuel.batterDecision,
+          duelWinner: state.pitchDuel.duelWinner ?? null,
           actualLocation: state.pitchDuel.actualLocation
             ? { ...state.pitchDuel.actualLocation }
             : null,
+          result: state.pitchDuel.result,
         }
       : null,
     eventLog: [...state.eventLog],
@@ -394,7 +400,6 @@ function emit(
     pitchTarget?: PitchTarget;
     swingDecision?: GameEvent["swingDecision"];
     pitchLocation?: PitchLocation;
-    pitchHint?: PitchHint;
     duelWinner?: GameEvent["duelWinner"];
   },
 ) {
@@ -416,7 +421,6 @@ function emit(
     pitchTarget: event.pitchTarget,
     swingDecision: event.swingDecision,
     pitchLocation: event.pitchLocation,
-    pitchHint: event.pitchHint,
     duelWinner: event.duelWinner,
   });
 }
@@ -482,14 +486,10 @@ function selectPitch(
   const actualLocation = createActualPitchLocation(target, pitchNumber, () =>
     nextRandom(state.rng),
   );
-  const hint = createPitchHint(target, actualLocation, () =>
-    nextRandom(state.rng),
-  );
   state.pitchDuel = {
     sequence: pitchNumber,
     status: "pitch_locked",
     pitcherChoice: target,
-    hint,
     batterDecision: null,
     duelWinner: null,
     actualLocation,
@@ -544,7 +544,6 @@ function revealPitchDuel(
     pitchTarget: duel.pitcherChoice,
     swingDecision: decision,
     pitchLocation: actualLocation,
-    pitchHint: { ...duel.hint },
     duelWinner: duel.duelWinner,
   });
 }
@@ -2371,15 +2370,11 @@ function pitchDuelView(
   const revealed = duel.status === "revealed";
   const defenseTeam = oppositeTeam(state.battingTeam);
   const canSeeChoice = viewer === "debug" || revealed || viewer === defenseTeam;
-  const canSeeHint =
-    viewer === "debug" || revealed || viewer === state.battingTeam;
-
   return {
     sequence: duel.sequence,
     status: duel.status,
     pitcherLocked: true,
     pitcherChoice: canSeeChoice ? duel.pitcherChoice : null,
-    hint: canSeeHint ? { ...duel.hint } : null,
     batterDecision: revealed ? duel.batterDecision : null,
     duelWinner: revealed ? (duel.duelWinner ?? null) : null,
     actualLocation:

@@ -87,7 +87,7 @@ test("공용 화면과 2대2 개인기기가 한 파티 경기를 실제로 진�
       for (const page of players.slice(2)) {
         if (
           await page
-            .getByRole("button", { name: /^높은 몸쪽/ })
+            .getByRole("button", { name: "스트라이크 선택" })
             .isVisible()
             .catch(() => false)
         ) {
@@ -150,7 +150,7 @@ test("공용 화면과 2대2 개인기기가 한 파티 경기를 실제로 진�
           playerView.snapshot?.me.id === afterSkip.snapshot.activeDefenderId &&
           playerView.snapshot?.canAct === true &&
           (await page
-            .getByRole("button", { name: /^높은 몸쪽/ })
+            .getByRole("button", { name: "스트라이크 선택" })
             .isVisible()
             .catch(() => false))
         ) {
@@ -171,7 +171,7 @@ test("공용 화면과 2대2 개인기기가 한 파티 경기를 실제로 진�
         method: "POST",
         headers: { "content-type": "application/json" },
         body: JSON.stringify({
-          command: { type: "SELECT_PITCH", target: "high_inside" },
+          command: { type: "SELECT_PITCH", target: "strike" },
           expectedRevision: current.snapshot.view.revision,
           expectedRoomRevision: current.snapshot.roomRevision,
           idempotencyKey: crypto.randomUUID(),
@@ -201,7 +201,6 @@ test("공용 화면과 2대2 개인기기가 한 파티 경기를 실제로 진�
   expect(publicPayload.snapshot.view.cards.offense.hand).toBeNull();
   expect(publicPayload.snapshot.view.cards.defense.hand).toBeNull();
   expect(publicPayload.snapshot.view.pitchDuel.pitcherChoice).toBeNull();
-  expect(publicPayload.snapshot.view.pitchDuel.hint).toBeNull();
   expect(publicPayload.snapshot.view.pitchDuel.actualLocation).toBeNull();
   expect(publicPayload.snapshot.view).not.toHaveProperty("rng");
   expect(JSON.stringify(publicPayload)).not.toContain("token");
@@ -212,7 +211,6 @@ test("공용 화면과 2대2 개인기기가 한 파티 경기를 실제로 진�
   );
   expect(playerPayload.snapshot.view.cards.defense.hand).toBeNull();
   expect(playerPayload.snapshot.view.pitchDuel.pitcherChoice).toBeNull();
-  expect(playerPayload.snapshot.view.pitchDuel.hint).not.toBeNull();
   expect(playerPayload.snapshot.view).not.toHaveProperty("rng");
 
   const spectatorContext = await browser.newContext({

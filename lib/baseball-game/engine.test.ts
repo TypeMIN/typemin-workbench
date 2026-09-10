@@ -141,29 +141,26 @@ describe("pitch and phase flow", () => {
     expect(state.revision).toBe(0);
   });
 
-  it("keeps the selected pitch private, gives the batter only a hint, then reveals both choices", () => {
+  it("keeps the selected pitch private with no location hint, then reveals both choices", () => {
     const initial = game({ phase: "awaiting_pitch" });
     const locked = apply(initial, {
       type: "SELECT_PITCH",
-      target: "low_outside",
+      target: "strike",
     });
 
     expect(locked.phase).toBe("awaiting_swing");
     expect(getActionOwner(locked)).toBe("away");
     expect(getLegalActions(locked)).toEqual(["SELECT_SWING"]);
     expect(getGameView(locked, "home").pitchDuel).toMatchObject({
-      pitcherChoice: "low_outside",
-      hint: null,
+      pitcherChoice: "strike",
       actualLocation: null,
     });
     expect(getGameView(locked, "away").pitchDuel).toMatchObject({
       pitcherChoice: null,
       actualLocation: null,
     });
-    expect(getGameView(locked, "away").pitchDuel?.hint).not.toBeNull();
     expect(getGameView(locked, "public").pitchDuel).toMatchObject({
       pitcherChoice: null,
-      hint: null,
       actualLocation: null,
     });
     expect(
@@ -178,7 +175,7 @@ describe("pitch and phase flow", () => {
       (event) => event.kind === "pitch_result",
     );
     expect(reveal).toMatchObject({
-      pitchTarget: "low_outside",
+      pitchTarget: "strike",
       swingDecision: "take",
       face: "S",
       duelWinner: "pitcher",
@@ -200,7 +197,7 @@ describe("pitch and phase flow", () => {
   it("records a batter win when the hitter attacks a strike", () => {
     const locked = apply(game({ phase: "awaiting_pitch" }), {
       type: "SELECT_PITCH",
-      target: "high_inside",
+      target: "strike",
     });
     const resolved = apply(locked, {
       type: "SELECT_SWING",
@@ -211,13 +208,7 @@ describe("pitch and phase flow", () => {
     ).toMatchObject({ duelWinner: "batter" });
   });
 
-  it.each([
-    "high_inside",
-    "high_outside",
-    "low_inside",
-    "low_outside",
-    "ball",
-  ] as const)(
+  it.each(["strike", "ball"] as const)(
     "automatically completes every batter response against %s",
     (target) => {
       for (const decision of ["swing", "take"] as const) {
@@ -1128,11 +1119,11 @@ describe("advanced strategy and automatic pro rules", () => {
   });
 });
 
-describe("broadcast-v2 box score", () => {
-  it("initializes schema 6 and keeps structured inning totals", () => {
+describe("catcher-view-v1 box score", () => {
+  it("initializes schema 7 and keeps structured inning totals", () => {
     const state = createGame(CONFIG);
-    expect(state.schemaVersion).toBe(6);
-    expect(state.presentationVersion).toBe("broadcast-v2");
+    expect(state.schemaVersion).toBe(7);
+    expect(state.presentationVersion).toBe("catcher-view-v1");
     expect(state.boxScore).toEqual({
       innings: [{ away: 0, home: null }],
       totals: {

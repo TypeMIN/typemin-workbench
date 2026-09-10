@@ -115,7 +115,7 @@ describe("baseball multiplayer service", () => {
         "ABC234",
         AWAY_TOKEN,
         {
-          command: { type: "SELECT_PITCH", target: "low_outside" },
+          command: { type: "SELECT_PITCH", target: "strike" },
           expectedRevision: 0,
           idempotencyKey: randomUUID(),
         },
@@ -133,7 +133,7 @@ describe("baseball multiplayer service", () => {
       "ABC234",
       HOME_TOKEN,
       {
-        command: { type: "SELECT_PITCH", target: "low_outside" },
+        command: { type: "SELECT_PITCH", target: "strike" },
         expectedRevision: 0,
         idempotencyKey,
       },
@@ -143,7 +143,7 @@ describe("baseball multiplayer service", () => {
       "ABC234",
       HOME_TOKEN,
       {
-        command: { type: "SELECT_PITCH", target: "low_outside" },
+        command: { type: "SELECT_PITCH", target: "strike" },
         expectedRevision: 0,
         idempotencyKey,
       },
@@ -161,7 +161,7 @@ describe("baseball multiplayer service", () => {
       "ABC234",
       HOME_TOKEN,
       {
-        command: { type: "SELECT_PITCH", target: "low_outside" },
+        command: { type: "SELECT_PITCH", target: "strike" },
         expectedRevision: 0,
         idempotencyKey: randomUUID(),
       },
@@ -172,7 +172,7 @@ describe("baseball multiplayer service", () => {
         "ABC234",
         HOME_TOKEN,
         {
-          command: { type: "SELECT_PITCH", target: "low_outside" },
+          command: { type: "SELECT_PITCH", target: "strike" },
           expectedRevision: 0,
           idempotencyKey: randomUUID(),
         },

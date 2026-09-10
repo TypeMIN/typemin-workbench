@@ -6,10 +6,10 @@ import { commandToGameAction, parseMultiplayerCommand } from "./command";
 describe("multiplayer commands", () => {
   it("accepts only the four public multiplayer command shapes", () => {
     expect(
-      parseMultiplayerCommand({ type: "SELECT_PITCH", target: "low_outside" }),
+      parseMultiplayerCommand({ type: "SELECT_PITCH", target: "strike" }),
     ).toEqual({
       type: "SELECT_PITCH",
-      target: "low_outside",
+      target: "strike",
     });
     expect(
       parseMultiplayerCommand({ type: "SELECT_SWING", decision: "take" }),
@@ -37,15 +37,15 @@ describe("multiplayer commands", () => {
     expect(
       commandToGameAction(pitch, {
         type: "SELECT_PITCH",
-        target: "high_inside",
+        target: "strike",
       }),
     ).toEqual({
       type: "SELECT_PITCH",
-      target: "high_inside",
+      target: "strike",
     });
     const locked = transition(pitch, {
       type: "SELECT_PITCH",
-      target: "high_inside",
+      target: "strike",
     });
     if (!locked.ok) throw new Error("투구 선택 실패");
     expect(

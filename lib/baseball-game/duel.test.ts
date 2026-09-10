@@ -3,8 +3,8 @@ import { describe, expect, it } from "vitest";
 import {
   BATTER_DUEL_HIT_BONUS,
   createActualPitchLocation,
-  createPitchHint,
   getBattedBallTendency,
+  PITCHER_DUEL_HIT_PENALTY,
   PITCH_TARGETS,
   PITCH_TENDENCIES,
   resolveBattedBall,
@@ -22,17 +22,24 @@ describe("pitch duel balance", () => {
       expect(
         rewarded.ground + rewarded.air + rewarded.hit + rewarded.homeRun,
       ).toBe(100);
+      const suppressed = getBattedBallTendency(target, "pitcher");
+      expect(
+        suppressed.ground +
+          suppressed.air +
+          suppressed.hit +
+          suppressed.homeRun,
+      ).toBe(100);
     }
   });
 
   it("awards the simple 2x2 mind game to the correct side", () => {
-    expect(resolveDuelWinner("high_inside", "swing")).toBe("batter");
-    expect(resolveDuelWinner("high_inside", "take")).toBe("pitcher");
+    expect(resolveDuelWinner("strike", "swing")).toBe("batter");
+    expect(resolveDuelWinner("strike", "take")).toBe("pitcher");
     expect(resolveDuelWinner("ball", "swing")).toBe("pitcher");
     expect(resolveDuelWinner("ball", "take")).toBe("batter");
   });
 
-  it("moves twelve percentage points into hits after a batter win", () => {
+  it("strongly rewards the winner on a contacted pitch", () => {
     for (const target of PITCH_TARGETS) {
       const normal = getBattedBallTendency(target);
       const rewarded = getBattedBallTendency(target, "batter");
@@ -41,26 +48,39 @@ describe("pitch duel balance", () => {
       );
     }
 
-    const values = [0.7, 0];
+    for (const target of PITCH_TARGETS) {
+      const normal = getBattedBallTendency(target);
+      const suppressed = getBattedBallTendency(target, "pitcher");
+      expect(suppressed.hit + suppressed.homeRun).toBe(
+        normal.hit + normal.homeRun - PITCHER_DUEL_HIT_PENALTY,
+      );
+    }
+
+    const values = [0.58, 0];
     let normalIndex = 0;
     let rewardedIndex = 0;
+    expect(resolveBattedBall("strike", () => values[normalIndex++]!)).not.toBe(
+      "HIT",
+    );
     expect(
-      resolveBattedBall("high_inside", () => values[normalIndex++]!),
-    ).not.toBe("HIT");
-    expect(
-      resolveBattedBall(
-        "high_inside",
-        () => values[rewardedIndex++]!,
-        "batter",
-      ),
+      resolveBattedBall("strike", () => values[rewardedIndex++]!, "batter"),
     ).toBe("HIT");
+
+    let pitcherIndex = 0;
+    expect(resolveBattedBall("ball", () => [0.82, 0][pitcherIndex++]!)).toBe(
+      "HIT",
+    );
+    pitcherIndex = 0;
+    expect(
+      resolveBattedBall("ball", () => [0.82, 0][pitcherIndex++]!, "pitcher"),
+    ).not.toBe("HIT");
   });
 
   it("makes takes deterministic and swings target-dependent", () => {
     expect(resolvePitchFace("ball", "take", () => 0.5)).toBe("B");
-    expect(resolvePitchFace("high_inside", "take", () => 0.5)).toBe("S");
-    expect(resolvePitchFace("high_inside", "swing", () => 0.1)).toBe("C");
-    expect(resolvePitchFace("ball", "swing", () => 0.2)).toBe("F");
+    expect(resolvePitchFace("strike", "take", () => 0.5)).toBe("S");
+    expect(resolvePitchFace("strike", "swing", () => 0.1)).toBe("C");
+    expect(resolvePitchFace("ball", "swing", () => 0.1)).toBe("F");
     expect(resolvePitchFace("ball", "swing", () => 0.9)).toBe("SM");
   });
 
@@ -82,16 +102,15 @@ describe("pitch duel balance", () => {
     }
   });
 
-  it("creates reproducible hint and batted-ball results", () => {
+  it("creates reproducible locations and batted-ball results", () => {
     const values = [0.4, 0.2, 0.7, 0.1, 0.8, 0.3];
     const run = () => {
       let index = 0;
       const random = () => values[index++ % values.length];
-      const actual = createActualPitchLocation("low_outside", 1, random);
+      const actual = createActualPitchLocation("strike", 1, random);
       return {
         actual,
-        hint: createPitchHint("low_outside", actual, random),
-        batted: resolveBattedBall("low_outside", random),
+        batted: resolveBattedBall("strike", random),
       };
     };
     expect(run()).toEqual(run());

@@ -24,12 +24,12 @@ describe("baseball game AI", () => {
     const pitch = createGame(CONFIG);
     expect(chooseAiAction(pitch, "home", () => 0.999_999)).toEqual({
       type: "SELECT_PITCH",
-      target: "low_outside",
+      target: "strike",
     });
 
     const locked = transition(pitch, {
       type: "SELECT_PITCH",
-      target: "high_inside",
+      target: "strike",
     });
     if (!locked.ok) throw new Error("투구 선택 실패");
     expect(chooseAiAction(locked.state, "away", () => 0)).toEqual({
@@ -38,11 +38,11 @@ describe("baseball game AI", () => {
     });
   });
 
-  it("bases the batter decision on the visible hint, not the hidden pitch choice", () => {
+  it("bases the batter decision on the count, not the hidden pitch choice", () => {
     const initial = createGame(CONFIG);
     const locked = transition(initial, {
       type: "SELECT_PITCH",
-      target: "high_inside",
+      target: "strike",
     });
     if (!locked.ok || !locked.state.pitchDuel)
       throw new Error("투구 선택 실패");

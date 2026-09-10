@@ -12,32 +12,24 @@ export type HitFace =
   "IH" | "L1" | "L2" | "C1" | "C2" | "R1" | "R2" | "D2" | "D3" | "T3";
 export type DieFace = PitchFace | BattingFace | HitFace;
 
-export type PitchTarget =
-  "high_inside" | "high_outside" | "low_inside" | "low_outside" | "ball";
+export type PitchTarget = "strike" | "ball";
 
 export type SwingDecision = "swing" | "take";
 export type DuelWinner = "batter" | "pitcher";
-
-export type PitchHint = FieldPoint & {
-  radius: number;
-  read: "likely_strike" | "borderline" | "likely_ball";
-};
 
 export type PitchDuelState = {
   sequence: number;
   status: "pitch_locked" | "revealed";
   pitcherChoice: PitchTarget;
-  hint: PitchHint;
   batterDecision: SwingDecision | null;
   duelWinner: DuelWinner | null;
   actualLocation: PitchLocation | null;
   result: PitchFace | null;
 };
 
-export type PitchDuelView = Omit<PitchDuelState, "pitcherChoice" | "hint"> & {
+export type PitchDuelView = Omit<PitchDuelState, "pitcherChoice"> & {
   pitcherLocked: boolean;
   pitcherChoice: PitchTarget | null;
-  hint: PitchHint | null;
 };
 
 export type CardRole = "offense" | "defense";
@@ -255,14 +247,13 @@ export type GameEvent = {
   pitchTarget?: PitchTarget;
   swingDecision?: SwingDecision;
   pitchLocation?: PitchLocation;
-  pitchHint?: PitchHint;
   duelWinner?: DuelWinner;
 };
 
 export type GameState = {
-  schemaVersion: 6;
-  rulesetVersion: "pitch-duel-v2";
-  presentationVersion: "broadcast-v2";
+  schemaVersion: 7;
+  rulesetVersion: "pitch-duel-v3";
+  presentationVersion: "catcher-view-v1";
   revision: number;
   config: GameConfig;
   phase: GamePhase;

@@ -9585,3 +9585,314 @@
       repeat(4, minmax(15px, 18px));
   }
 }
+
+/* Pitch duel v3: catcher camera and a focused two-by-two mind game. */
+.bbg-stadium[data-camera="catcher"] > .bbg-field-overview {
+  display: none;
+}
+
+.bbg-catcher-view {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  background: #07131e;
+}
+
+.bbg-catcher-view > svg {
+  width: 100%;
+  height: 100%;
+}
+
+.bbg-catcher-stands {
+  fill: #101e2c;
+  stroke: rgb(166 198 216 / 12%);
+  stroke-width: 4;
+}
+
+.bbg-catcher-grass {
+  fill: #12583d;
+  opacity: 0.92;
+}
+
+.bbg-catcher-mound {
+  fill: #9e6a46;
+  stroke: rgb(255 229 196 / 28%);
+  stroke-width: 2;
+}
+
+.bbg-catcher-pitcher {
+  fill: #d9e4e7;
+  stroke: #06111a;
+  stroke-linecap: round;
+  stroke-width: 9;
+}
+
+.bbg-catcher-batter {
+  fill: #071019;
+  stroke: rgb(217 231 236 / 18%);
+  stroke-width: 4;
+}
+
+.bbg-catcher-bat {
+  fill: none;
+  stroke: #d2a06a;
+  stroke-linecap: round;
+  stroke-width: 13;
+}
+
+.bbg-catcher-box {
+  fill: none;
+  stroke: rgb(250 246 228 / 58%);
+  stroke-width: 4;
+}
+
+.bbg-catcher-plate {
+  fill: #f5f7f2;
+  stroke: rgb(7 16 24 / 72%);
+  stroke-width: 4;
+}
+
+.bbg-catcher-mask {
+  fill: rgb(2 8 13 / 82%);
+  stroke: rgb(130 158 174 / 18%);
+  stroke-width: 5;
+}
+
+.bbg-catcher-zone {
+  position: absolute;
+  z-index: 4;
+  top: 58%;
+  left: 50%;
+  width: clamp(150px, 25%, 235px);
+  aspect-ratio: 0.82;
+  translate: -50% -50%;
+  border: 2px solid rgb(235 246 249 / 78%);
+  border-radius: 5px;
+  background: rgb(5 16 25 / 9%);
+  box-shadow:
+    0 0 0 1px rgb(3 10 15 / 50%),
+    inset 0 0 30px rgb(6 16 24 / 18%);
+}
+
+.bbg-catcher-zone .bbg-zone-grid {
+  inset: 0;
+  border: 0;
+}
+
+.bbg-catcher-zone .bbg-pitch-marker {
+  width: 17px;
+  height: 17px;
+  font-size: 7px;
+}
+
+.bbg-catcher-zone .bbg-pitch-marker[data-current="true"] {
+  width: 23px;
+  height: 23px;
+  font-size: 9px;
+}
+
+.bbg-catcher-state {
+  position: absolute;
+  z-index: 4;
+  bottom: 18px;
+  left: 18px;
+  display: grid;
+  gap: 2px;
+  padding: 8px 11px;
+  border-left: 3px solid var(--bbg-mint);
+  border-radius: 4px;
+  color: #eef8f5;
+  background: rgb(3 12 19 / 76%);
+  backdrop-filter: blur(8px);
+}
+
+.bbg-catcher-state small {
+  color: var(--bbg-mint);
+  font-size: 7px;
+  font-weight: 950;
+  letter-spacing: 0.12em;
+}
+
+.bbg-catcher-state strong {
+  font-size: 11px;
+}
+
+.bbg-catcher-pitch-flight path {
+  fill: none;
+  stroke: rgb(237 250 255 / 82%);
+  stroke-dasharray: 12 9;
+  stroke-linecap: round;
+  stroke-width: 5;
+  animation: bbg-route 440ms ease-out both;
+}
+
+.bbg-catcher-pitch-flight circle {
+  fill: white;
+  filter: drop-shadow(0 0 10px rgb(255 255 255 / 78%));
+}
+
+.bbg-duel--simple {
+  gap: 7px;
+}
+
+.bbg-duel--simple .bbg-pitch-choice-grid {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 7px;
+}
+
+.bbg-duel--simple .bbg-pitch-choice,
+.bbg-duel--simple .bbg-pitch-choice.is-ball {
+  min-height: 96px;
+  grid-column: auto;
+  align-content: center;
+  gap: 4px;
+  padding: 10px;
+  text-align: center;
+}
+
+.bbg-duel--simple .bbg-pitch-choice.is-strike {
+  border-color: rgb(112 240 186 / 52%);
+  background: linear-gradient(
+    145deg,
+    rgb(112 240 186 / 15%),
+    rgb(7 18 30 / 92%)
+  );
+}
+
+.bbg-duel--simple .bbg-pitch-choice.is-ball {
+  border-color: rgb(255 209 102 / 46%);
+  background: linear-gradient(
+    145deg,
+    rgb(255 209 102 / 13%),
+    rgb(7 18 30 / 92%)
+  );
+}
+
+.bbg-duel--simple .bbg-pitch-choice > small,
+.bbg-duel--simple .bbg-pitch-choice > span {
+  color: #91a7b4;
+  font-size: 7px;
+}
+
+.bbg-duel--simple .bbg-pitch-choice > strong {
+  color: #f4fbf8;
+  font-size: 17px;
+}
+
+.bbg-duel--simple .bbg-swing-actions {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.bbg-duel--simple .bbg-swing-actions button {
+  min-height: 88px;
+  align-content: center;
+  gap: 2px;
+  text-align: center;
+}
+
+.bbg-duel--simple .bbg-swing-actions strong {
+  font-size: 17px;
+}
+
+.bbg-duel--simple .bbg-swing-actions span {
+  color: #91a7b4;
+  font-size: 7px;
+}
+
+.bbg-duel-payoff {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 5px;
+}
+
+.bbg-duel-payoff span {
+  display: grid;
+  gap: 1px;
+  padding: 5px 7px;
+  border: 1px solid rgb(145 169 183 / 16%);
+  border-radius: 6px;
+  color: #91a7b4;
+  background: rgb(255 255 255 / 3%);
+  font-size: 7px;
+  text-align: center;
+}
+
+.bbg-duel-payoff b {
+  color: #eaf8f3;
+  font-size: 8px;
+}
+
+@media (max-width: 680px) {
+  .bbg-game-console .bbg-control-panel--broadcast {
+    display: flex;
+    flex-direction: column;
+    gap: 5px;
+    padding: 8px;
+  }
+
+  .bbg-control-panel--broadcast .bbg-panel-heading,
+  .bbg-control-panel--broadcast .bbg-phase-copy {
+    display: none;
+  }
+
+  .bbg-control-panel--broadcast .bbg-duel--simple {
+    flex: 0 0 auto;
+  }
+
+  .bbg-control-panel--broadcast .bbg-card-hands {
+    min-height: 0;
+    flex: 1 1 auto;
+  }
+
+  .bbg-broadcast-heading .bbg-sound-toggle > span:last-child {
+    display: none !important;
+  }
+
+  .bbg-catcher-zone {
+    top: 56%;
+    width: clamp(118px, 28%, 160px);
+  }
+
+  .bbg-catcher-state {
+    bottom: 9px;
+    left: 9px;
+    padding: 6px 8px;
+  }
+
+  .bbg-duel--simple .bbg-pitch-choice-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .bbg-duel--simple .bbg-pitch-choice,
+  .bbg-duel--simple .bbg-pitch-choice.is-ball,
+  .bbg-duel--simple .bbg-swing-actions button {
+    min-height: 58px;
+  }
+
+  .bbg-duel--simple .bbg-pitch-choice > strong,
+  .bbg-duel--simple .bbg-swing-actions strong {
+    font-size: 13px;
+  }
+}
+
+@media (max-height: 820px) and (min-width: 681px) {
+  .bbg-control-panel--broadcast .bbg-duel--simple .bbg-pitch-choice-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .bbg-control-panel--broadcast .bbg-duel--simple .bbg-pitch-choice,
+  .bbg-control-panel--broadcast .bbg-duel--simple .bbg-pitch-choice.is-ball,
+  .bbg-control-panel--broadcast .bbg-duel--simple .bbg-swing-actions button {
+    min-height: 54px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .bbg-catcher-pitch-flight path {
+    animation: none;
+  }
+
+  .bbg-catcher-pitch-flight circle {
+    display: none;
+  }
+}

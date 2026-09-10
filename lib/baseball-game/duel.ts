@@ -3,7 +3,6 @@ import type {
   DuelWinner,
   HitFace,
   PitchFace,
-  PitchHint,
   PitchLocation,
   PitchTarget,
   SwingDecision,
@@ -20,77 +19,49 @@ export type PitchTendency = {
 };
 
 export const PITCH_TARGETS = [
-  "high_inside",
-  "high_outside",
-  "low_inside",
-  "low_outside",
+  "strike",
   "ball",
 ] as const satisfies readonly PitchTarget[];
 
 export const PITCH_TARGET_LABELS: Record<PitchTarget, string> = {
-  high_inside: "높은 몸쪽",
-  high_outside: "높은 바깥쪽",
-  low_inside: "낮은 몸쪽",
-  low_outside: "낮은 바깥쪽",
+  strike: "스트라이크",
   ball: "볼",
 };
 
 export const PITCH_TENDENCIES: Record<PitchTarget, PitchTendency> = {
-  high_inside: {
-    contact: 68,
-    foul: 17,
-    whiff: 15,
-    ground: 20,
-    air: 55,
-    hit: 17,
-    homeRun: 8,
-  },
-  high_outside: {
-    contact: 60,
-    foul: 22,
-    whiff: 18,
-    ground: 22,
-    air: 60,
-    hit: 15,
-    homeRun: 3,
-  },
-  low_inside: {
-    contact: 64,
-    foul: 18,
-    whiff: 18,
-    ground: 45,
-    air: 23,
-    hit: 27,
-    homeRun: 5,
-  },
-  low_outside: {
-    contact: 55,
-    foul: 22,
-    whiff: 23,
-    ground: 52,
-    air: 28,
-    hit: 18,
-    homeRun: 2,
+  strike: {
+    contact: 82,
+    foul: 12,
+    whiff: 6,
+    ground: 36,
+    air: 34,
+    hit: 24,
+    homeRun: 6,
   },
   ball: {
-    contact: 12,
-    foul: 18,
-    whiff: 70,
-    ground: 66,
-    air: 27,
-    hit: 7,
-    homeRun: 0,
+    contact: 6,
+    foul: 14,
+    whiff: 80,
+    ground: 45,
+    air: 35,
+    hit: 17,
+    homeRun: 3,
   },
 };
 
-/** A correct swing/take read transfers 12 percentage points to hit outcomes. */
-export const BATTER_DUEL_HIT_BONUS = 12;
+/** Winning the read should feel decisive without changing count rules. */
+export const BATTER_DUEL_HIT_BONUS = 24;
+export const PITCHER_DUEL_HIT_PENALTY = 18;
+
+export function normalizePitchTarget(value: unknown): PitchTarget {
+  return value === "ball" ? "ball" : "strike";
+}
 
 export function resolveDuelWinner(
   target: PitchTarget,
   decision: SwingDecision,
 ): DuelWinner {
-  const isStrike = target !== "ball";
+  const isStrike = target === "strike";
   return (isStrike && decision === "swing") ||
     (!isStrike && decision === "take")
     ? "batter"
@@ -102,7 +73,7 @@ export function getBattedBallTendency(
   duelWinner: DuelWinner | null = null,
 ): Pick<PitchTendency, "ground" | "air" | "hit" | "homeRun"> {
   const tendency = PITCH_TENDENCIES[target];
-  if (duelWinner !== "batter") {
+  if (!duelWinner) {
     return {
       ground: tendency.ground,
       air: tendency.air,
@@ -110,12 +81,19 @@ export function getBattedBallTendency(
       homeRun: tendency.homeRun,
     };
   }
-  return {
-    ground: tendency.ground - 7,
-    air: tendency.air - 5,
-    hit: tendency.hit + 9,
-    homeRun: tendency.homeRun + 3,
-  };
+  return duelWinner === "batter"
+    ? {
+        ground: tendency.ground - 12,
+        air: tendency.air - 12,
+        hit: tendency.hit + 17,
+        homeRun: tendency.homeRun + 7,
+      }
+    : {
+        ground: tendency.ground + 9,
+        air: tendency.air + 9,
+        hit: tendency.hit - 15,
+        homeRun: tendency.homeRun - 3,
+      };
 }
 
 const GROUND_OUTCOMES = [
@@ -163,54 +141,11 @@ export function createActualPitchLocation(
     return { x: 22 + x * 56, y: 79 + y * 14, zone: "ball", pitchNumber };
   }
 
-  const inside = target.endsWith("inside");
-  const high = target.startsWith("high");
   return {
-    x: (inside ? 29 : 51) + x * 20,
-    y: (high ? 25 : 51) + y * 24,
+    x: 27 + x * 46,
+    y: 23 + y * 54,
     zone: "strike",
     pitchNumber,
-  };
-}
-
-export function createPitchHint(
-  target: PitchTarget,
-  actual: PitchLocation,
-  random: () => number,
-): PitchHint {
-  const reliability = random();
-  const jitterX = (random() - 0.5) * 10;
-  const jitterY = (random() - 0.5) * 10;
-  if (reliability < 0.68) {
-    return {
-      x: clamp(actual.x + jitterX, 5, 95),
-      y: clamp(actual.y + jitterY, 5, 95),
-      radius: 17,
-      read: target === "ball" ? "likely_ball" : "likely_strike",
-    };
-  }
-  if (reliability < 0.9) {
-    return {
-      x: clamp(actual.x + (actual.x < 50 ? 12 : -12) + jitterX, 12, 88),
-      y: clamp(actual.y + (actual.y < 50 ? 10 : -10) + jitterY, 12, 88),
-      radius: 22,
-      read: "borderline",
-    };
-  }
-  if (target === "ball") {
-    return {
-      x: 36 + random() * 28,
-      y: 34 + random() * 32,
-      radius: 24,
-      read: "likely_strike",
-    };
-  }
-  const left = random() < 0.5;
-  return {
-    x: left ? 12 + random() * 10 : 78 + random() * 10,
-    y: 25 + random() * 50,
-    radius: 24,
-    read: "likely_ball",
   };
 }
 
@@ -256,8 +191,4 @@ function weighted<T extends string>(
     cursor -= weight;
   }
   return choices.at(-1)![0];
-}
-
-function clamp(value: number, min: number, max: number) {
-  return Math.max(min, Math.min(max, value));
 }

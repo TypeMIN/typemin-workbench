@@ -1,5 +1,5 @@
 import { CARD_DEFINITIONS } from "./cards";
-import { getActionOwner, getGameView, getLegalCards } from "./engine";
+import { getActionOwner, getLegalCards } from "./engine";
 import type {
   CardId,
   GameAction,
@@ -84,12 +84,9 @@ export function chooseAiAction(
     return { type: "SELECT_PITCH", target: choosePitchTarget(state, random) };
   }
   if (state.phase === "awaiting_swing") {
-    const view = getGameView(state, aiTeam);
-    const read = view.pitchDuel?.hint?.read ?? "borderline";
-    let swingChance =
-      read === "likely_strike" ? 0.78 : read === "likely_ball" ? 0.18 : 0.48;
-    if (state.strikes === 2) swingChance += 0.14;
-    if (state.balls === 3) swingChance -= 0.12;
+    let swingChance = 0.5;
+    if (state.strikes === 2) swingChance = 0.68;
+    if (state.balls === 3) swingChance = 0.34;
     return {
       type: "SELECT_SWING",
       decision: random() < swingChance ? "swing" : "take",
@@ -103,14 +100,7 @@ function choosePitchTarget(
   random: () => number,
 ): PitchTarget {
   const ballChance = state.balls === 3 ? 0.08 : state.strikes === 2 ? 0.3 : 0.2;
-  if (random() < ballChance) return "ball";
-  const strikeTargets: PitchTarget[] = [
-    "high_inside",
-    "high_outside",
-    "low_inside",
-    "low_outside",
-  ];
-  return strikeTargets[Math.floor(random() * strikeTargets.length)]!;
+  return random() < ballChance ? "ball" : "strike";
 }
 
 function scoreCard(state: GameState, cardId: CardId) {
