@@ -763,7 +763,11 @@ function CardHands({
     game.phase === "awaiting_card" ? currentCardRole(game) : null;
   const visibleRole = viewer ? roleForTeam(game, viewer) : null;
   return (
-    <div className="bbg-card-hands" aria-label="싱글플레이 전략카드 손패">
+    <div
+      className="bbg-card-hands"
+      data-card-window={game.phase === "awaiting_card"}
+      aria-label="싱글플레이 전략카드 손패"
+    >
       {(["offense", "defense"] as const).map((role) => (
         <CardHand
           active={activeRole === role && visibleRole === role}
@@ -808,6 +812,7 @@ function CardHand({
         .filter(Boolean)
         .join(" ")}
       data-active={active}
+      data-revealed={revealed}
       aria-label={`${teamName} ${role === "offense" ? "공격" : "수비"} ${revealed ? "손패" : "비공개 손패"}`}
     >
       <header>
@@ -1287,6 +1292,7 @@ function CatcherPitchStage({
     <div
       aria-label="포수 시점 스트라이크존"
       className="bbg-catcher-view"
+      data-last-zone={latestPitch?.location.zone}
       role="img"
     >
       <svg
@@ -1387,6 +1393,7 @@ function PitchSequence({
       {pitchHistory.map(({ event, face, location }, index) => (
         <li
           data-current={index === pitchHistory.length - 1}
+          data-zone={location.zone}
           key={event.sequence}
         >
           <b>{location.pitchNumber}</b>

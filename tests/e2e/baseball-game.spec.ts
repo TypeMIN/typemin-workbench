@@ -64,6 +64,10 @@ test("야구 게임에서 투타 심리전과 새 경기를 진행한다", async
   await expect(page.locator(".bbg-card-hand button")).toHaveCount(4);
   await expect(page.locator(".bbg-card-back")).toHaveCount(4);
   await expect(page.locator(".bbg-card-hand button[data-tier]")).toHaveCount(4);
+  await expect(page.locator(".bbg-card-hands")).toHaveAttribute(
+    "data-card-window",
+    "false",
+  );
   await expect(
     page.getByRole("button", { name: "카드 없이 진행" }),
   ).toHaveCount(0);
@@ -150,6 +154,21 @@ test("야구 게임에서 투타 심리전과 새 경기를 진행한다", async
     }),
   );
   expect(scoreRows[1].top).toBeGreaterThanOrEqual(scoreRows[0].bottom - 1);
+  const strategyLayout = await page.evaluate(() => {
+    const panel = document
+      .querySelector(".bbg-control-panel--broadcast")
+      ?.getBoundingClientRect();
+    const cardTops = Array.from(
+      document.querySelectorAll(".bbg-card-hand button"),
+      (card) => Math.round(card.getBoundingClientRect().top),
+    );
+    return {
+      panelWidth: panel?.width ?? 0,
+      cardRows: new Set(cardTops).size,
+    };
+  });
+  expect(strategyLayout.panelWidth).toBeLessThanOrEqual(283);
+  expect(strategyLayout.cardRows).toBe(1);
 
   await page.getByRole("button", { name: "스트라이크 선택" }).click();
   await expect(page.locator(".bbg-choice-flash")).toHaveText("스트라이크");
@@ -210,14 +229,23 @@ test("야구 게임에서 투타 심리전과 새 경기를 진행한다", async
     const consoleRect = element
       .closest(".bbg-game-console")
       ?.getBoundingClientRect();
+    const fieldRect = document
+      .querySelector(".bbg-broadcast-field")
+      ?.getBoundingClientRect();
+    const controlRect = document
+      .querySelector(".bbg-control-panel--broadcast")
+      ?.getBoundingClientRect();
     return {
       bottom: rect.bottom,
       consoleBottom: consoleRect?.bottom ?? 0,
       viewportBottom: window.innerHeight,
+      fieldHeight: fieldRect?.height ?? 0,
+      controlHeight: controlRect?.height ?? 0,
     };
   });
   expect(cardsFit.bottom).toBeLessThanOrEqual(cardsFit.consoleBottom + 1);
   expect(cardsFit.bottom).toBeLessThanOrEqual(cardsFit.viewportBottom);
+  expect(cardsFit.fieldHeight).toBeGreaterThan(cardsFit.controlHeight * 3);
   expect(
     await page.evaluate(
       () => document.documentElement.scrollHeight <= window.innerHeight,

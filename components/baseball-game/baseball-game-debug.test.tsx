@@ -118,6 +118,10 @@ describe("BaseballGameDebug", () => {
     ).toBeVisible();
     expect(container.querySelectorAll(".bbg-card-hand button")).toHaveLength(4);
     expect(container.querySelectorAll(".bbg-card-back")).toHaveLength(4);
+    expect(container.querySelector(".bbg-card-hands")).toHaveAttribute(
+      "data-card-window",
+      "false",
+    );
     expect(
       container.querySelectorAll(".bbg-card-hand button[data-tier]"),
     ).toHaveLength(4);
@@ -275,6 +279,16 @@ describe("BaseballGameDebug", () => {
     expect(sequence.querySelector('li[data-current="true"]')).toHaveTextContent(
       "2볼",
     );
+    expect(sequence.querySelector('li[data-current="true"]')).toHaveAttribute(
+      "data-zone",
+      "ball",
+    );
+    expect(
+      screen.getByRole("img", { name: "포수 시점 스트라이크존" }),
+    ).toHaveAttribute("data-last-zone", "ball");
+    expect(
+      document.querySelector(".bbg-pitch-marker[data-current='true']"),
+    ).toHaveAttribute("data-zone", "ball");
   });
 
   it("switches from catcher view to the full field when a ball is put in play", () => {

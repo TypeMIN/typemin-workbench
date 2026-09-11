@@ -10777,3 +10777,148 @@
     animation: none;
   }
 }
+
+/* Self-review pass: keep the field dominant and let strategy expand only when it matters. */
+@media (min-width: 681px) {
+  .bbg-game-console {
+    grid-template-columns: minmax(0, 1fr) minmax(252px, 282px);
+  }
+
+  .bbg-control-panel--broadcast > .bbg-card-hands {
+    min-height: 0;
+    flex: 0 0 auto;
+    grid-template-rows: repeat(2, auto);
+    align-content: start;
+  }
+
+  .bbg-card-hands[data-card-window="false"] .bbg-card-hand,
+  .bbg-card-hands[data-card-window="true"] .bbg-card-hand:not(.is-active) {
+    grid-template-rows: 18px 44px;
+  }
+
+  .bbg-card-hands[data-card-window="false"] .bbg-card-hand > div,
+  .bbg-card-hands[data-card-window="true"]
+    .bbg-card-hand:not(.is-active)
+    > div {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 3px;
+  }
+
+  .bbg-card-hands[data-card-window="false"] .bbg-card-hand button,
+  .bbg-card-hands[data-card-window="true"]
+    .bbg-card-hand:not(.is-active)
+    button {
+    min-height: 44px;
+    grid-template-columns: 1fr;
+    place-content: center;
+    justify-items: center;
+    padding: 4px 2px;
+    text-align: center;
+  }
+
+  .bbg-card-hands[data-card-window="false"] .bbg-card-hand button b,
+  .bbg-card-hands[data-card-window="true"]
+    .bbg-card-hand:not(.is-active)
+    button
+    b {
+    grid-row: auto;
+  }
+
+  .bbg-card-hands[data-card-window="false"] .bbg-card-hand button span,
+  .bbg-card-hands[data-card-window="true"]
+    .bbg-card-hand:not(.is-active)
+    button
+    span {
+    display: none;
+  }
+
+  .bbg-card-hands[data-card-window="false"] .bbg-card-back,
+  .bbg-card-hands[data-card-window="true"]
+    .bbg-card-hand:not(.is-active)
+    .bbg-card-back {
+    min-height: 44px;
+  }
+
+  .bbg-card-hands[data-card-window="true"] .bbg-card-hand.is-active {
+    grid-template-rows: 20px auto;
+  }
+
+  .bbg-card-hands[data-card-window="true"] .bbg-card-hand.is-active > div {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .bbg-card-hands[data-card-window="true"] .bbg-card-hand.is-active button {
+    min-height: 74px;
+  }
+}
+
+/* The newest pitch must remain visible even when a long at-bat fills the rail. */
+.bbg-pitch-sequence {
+  justify-content: flex-end;
+}
+
+.bbg-pitch-sequence:has(li:nth-child(6)) {
+  mask-image: linear-gradient(to right, transparent 0, #000 18px, #000 100%);
+}
+
+.bbg-pitch-sequence li[data-zone="ball"][data-current="true"],
+.bbg-catcher-zone .bbg-pitch-marker[data-zone="ball"][data-current="true"] {
+  color: #241a06;
+  background: #ffd76b;
+  box-shadow:
+    0 0 0 7px rgb(255 215 107 / 15%),
+    0 0 28px rgb(255 215 107 / 66%);
+}
+
+.bbg-pitch-sequence li[data-zone="edge"][data-current="true"],
+.bbg-catcher-zone .bbg-pitch-marker[data-zone="edge"][data-current="true"] {
+  color: #1e1608;
+  background: #ffbc64;
+  box-shadow:
+    0 0 0 7px rgb(255 188 100 / 15%),
+    0 0 28px rgb(255 188 100 / 60%);
+}
+
+.bbg-catcher-view[data-last-zone="ball"] .bbg-last-pitch-path {
+  stroke: rgb(255 215 107 / 54%);
+}
+
+.bbg-catcher-view[data-last-zone="edge"] .bbg-last-pitch-path {
+  stroke: rgb(255 188 100 / 52%);
+}
+
+@media (max-width: 900px) and (min-width: 681px) {
+  .bbg-game-console {
+    grid-template-columns: minmax(0, 1fr) 242px;
+  }
+}
+
+@media (max-width: 680px) {
+  .bbg-game-console {
+    height: min(661px, calc(100dvh - 174px));
+    grid-template-rows: minmax(0, 1fr) 126px;
+  }
+
+  .bbg-game-console:has(.bbg-card-hands[data-card-window="true"]) {
+    grid-template-rows: minmax(0, 1fr) 208px;
+  }
+
+  .bbg-control-panel--broadcast {
+    padding: 6px;
+  }
+
+  .bbg-control-panel--broadcast > .bbg-card-hands {
+    height: 112px;
+    min-height: 0;
+    flex: 0 0 112px;
+  }
+
+  .bbg-control-panel--broadcast > .bbg-card-hands[data-card-window="true"] {
+    height: auto;
+    flex: 1 1 auto;
+  }
+
+  .bbg-pitch-sequence {
+    justify-content: flex-end;
+  }
+}
