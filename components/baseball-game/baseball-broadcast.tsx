@@ -264,17 +264,18 @@ export function usePresentation(events: GameEvent[]) {
 
   useEffect(() => {
     if (cues.length === 0) return;
-    const interval = Math.min(420, 2600 / cues.length);
-    let nextIndex = 0;
-    const timer = window.setInterval(() => {
-      nextIndex += 1;
-      setProgress({
-        revision: latestRevision,
-        index: Math.min(nextIndex, cues.length),
-      });
-      if (nextIndex >= cues.length) window.clearInterval(timer);
-    }, interval);
-    return () => window.clearInterval(timer);
+    const stableCues = JSON.parse(cueSignature) as PresentationCue[];
+    const rawDurations = stableCues.map(presentationCueDuration);
+    const rawTotal = rawDurations.reduce((sum, duration) => sum + duration, 0);
+    const scale = Math.min(1, 5_800 / rawTotal);
+    let elapsed = 0;
+    const timers = rawDurations.map((duration, index) => {
+      elapsed += Math.round(duration * scale);
+      return window.setTimeout(() => {
+        setProgress({ revision: latestRevision, index: index + 1 });
+      }, elapsed);
+    });
+    return () => timers.forEach((timer) => window.clearTimeout(timer));
   }, [cueSignature, cues.length, latestRevision]);
 
   return {
@@ -286,6 +287,16 @@ export function usePresentation(events: GameEvent[]) {
         index: cues.length,
       }),
   };
+}
+
+function presentationCueDuration(cue: PresentationCue) {
+  if (cue.type === "pitch") return 460;
+  if (cue.type === "call") return 900;
+  if (cue.type === "batted_ball") return 820;
+  if (cue.type === "catch") return 650;
+  if (cue.type === "throw") return 760;
+  if (cue.type === "runner_move") return 720;
+  return 1_400;
 }
 
 type PlayReceiptGame = Pick<

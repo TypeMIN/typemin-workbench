@@ -42,8 +42,6 @@ import type {
   PitchFace,
   PitchLocation,
   PresentationCue,
-  RunnerDestination,
-  RunnerOrigin,
   ScheduledInnings,
   TeamSide,
 } from "@/lib/baseball-game/types";
@@ -303,10 +301,6 @@ export default function BaseballGameDebug() {
                   face={lastResult?.face}
                   game={playerView}
                   key={`field-${game.revision}`}
-                />
-                <StadiumHighlight
-                  events={currentRevisionEvents}
-                  key={`highlight-${game.revision}`}
                 />
                 {choiceFlash ? (
                   <div
@@ -650,55 +644,6 @@ function MiniScore({ game }: { game: GameState }) {
   );
 }
 
-type Highlight = {
-  label: string;
-  summary: string;
-  tone: "score" | "out" | "special";
-};
-
-function StadiumHighlight({ events }: { events: GameEvent[] }) {
-  const highlight = getStadiumHighlight(events);
-  if (!highlight) return null;
-  return (
-    <div
-      aria-live="polite"
-      className="bbg-stadium-highlight"
-      data-tone={highlight.tone}
-      role="status"
-    >
-      <strong>{highlight.label}</strong>
-      <span>{highlight.summary}</span>
-    </div>
-  );
-}
-
-function getStadiumHighlight(events: GameEvent[]): Highlight | null {
-  const event =
-    events.findLast((item) => item.kind === "plate_appearance") ??
-    events.findLast((item) => item.kind === "card_resolve");
-  if (!event) return null;
-  if (event.summary.includes("홈런")) {
-    return { label: "HOME RUN", summary: event.summary, tone: "score" };
-  }
-  if (event.summary.includes("삼중살")) {
-    return { label: "TRIPLE PLAY", summary: event.summary, tone: "special" };
-  }
-  if (event.summary.includes("병살")) {
-    return { label: "DOUBLE PLAY", summary: event.summary, tone: "special" };
-  }
-  if (event.summary.includes("삼진")) {
-    return { label: "STRIKE OUT", summary: event.summary, tone: "out" };
-  }
-  if (event.runs > 0) {
-    return {
-      label: `SCORE +${event.runs}`,
-      summary: event.summary,
-      tone: "score",
-    };
-  }
-  return null;
-}
-
 function AiTurnIndicator({ game, team }: { game: GameState; team: TeamSide }) {
   const role = roleForTeam(game, team);
   const isCardDecision = game.phase === "awaiting_card";
@@ -1018,39 +963,50 @@ type BallFlight = {
   target: { x: number; y: number };
 };
 
-const RUNNER_POINTS: Record<
-  RunnerOrigin | RunnerDestination,
-  [number, number]
-> = {
-  batter: [450, 650],
-  home: [450, 650],
-  first: [540, 560],
-  second: [450, 470],
-  third: [360, 560],
-  out: [450, 560],
-};
-
-function runnerPath(from: RunnerOrigin, to: RunnerDestination) {
-  const [fromX, fromY] = RUNNER_POINTS[from];
-  const [toX, toY] = RUNNER_POINTS[to];
-  return `M${fromX} ${fromY} L${toX} ${toY}`;
+function fieldPath(
+  from: { x: number; y: number },
+  to: { x: number; y: number },
+) {
+  return `M${from.x} ${from.y} L${to.x} ${to.y}`;
 }
 
 function presentationLabel(cue: PresentationCue) {
   if (cue.type === "call") {
-    return {
-      ball: "BALL",
-      strike: "STRIKE",
-      foul: "FOUL",
-      contact: "CONTACT",
+    const label = {
+      ball: ["BALL", "볼"],
+      strike: ["STRIKE", "스트라이크"],
+      foul: ["FOUL", "파울"],
+      contact: ["CONTACT", "타격"],
     }[cue.call];
+    return { primary: label[0], detail: label[1] };
   }
-  if (cue.type === "decision") return cue.result.toUpperCase();
-  if (cue.type === "pitch") return `${cue.location.pitchNumber}구`;
-  if (cue.type === "batted_ball") return cue.face;
-  if (cue.type === "catch") return "CATCH";
-  if (cue.type === "throw") return "THROW";
-  return "RUN";
+  if (cue.type === "decision") {
+    return {
+      primary: cue.result.toUpperCase(),
+      detail: cue.label,
+    };
+  }
+  if (cue.type === "pitch") {
+    return { primary: `${cue.location.pitchNumber}구`, detail: "투구" };
+  }
+  if (cue.type === "batted_ball") {
+    return { primary: "타격", detail: FACE_LABELS[cue.face] };
+  }
+  if (cue.type === "catch") {
+    return { primary: "포구", detail: cue.label };
+  }
+  if (cue.type === "throw") {
+    return {
+      primary:
+        cue.kind === "pickoff"
+          ? "견제"
+          : cue.kind === "caught_stealing"
+            ? "도루 저지"
+            : "송구",
+      detail: cue.label,
+    };
+  }
+  return { primary: "주자 출발", detail: cue.label };
 }
 
 export function BaseballStadium({
@@ -1071,7 +1027,13 @@ export function BaseballStadium({
   const flight = getBallFlight(face);
   const pitchHistory = getPlateAppearancePitchHistory(game.eventLog);
   const { cue, skip } = usePresentation(game.eventLog);
-  const catcherView = shouldUseCatcherView(game.phase, face);
+  const fieldAction = Boolean(
+    cue &&
+    (["batted_ball", "catch", "throw", "runner_move"].includes(cue.type) ||
+      (cue.type === "decision" && cue.camera === "field")),
+  );
+  const catcherView = !fieldAction && shouldUseCatcherView(game.phase, face);
+  const cueLabel = cue ? presentationLabel(cue) : null;
   const battingTeamName =
     game.config[game.battingTeam === "away" ? "awayTeamName" : "homeTeamName"];
   const baseLabel = occupied.length
@@ -1208,16 +1170,49 @@ export function BaseballStadium({
           </g>
         ) : null}
         {cue?.type === "throw" ? (
-          <g className="bbg-throw-cue">
-            <path d={`M${cue.from.x} ${cue.from.y} L${cue.to.x} ${cue.to.y}`} />
-            <circle cx={cue.to.x} cy={cue.to.y} r="7" />
+          <g className="bbg-throw-cue" data-kind={cue.kind}>
+            <path d={fieldPath(cue.from, cue.to)} />
+            <circle
+              className="bbg-throw-target"
+              cx={cue.to.x}
+              cy={cue.to.y}
+              r="18"
+            />
+            <circle className="bbg-live-throw" r="7">
+              <animateMotion
+                dur="640ms"
+                fill="freeze"
+                path={fieldPath(cue.from, cue.to)}
+              />
+            </circle>
+          </g>
+        ) : null}
+        {cue?.type === "catch" ? (
+          <g
+            className="bbg-catch-cue"
+            transform={`translate(${cue.location.x} ${cue.location.y})`}
+          >
+            <circle r="24" />
+            <circle r="7" />
           </g>
         ) : null}
         {cue?.type === "runner_move" ? (
-          <path
-            className="bbg-runner-cue"
-            d={runnerPath(cue.move.from, cue.move.to)}
-          />
+          <g className="bbg-runner-cue" data-out={cue.move.to === "out"}>
+            <path d={fieldPath(cue.origin, cue.destination)} />
+            <circle
+              className="bbg-runner-origin"
+              cx={cue.origin.x}
+              cy={cue.origin.y}
+              r="11"
+            />
+            <circle className="bbg-live-runner" r="10">
+              <animateMotion
+                dur="620ms"
+                fill="freeze"
+                path={fieldPath(cue.origin, cue.destination)}
+              />
+            </circle>
+          </g>
         ) : null}
       </svg>
       {!catcherView ? (
@@ -1227,15 +1222,17 @@ export function BaseballStadium({
           <PitchMarkers pitchHistory={pitchHistory} />
         </div>
       ) : null}
-      {cue ? (
+      {cue && cueLabel ? (
         <button
           aria-label="현재 연출 빠르게 넘기기"
           className="bbg-presentation-cue"
           data-cue={cue.type}
+          data-result={cue.type === "decision" ? cue.result : undefined}
           onClick={skip}
           type="button"
         >
-          {presentationLabel(cue)}
+          <strong>{cueLabel.primary}</strong>
+          <span>{cueLabel.detail}</span>
         </button>
       ) : null}
     </div>

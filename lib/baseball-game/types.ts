@@ -197,10 +197,27 @@ export type PresentationCue =
   | { type: "pitch"; location: PitchLocation; face: PitchFace }
   | { type: "call"; call: "ball" | "strike" | "foul" | "contact" }
   | { type: "batted_ball"; face: BattingFace | HitFace }
-  | { type: "catch"; location: FieldPoint }
-  | { type: "throw"; from: FieldPoint; to: FieldPoint }
-  | { type: "runner_move"; move: RunnerMove }
-  | { type: "decision"; result: "safe" | "out" | "score" };
+  | { type: "catch"; location: FieldPoint; label: string }
+  | {
+      type: "throw";
+      from: FieldPoint;
+      to: FieldPoint;
+      kind: "throw" | "pickoff" | "caught_stealing";
+      label: string;
+    }
+  | {
+      type: "runner_move";
+      move: RunnerMove;
+      origin: FieldPoint;
+      destination: FieldPoint;
+      label: string;
+    }
+  | {
+      type: "decision";
+      result: "safe" | "out" | "score";
+      label: string;
+      camera: "catcher" | "field";
+    };
 
 export type AudioCue =
   | "pitch"

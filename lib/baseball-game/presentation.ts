@@ -8,6 +8,7 @@ import type {
   PitchLocation,
   PresentationCue,
   RunnerDestination,
+  RunnerMove,
   RunnerOrigin,
 } from "./types";
 
@@ -180,6 +181,8 @@ export function getPlateAppearancePitchHistory(events: GameEvent[]) {
 
 export function buildPresentationCues(events: GameEvent[]): PresentationCue[] {
   const cues: PresentationCue[] = [];
+  let battedFace: BattingFace | HitFace | null = null;
+  let throwOrigin: FieldPoint = { x: 450, y: 650 };
   const pitchEventsBefore = events.filter(
     (event) =>
       event.kind === "pitch_result" ||
@@ -206,25 +209,90 @@ export function buildPresentationCues(events: GameEvent[]): PresentationCue[] {
           (event.die === "batting" || event.die === "hit"))) &&
       isBattedFace(event.face)
     ) {
+      battedFace = event.face;
+      throwOrigin = CATCH_POINTS[event.face];
       cues.push({ type: "batted_ball", face: event.face });
       if (isCaughtFace(event.face))
-        cues.push({ type: "catch", location: CATCH_POINTS[event.face] });
+        cues.push({
+          type: "catch",
+          location: CATCH_POINTS[event.face],
+          label: "타구 포구",
+        });
     }
 
+    const safeMoves: RunnerMove[] = [];
     for (const move of event.moves) {
       if (move.to === "out") {
+        if (
+          move.runner === "batter" &&
+          ((battedFace && isCaughtFace(battedFace)) ||
+            event.summary.includes("삼진"))
+        ) {
+          cues.push({
+            type: "decision",
+            result: "out",
+            label: event.summary || "타자 아웃",
+            camera: event.summary.includes("삼진") ? "catcher" : "field",
+          });
+          continue;
+        }
+        const destination = inferOutDestination(event, move);
+        const kind = inferThrowKind(event);
+        const origin =
+          kind === "pickoff"
+            ? leadOffPoint(move.from)
+            : FIELD_POINTS[move.from];
+        cues.push({
+          type: "runner_move",
+          move,
+          origin,
+          destination,
+          label: runnerMoveLabel(move.from, destination, true),
+        });
         cues.push({
           type: "throw",
-          from: inferThrowOrigin(event.face),
-          to: FIELD_POINTS[move.from],
+          from: inferThrowStart(event, kind, throwOrigin),
+          to: destination,
+          kind,
+          label: throwLabel(event, destination, kind),
+        });
+        throwOrigin = destination;
+        cues.push({
+          type: "decision",
+          result: "out",
+          label: event.summary || "주자 아웃",
+          camera: "field",
         });
       } else {
-        cues.push({ type: "runner_move", move });
+        safeMoves.push(move);
+        cues.push({
+          type: "runner_move",
+          move,
+          origin: FIELD_POINTS[move.from],
+          destination: FIELD_POINTS[move.to],
+          label: runnerMoveLabel(move.from, FIELD_POINTS[move.to], false),
+        });
       }
+    }
+    if (event.cardId === "POE" && safeMoves.length > 0) {
+      const pickoffBase = safeMoves.find((move) => move.to !== "home")?.from;
+      if (pickoffBase && pickoffBase !== "batter") {
+        cues.splice(Math.max(0, cues.length - safeMoves.length), 0, {
+          type: "throw",
+          from: FIELD_POINTS.out,
+          to: FIELD_POINTS[pickoffBase],
+          kind: "pickoff",
+          label: "견제 송구",
+        });
+      }
+    }
+    if (safeMoves.length > 0) {
+      const scored = safeMoves.some((move) => move.to === "home");
       cues.push({
         type: "decision",
-        result:
-          move.to === "out" ? "out" : move.to === "home" ? "score" : "safe",
+        result: scored ? "score" : "safe",
+        label: event.summary || (scored ? "주자 득점" : "주자 세이프"),
+        camera: "field",
       });
     }
   });
@@ -277,8 +345,94 @@ function pitchCall(
   return "strike";
 }
 
-function inferThrowOrigin(face: GameEvent["face"]): FieldPoint {
-  return face && isBattedFace(face) ? CATCH_POINTS[face] : { x: 450, y: 560 };
+function inferThrowKind(
+  event: GameEvent,
+): Extract<PresentationCue, { type: "throw" }>["kind"] {
+  if (["PO1", "PO2", "CO1", "CO3", "POE"].includes(event.cardId ?? "")) {
+    return "pickoff";
+  }
+  if (["CS2", "CS3", "CSH"].includes(event.cardId ?? "")) {
+    return "caught_stealing";
+  }
+  return "throw";
+}
+
+function inferThrowStart(
+  event: GameEvent,
+  kind: Extract<PresentationCue, { type: "throw" }>["kind"],
+  current: FieldPoint,
+) {
+  if (kind === "caught_stealing") return FIELD_POINTS.home;
+  if (["PO1", "PO2", "POE"].includes(event.cardId ?? "")) {
+    return FIELD_POINTS.out;
+  }
+  if (["CO1", "CO3"].includes(event.cardId ?? "")) return FIELD_POINTS.home;
+  return current;
+}
+
+function inferOutDestination(event: GameEvent, move: RunnerMove): FieldPoint {
+  if (event.cardId === "PO1" || event.cardId === "CO1") {
+    return FIELD_POINTS.first;
+  }
+  if (event.cardId === "PO2") return FIELD_POINTS.second;
+  if (event.cardId === "CO3") return FIELD_POINTS.third;
+  if (event.cardId === "CS2") return FIELD_POINTS.second;
+  if (event.cardId === "CS3") return FIELD_POINTS.third;
+  if (event.cardId === "CSH") return FIELD_POINTS.home;
+  if (move.from === "batter") return FIELD_POINTS.first;
+  if (move.from === "first") return FIELD_POINTS.second;
+  if (move.from === "second") return FIELD_POINTS.third;
+  return FIELD_POINTS.home;
+}
+
+function leadOffPoint(from: RunnerOrigin): FieldPoint {
+  const base = FIELD_POINTS[from];
+  const next =
+    from === "first"
+      ? FIELD_POINTS.second
+      : from === "second"
+        ? FIELD_POINTS.third
+        : from === "third"
+          ? FIELD_POINTS.home
+          : FIELD_POINTS.first;
+  return {
+    x: base.x + (next.x - base.x) * 0.28,
+    y: base.y + (next.y - base.y) * 0.28,
+  };
+}
+
+function runnerMoveLabel(
+  from: RunnerOrigin,
+  destination: FieldPoint,
+  isOutAttempt: boolean,
+) {
+  const fromLabel = from === "batter" ? "타자" : baseName(FIELD_POINTS[from]);
+  const toLabel = baseName(destination);
+  return isOutAttempt
+    ? `${fromLabel}${from === "batter" ? "" : " 주자"} · ${toLabel} 승부`
+    : `${fromLabel} → ${toLabel}`;
+}
+
+function throwLabel(
+  event: GameEvent,
+  destination: FieldPoint,
+  kind: Extract<PresentationCue, { type: "throw" }>["kind"],
+) {
+  if (kind === "pickoff") return `${baseName(destination)} 견제`;
+  if (kind === "caught_stealing") return `${baseName(destination)} 도루 저지`;
+  if (event.summary.includes("병살"))
+    return `${baseName(destination)} 병살 송구`;
+  return `${baseName(destination)} 송구`;
+}
+
+function baseName(point: FieldPoint) {
+  if (point.x === FIELD_POINTS.first.x && point.y === FIELD_POINTS.first.y)
+    return "1루";
+  if (point.x === FIELD_POINTS.second.x && point.y === FIELD_POINTS.second.y)
+    return "2루";
+  if (point.x === FIELD_POINTS.third.x && point.y === FIELD_POINTS.third.y)
+    return "3루";
+  return "홈";
 }
 
 function isPitchFace(face: GameEvent["face"]): face is PitchFace {

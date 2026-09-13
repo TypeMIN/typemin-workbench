@@ -78,11 +78,13 @@ describe("broadcast UI", () => {
 
     expect(result.current.cue?.type).toBe("pitch");
     act(() => vi.advanceTimersByTime(850));
+    expect(result.current.cue).toEqual({ type: "call", call: "strike" });
+    act(() => vi.advanceTimersByTime(600));
     expect(result.current.cue).toBeUndefined();
 
     rerender({ events: [{ ...pitchEvent }] });
     expect(result.current.cue).toBeUndefined();
-    act(() => vi.advanceTimersByTime(850));
+    act(() => vi.advanceTimersByTime(1_450));
     expect(result.current.cue).toBeUndefined();
   });
 

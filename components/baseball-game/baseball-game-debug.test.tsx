@@ -170,6 +170,12 @@ describe("BaseballGameDebug", () => {
     });
     expect(
       screen.queryByRole("button", { name: "현재 연출 빠르게 넘기기" }),
+    ).toBeVisible();
+    act(() => {
+      vi.advanceTimersByTime(3_000);
+    });
+    expect(
+      screen.queryByRole("button", { name: "현재 연출 빠르게 넘기기" }),
     ).not.toBeInTheDocument();
     expect(screen.queryByText(/특정 면 강제 입력/)).not.toBeInTheDocument();
   });
@@ -314,6 +320,56 @@ describe("BaseballGameDebug", () => {
       screen.queryByRole("img", { name: "포수 시점 스트라이크존" }),
     ).not.toBeInTheDocument();
     expect(container.querySelector(".bbg-fence")).toBeVisible();
+  });
+
+  it("shows a pickoff as runner movement, a live throw and a held ruling", () => {
+    vi.useFakeTimers();
+    const game = createGame({
+      innings: 3,
+      awayTeamName: "원정팀",
+      homeTeamName: "홈팀",
+    });
+    game.phase = "awaiting_pitch";
+    game.bases.first = false;
+    game.eventLog = [
+      {
+        sequence: 1,
+        revision: 1,
+        inning: 1,
+        half: "top",
+        kind: "card_resolve",
+        summary: "1루 견제 성공",
+        cardId: "PO1",
+        runs: 0,
+        outsRecorded: 1,
+        moves: [{ runner: "first", from: "first", to: "out" }],
+      },
+    ];
+
+    const { container } = render(<BaseballStadium game={game} />);
+    expect(container.querySelector(".bbg-stadium")).toHaveAttribute(
+      "data-camera",
+      "field",
+    );
+    expect(container.querySelector(".bbg-live-runner")).toBeVisible();
+    expect(
+      screen.getByRole("button", { name: "현재 연출 빠르게 넘기기" }),
+    ).toHaveTextContent("주자 출발1루 주자 · 1루 승부");
+
+    act(() => vi.advanceTimersByTime(720));
+    expect(container.querySelector(".bbg-live-throw")).toBeVisible();
+    expect(
+      screen.getByRole("button", { name: "현재 연출 빠르게 넘기기" }),
+    ).toHaveTextContent("견제1루 견제");
+
+    act(() => vi.advanceTimersByTime(760));
+    expect(
+      screen.getByRole("button", { name: "현재 연출 빠르게 넘기기" }),
+    ).toHaveTextContent("OUT1루 견제 성공");
+    act(() => vi.advanceTimersByTime(1_100));
+    expect(
+      screen.getByRole("button", { name: "현재 연출 빠르게 넘기기" }),
+    ).toBeVisible();
   });
 
   it("creates a new game from edited team names and innings", () => {
