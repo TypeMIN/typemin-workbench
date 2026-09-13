@@ -4,9 +4,13 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { Volume2, VolumeX } from "lucide-react";
 import {
   buildPresentationCues,
+  CARD_DEFINITIONS,
+  FACE_LABELS,
   getAudioCues,
+  PITCH_TARGET_LABELS,
   type GameEvent,
   type GameState,
+  type GameView,
   type PresentationCue,
   type TeamSide,
 } from "@/lib/baseball-game";
@@ -256,6 +260,7 @@ export function usePresentation(events: GameEvent[]) {
   );
   const [progress, setProgress] = useState({ revision: 0, index: 0 });
   const cueIndex = progress.revision === latestRevision ? progress.index : 0;
+  const cueSignature = JSON.stringify(cues);
 
   useEffect(() => {
     if (cues.length === 0) return;
@@ -270,7 +275,7 @@ export function usePresentation(events: GameEvent[]) {
       if (nextIndex >= cues.length) window.clearInterval(timer);
     }, interval);
     return () => window.clearInterval(timer);
-  }, [cues, latestRevision]);
+  }, [cueSignature, cues.length, latestRevision]);
 
   return {
     cue: cues[cueIndex] as PresentationCue | undefined,
@@ -281,6 +286,128 @@ export function usePresentation(events: GameEvent[]) {
         index: cues.length,
       }),
   };
+}
+
+type PlayReceiptGame = Pick<
+  GameState | GameView,
+  "eventLog" | "phase" | "cardWindow"
+>;
+
+export type BaseballPlayReceiptData = {
+  pitcher: string;
+  batter: string;
+  cards: string;
+  result: string;
+};
+
+export function getBaseballPlayReceipt(
+  game: PlayReceiptGame,
+): BaseballPlayReceiptData | null {
+  const events = game.eventLog;
+  const commitIndex = events.findLastIndex(
+    (event) => event.kind === "pitch_commit",
+  );
+  const lastCardIndex = events.findLastIndex(
+    (event) => event.kind === "card_play",
+  );
+  if (commitIndex < 0 && lastCardIndex < 0) return null;
+
+  const resultIndex = events.findLastIndex(
+    (event) => event.kind === "pitch_result",
+  );
+  const hasPendingPitch = commitIndex > resultIndex;
+  const hasNewPrePitchCard =
+    game.cardWindow?.timing === "before_pitch" &&
+    lastCardIndex > resultIndex &&
+    !hasPendingPitch;
+  const cycleEndIndex = hasPendingPitch ? commitIndex : resultIndex;
+  const previousPitchIndex = events.findLastIndex(
+    (event, index) => index < cycleEndIndex && event.kind === "pitch_result",
+  );
+  const cycleStartIndex = hasNewPrePitchCard
+    ? resultIndex + 1
+    : previousPitchIndex + 1;
+  const cycle = events.slice(cycleStartIndex);
+  const pitchResult = cycle.findLast((event) => event.kind === "pitch_result");
+  const hasCommittedPitch = cycle.some(
+    (event) => event.kind === "pitch_commit",
+  );
+  const cardIds = Array.from(
+    new Set(
+      cycle.flatMap((event) =>
+        event.kind === "card_play" && event.cardId ? [event.cardId] : [],
+      ),
+    ),
+  );
+  const latestOutcome = cycle.findLast((event) =>
+    [
+      "game_end",
+      "half_inning",
+      "plate_appearance",
+      "card_resolve",
+      "card_play",
+      "batted_ball",
+      "count",
+      "pitch_result",
+    ].includes(event.kind),
+  );
+
+  return {
+    pitcher: pitchResult?.pitchTarget
+      ? PITCH_TARGET_LABELS[pitchResult.pitchTarget]
+      : hasCommittedPitch
+        ? "선택 완료"
+        : "대기",
+    batter: pitchResult?.swingDecision
+      ? pitchResult.swingDecision === "swing"
+        ? "스윙"
+        : "지켜보기"
+      : hasCommittedPitch
+        ? "판단 중"
+        : "대기",
+    cards:
+      cardIds.length > 0
+        ? cardIds.map((id) => CARD_DEFINITIONS[id].name).join(" + ")
+        : pitchResult
+          ? "사용 안 함"
+          : game.phase === "awaiting_card"
+            ? "선택 중"
+            : "대기",
+    result:
+      latestOutcome?.kind === "pitch_result" && latestOutcome.face
+        ? FACE_LABELS[latestOutcome.face]
+        : (latestOutcome?.summary ?? "대기"),
+  };
+}
+
+export function BaseballPlayReceipt({
+  className,
+  game,
+}: {
+  className?: string;
+  game: PlayReceiptGame;
+}) {
+  const receipt = getBaseballPlayReceipt(game);
+  if (!receipt) return null;
+  const items: Array<[string, string]> = [
+    ["투수", receipt.pitcher],
+    ["타자", receipt.batter],
+    ["카드", receipt.cards],
+    ["판정", receipt.result],
+  ];
+  return (
+    <dl
+      aria-label="현재 승부 진행 기록"
+      className={["bbg-play-receipt", className].filter(Boolean).join(" ")}
+    >
+      {items.map(([label, value]) => (
+        <div key={label}>
+          <dt>{label}</dt>
+          <dd>{value}</dd>
+        </div>
+      ))}
+    </dl>
+  );
 }
 
 function synthesizeCue(

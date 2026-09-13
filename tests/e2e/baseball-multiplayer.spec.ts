@@ -146,6 +146,9 @@ test("두 기기가 방을 만들고 비공개 손패로 같은 경기를 진행
     })
     .toBe(1);
   expect(Date.now() - syncStartedAt).toBeLessThan(1_800);
+  await expect(host.getByLabel("현재 승부 진행 기록")).toContainText(
+    "투수선택 완료타자판단 중카드대기판정대기",
+  );
 
   const lockedViews = await Promise.all([
     host.evaluate(
@@ -178,6 +181,9 @@ test("두 기기가 방을 만들고 비공개 손패로 같은 경기를 진행
   await expect(
     host.getByRole("list", { name: "현재 타자 누적 투구" }),
   ).toBeVisible();
+  await expect(host.getByLabel("현재 승부 진행 기록")).toContainText(
+    "투수스트라이크타자지켜보기",
+  );
 
   const directFace = await home.evaluate(async (code) => {
     const response = await fetch(`/api/baseball-game/rooms/${code}/actions`, {

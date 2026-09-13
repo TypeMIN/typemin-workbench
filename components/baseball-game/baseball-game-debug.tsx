@@ -12,6 +12,7 @@ import {
 } from "@/components/baseball-game/baseball-action-feedback";
 import {
   BaseballAudio,
+  BaseballPlayReceipt,
   BroadcastLineScore,
   usePresentation,
 } from "@/components/baseball-game/baseball-broadcast";
@@ -1632,7 +1633,6 @@ function PlayResult({
     events.findLast((item) => item.kind === "count") ??
     events.findLast((item) => item.kind === "half_inning") ??
     events.at(-1);
-  const sideChange = events.some((item) => item.kind === "half_inning");
   const tone = !event
     ? "ready"
     : event.kind === "game_end"
@@ -1667,18 +1667,7 @@ function PlayResult({
       </div>
       <div className="bbg-result-copy">
         <h2>{event?.summary ?? "첫 투구를 준비하세요"}</h2>
-        <div className="bbg-impact-list">
-          {event?.runs ? <b className="is-score">+{event.runs}점</b> : null}
-          {event?.outsRecorded ? (
-            <b className="is-out">+{event.outsRecorded}아웃</b>
-          ) : null}
-          {sideChange ? <b className="is-change">공수 교대</b> : null}
-          {event?.kind === "count" ? (
-            <b className="is-count">
-              B {game.balls} · S {game.strikes}
-            </b>
-          ) : null}
-        </div>
+        <BaseballPlayReceipt game={game} />
       </div>
     </div>
   );

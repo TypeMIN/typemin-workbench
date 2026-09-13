@@ -13,6 +13,7 @@ import { BaseballStadium } from "@/components/baseball-game/baseball-game-debug"
 import { BaseballDuelControl } from "@/components/baseball-game/baseball-duel-control";
 import {
   BaseballAudio,
+  BaseballPlayReceipt,
   BroadcastLineScore,
 } from "@/components/baseball-game/baseball-broadcast";
 import { CARD_DEFINITIONS } from "@/lib/baseball-game/cards";
@@ -411,8 +412,11 @@ function MultiplayerBoard({
             <small>{latestFace ? "PLAY" : "NEXT"}</small>
             <b>{latestFace ?? "▶"}</b>
           </span>
-          <small>{latestEvent ? "방금 판정" : "PLAY BALL"}</small>
-          <strong>{latestEvent?.summary ?? "첫 투구를 준비하세요"}</strong>
+          <div className="bbg-mp-result-copy">
+            <small>{latestEvent ? "방금 판정" : "PLAY BALL"}</small>
+            <strong>{latestEvent?.summary ?? "첫 투구를 준비하세요"}</strong>
+            <BaseballPlayReceipt game={game} />
+          </div>
         </div>
       </section>
 

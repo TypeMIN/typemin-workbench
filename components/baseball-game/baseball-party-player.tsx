@@ -13,7 +13,11 @@ import { CARD_DEFINITIONS } from "@/lib/baseball-game/cards";
 import { PITCH_TARGET_LABELS } from "@/lib/baseball-game/duel";
 import type { MultiplayerCommand } from "@/lib/baseball-game/multiplayer/types";
 import type { PartyPlayerSnapshot } from "@/lib/baseball-game/party/types";
-import { BaseballAudio, BroadcastLineScore } from "./baseball-broadcast";
+import {
+  BaseballAudio,
+  BaseballPlayReceipt,
+  BroadcastLineScore,
+} from "./baseball-broadcast";
 import { BaseballDuelControl } from "./baseball-duel-control";
 import type { CardRole, GameAction, GameView } from "@/lib/baseball-game/types";
 
@@ -246,6 +250,7 @@ function PartyPlayerBoard({
               ? `타자 · ${snapshot.me.nickname}`
               : `수비 · ${snapshot.me.nickname}`}
         </p>
+        <BaseballPlayReceipt game={game} />
       </section>
       <section className="bbg-party-player-roster" aria-label="내 팀 순서">
         <header>

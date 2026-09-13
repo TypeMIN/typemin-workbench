@@ -140,6 +140,9 @@ describe("BaseballGameDebug", () => {
     expect(screen.getByText("원정팀 판단 중")).toBeVisible();
     expect(document.querySelector(".bbg-choice-flash")).toHaveTextContent("볼");
     expect(document.querySelector(".bbg-choice-dock")).not.toBeInTheDocument();
+    expect(screen.getByLabelText("현재 승부 진행 기록")).toHaveTextContent(
+      "투수선택 완료타자판단 중카드대기판정대기",
+    );
     expect(
       screen.queryByRole("region", { name: "이번 승부 선택 기록" }),
     ).not.toBeInTheDocument();
@@ -156,6 +159,9 @@ describe("BaseballGameDebug", () => {
     expect(
       screen.getByRole("list", { name: "현재 타자 누적 투구" }),
     ).toBeVisible();
+    expect(screen.getByLabelText("현재 승부 진행 기록")).toHaveTextContent(
+      "투수볼",
+    );
     expect(
       document.querySelector(".bbg-pitch-marker[data-current='true']"),
     ).toBeVisible();

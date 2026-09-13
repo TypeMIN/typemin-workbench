@@ -192,6 +192,9 @@ test("공용 화면과 2대2 개인기기가 한 파티 경기를 실제로 진�
       return payload.snapshot.view.revision;
     })
     .toBe(1);
+  await expect(display.getByLabel("현재 승부 진행 기록")).toContainText(
+    "투수선택 완료타자판단 중카드대기판정대기",
+  );
 
   const publicPayload = await display.evaluate(
     async (code) =>

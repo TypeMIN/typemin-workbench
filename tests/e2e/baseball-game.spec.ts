@@ -174,6 +174,9 @@ test("야구 게임에서 투타 심리전과 새 경기를 진행한다", async
   await expect(page.locator(".bbg-choice-flash")).toHaveText("스트라이크");
   await expect(page.locator(".bbg-choice-dock")).toHaveCount(0);
   await expect(page.getByText("원정팀 판단 중")).toBeVisible();
+  await expect(page.getByLabel("현재 승부 진행 기록")).toContainText(
+    "투수선택 완료타자판단 중카드대기판정대기",
+  );
   await expect(
     page.getByRole("region", { name: "이번 승부 선택 기록" }),
   ).toHaveCount(0);
@@ -184,11 +187,22 @@ test("야구 게임에서 투타 심리전과 새 경기를 진행한다", async
   await expect(
     page.getByRole("list", { name: "현재 타자 누적 투구" }),
   ).toBeVisible();
+  await expect(page.getByLabel("현재 승부 진행 기록")).toContainText(
+    "투수스트라이크",
+  );
+  await expect(page.getByLabel("현재 승부 진행 기록")).toContainText(
+    "카드사용 안 함",
+  );
   await expect(page.locator(".bbg-last-pitch-path")).toBeVisible();
+  await expect(
+    page.getByRole("button", { name: "현재 연출 빠르게 넘기기" }),
+  ).toBeVisible();
+  await expect(page.locator(".bbg-choice-dock")).toBeHidden();
   await page.waitForTimeout(2_600);
   await expect(
     page.getByRole("button", { name: "현재 연출 빠르게 넘기기" }),
   ).toHaveCount(0);
+  await expect(page.locator(".bbg-choice-dock")).toBeVisible();
   await expect(page.getByText("특정 면 강제 입력")).toHaveCount(0);
 
   await page

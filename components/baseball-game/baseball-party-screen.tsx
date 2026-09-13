@@ -24,6 +24,7 @@ import {
 import { BaseballStadium } from "@/components/baseball-game/baseball-game-debug";
 import {
   BaseballAudio,
+  BaseballPlayReceipt,
   BroadcastLineScore,
 } from "@/components/baseball-game/baseball-broadcast";
 import type {
@@ -519,6 +520,7 @@ function PartyLive({
           <div>
             <small>방금 판정</small>
             <strong>{latest?.summary ?? "경기 시작"}</strong>
+            <BaseballPlayReceipt game={game} />
           </div>
         </div>
       </section>
