@@ -79,13 +79,51 @@ describe("broadcast UI", () => {
     expect(result.current.cue?.type).toBe("pitch");
     act(() => vi.advanceTimersByTime(850));
     expect(result.current.cue).toEqual({ type: "call", call: "strike" });
-    act(() => vi.advanceTimersByTime(600));
+    act(() => vi.advanceTimersByTime(1_000));
+    expect(result.current.cue).toEqual({ type: "call", call: "strike" });
+    act(() => vi.advanceTimersByTime(350));
     expect(result.current.cue).toBeUndefined();
 
     rerender({ events: [{ ...pitchEvent }] });
     expect(result.current.cue).toBeUndefined();
-    act(() => vi.advanceTimersByTime(1_450));
+    act(() => vi.advanceTimersByTime(2_200));
     expect(result.current.cue).toBeUndefined();
+  });
+
+  it("advances only the current scene when the presentation is tapped", () => {
+    vi.useFakeTimers();
+    const pitchEvent: GameEvent = {
+      sequence: 1,
+      revision: 1,
+      inning: 1,
+      half: "top",
+      kind: "pitch_result",
+      summary: "볼 · 스윙",
+      face: "B",
+      pitchTarget: "ball",
+      swingDecision: "swing",
+      runs: 0,
+      outsRecorded: 0,
+      moves: [],
+    };
+    const { result } = renderHook(() => usePresentation([pitchEvent]));
+
+    expect(result.current.cue).toMatchObject({
+      type: "choice",
+      actor: "pitcher",
+    });
+    act(() => result.current.skip());
+    expect(result.current.cue).toMatchObject({
+      type: "choice",
+      actor: "batter",
+    });
+    act(() => vi.advanceTimersByTime(1_000));
+    expect(result.current.cue).toMatchObject({
+      type: "choice",
+      actor: "batter",
+    });
+    act(() => result.current.skip());
+    expect(result.current.cue?.type).toBe("pitch");
   });
 
   it("keeps pitcher, batter, card and ruling visible as one play receipt", () => {

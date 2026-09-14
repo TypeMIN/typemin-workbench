@@ -194,6 +194,12 @@ export type PitchLocation = FieldPoint & {
 };
 
 export type PresentationCue =
+  | {
+      type: "choice";
+      actor: "pitcher" | "batter" | "offense" | "defense";
+      label: string;
+      concealed?: boolean;
+    }
   | { type: "pitch"; location: PitchLocation; face: PitchFace }
   | { type: "call"; call: "ball" | "strike" | "foul" | "contact" }
   | { type: "batted_ball"; face: BattingFace | HitFace }

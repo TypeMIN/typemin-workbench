@@ -8,6 +8,16 @@ async function passCardWindows(page: Page) {
   }
 }
 
+async function advancePresentation(page: Page) {
+  for (let step = 0; step < 24; step += 1) {
+    const next = page.getByRole("button", {
+      name: /현재 연출 \d+\/\d+, 다음 장면 보기/,
+    });
+    if (!(await next.isVisible().catch(() => false))) break;
+    await next.click();
+  }
+}
+
 test("야구 게임에서 투타 심리전과 새 경기를 진행한다", async ({ page }) => {
   const browserErrors: string[] = [];
   page.on("console", (message) => {
@@ -171,7 +181,12 @@ test("야구 게임에서 투타 심리전과 새 경기를 진행한다", async
   expect(strategyLayout.cardRows).toBe(1);
 
   await page.getByRole("button", { name: "스트라이크 선택" }).click();
-  await expect(page.locator(".bbg-choice-flash")).toHaveText("스트라이크");
+  const firstChoiceCue = page.getByRole("button", {
+    name: "현재 연출 1/1, 다음 장면 보기",
+  });
+  await expect(firstChoiceCue).toContainText("투수 선택선택 완료");
+  await page.waitForTimeout(700);
+  await expect(firstChoiceCue).toBeVisible();
   await expect(page.locator(".bbg-choice-dock")).toHaveCount(0);
   await expect(page.getByText("원정팀 판단 중")).toBeVisible();
   await expect(page.getByLabel("현재 승부 진행 기록")).toContainText(
@@ -183,6 +198,17 @@ test("야구 게임에서 투타 심리전과 새 경기를 진행한다", async
   await expect(
     page.locator(".bbg-pitch-marker[data-current='true'] b"),
   ).toHaveText("1");
+  const revealCue = page.getByRole("button", {
+    name: /현재 연출 1\/\d+, 다음 장면 보기/,
+  });
+  await expect(revealCue).toContainText("투수 선택");
+  await revealCue.click();
+  await expect(
+    page.getByRole("button", {
+      name: /현재 연출 2\/\d+, 다음 장면 보기/,
+    }),
+  ).toContainText("타자 선택");
+  await advancePresentation(page);
   await passCardWindows(page);
   await expect(
     page.getByRole("list", { name: "현재 타자 누적 투구" }),
@@ -194,13 +220,11 @@ test("야구 게임에서 투타 심리전과 새 경기를 진행한다", async
     "카드사용 안 함",
   );
   await expect(page.locator(".bbg-last-pitch-path")).toBeVisible();
+  await advancePresentation(page);
   await expect(
-    page.getByRole("button", { name: "현재 연출 빠르게 넘기기" }),
-  ).toBeVisible();
-  await expect(page.locator(".bbg-choice-dock")).toBeHidden();
-  await page.waitForTimeout(2_600);
-  await expect(
-    page.getByRole("button", { name: "현재 연출 빠르게 넘기기" }),
+    page.getByRole("button", {
+      name: /현재 연출 \d+\/\d+, 다음 장면 보기/,
+    }),
   ).toHaveCount(0);
   await expect(page.locator(".bbg-choice-dock")).toBeVisible();
   await expect(page.getByText("특정 면 강제 입력")).toHaveCount(0);

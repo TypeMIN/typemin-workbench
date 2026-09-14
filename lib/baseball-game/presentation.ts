@@ -1,5 +1,6 @@
 import type {
   AudioCue,
+  Bases,
   BattingFace,
   FieldPoint,
   GameEvent,
@@ -11,6 +12,7 @@ import type {
   RunnerMove,
   RunnerOrigin,
 } from "./types";
+import { CARD_DEFINITIONS } from "./cards";
 
 const FIELD_POINTS: Record<RunnerOrigin | RunnerDestination, FieldPoint> = {
   batter: { x: 450, y: 650 },
@@ -190,11 +192,40 @@ export function buildPresentationCues(events: GameEvent[]): PresentationCue[] {
   );
 
   events.forEach((event) => {
+    if (event.kind === "pitch_commit") {
+      cues.push({
+        type: "choice",
+        actor: "pitcher",
+        label: "선택 완료",
+        concealed: true,
+      });
+    }
+    if (event.kind === "card_play" && event.cardId && event.cardRole) {
+      cues.push({
+        type: "choice",
+        actor: event.cardRole,
+        label: CARD_DEFINITIONS[event.cardId].name,
+      });
+    }
     if (
       (event.kind === "pitch_result" ||
         (event.kind === "die_roll" && event.die === "pitch")) &&
       isPitchFace(event.face)
     ) {
+      if (event.pitchTarget) {
+        cues.push({
+          type: "choice",
+          actor: "pitcher",
+          label: event.pitchTarget === "strike" ? "스트라이크" : "볼",
+        });
+      }
+      if (event.swingDecision) {
+        cues.push({
+          type: "choice",
+          actor: "batter",
+          label: event.swingDecision === "swing" ? "스윙" : "지켜보기",
+        });
+      }
       const pitchNumber =
         pitchEventsBefore.findIndex(
           (pitch) => pitch.sequence === event.sequence,
@@ -242,20 +273,22 @@ export function buildPresentationCues(events: GameEvent[]): PresentationCue[] {
           kind === "pickoff"
             ? leadOffPoint(move.from)
             : FIELD_POINTS[move.from];
-        cues.push({
+        const runnerCue: PresentationCue = {
           type: "runner_move",
           move,
           origin,
           destination,
           label: runnerMoveLabel(move.from, destination, true),
-        });
-        cues.push({
+        };
+        const throwCue: PresentationCue = {
           type: "throw",
           from: inferThrowStart(event, kind, throwOrigin),
           to: destination,
           kind,
           label: throwLabel(event, destination, kind),
-        });
+        };
+        if (kind === "pickoff") cues.push(throwCue, runnerCue);
+        else cues.push(runnerCue, throwCue);
         throwOrigin = destination;
         cues.push({
           type: "decision",
@@ -297,7 +330,46 @@ export function buildPresentationCues(events: GameEvent[]): PresentationCue[] {
     }
   });
 
-  return dedupeAdjacent(cues).slice(0, 16);
+  return dedupeAdjacent(cues);
+}
+
+export function getPresentationDuration(events: GameEvent[]) {
+  return buildPresentationCues(events).reduce(
+    (total, cue) => total + presentationCueDuration(cue),
+    0,
+  );
+}
+
+export function getPresentationBases(
+  finalBases: Bases,
+  cues: PresentationCue[],
+  activeIndex: number,
+): Bases {
+  const staged = { ...finalBases };
+  for (let index = cues.length - 1; index >= activeIndex; index -= 1) {
+    const cue = cues[index];
+    if (cue.type !== "runner_move") continue;
+    if (
+      cue.move.to === "first" ||
+      cue.move.to === "second" ||
+      cue.move.to === "third"
+    ) {
+      staged[cue.move.to] = false;
+    }
+    if (cue.move.from !== "batter") staged[cue.move.from] = true;
+  }
+  return staged;
+}
+
+export function presentationCueDuration(cue: PresentationCue) {
+  if (cue.type === "choice") return 1_250;
+  if (cue.type === "pitch") return 850;
+  if (cue.type === "call") return 1_350;
+  if (cue.type === "batted_ball") return 1_050;
+  if (cue.type === "catch") return 950;
+  if (cue.type === "throw") return 1_100;
+  if (cue.type === "runner_move") return 1_100;
+  return 1_900;
 }
 
 export function getAudioCues(events: GameEvent[]): AudioCue[] {

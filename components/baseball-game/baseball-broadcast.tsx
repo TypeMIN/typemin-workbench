@@ -7,6 +7,7 @@ import {
   CARD_DEFINITIONS,
   FACE_LABELS,
   getAudioCues,
+  presentationCueDuration,
   PITCH_TARGET_LABELS,
   type GameEvent,
   type GameState,
@@ -265,38 +266,24 @@ export function usePresentation(events: GameEvent[]) {
   useEffect(() => {
     if (cues.length === 0) return;
     const stableCues = JSON.parse(cueSignature) as PresentationCue[];
-    const rawDurations = stableCues.map(presentationCueDuration);
-    const rawTotal = rawDurations.reduce((sum, duration) => sum + duration, 0);
-    const scale = Math.min(1, 5_800 / rawTotal);
-    let elapsed = 0;
-    const timers = rawDurations.map((duration, index) => {
-      elapsed += Math.round(duration * scale);
-      return window.setTimeout(() => {
-        setProgress({ revision: latestRevision, index: index + 1 });
-      }, elapsed);
-    });
-    return () => timers.forEach((timer) => window.clearTimeout(timer));
-  }, [cueSignature, cues.length, latestRevision]);
+    const activeCue = stableCues[cueIndex];
+    if (!activeCue) return;
+    const timer = window.setTimeout(() => {
+      setProgress({ revision: latestRevision, index: cueIndex + 1 });
+    }, presentationCueDuration(activeCue));
+    return () => window.clearTimeout(timer);
+  }, [cueIndex, cueSignature, cues.length, latestRevision]);
 
   return {
     cue: cues[cueIndex] as PresentationCue | undefined,
     cues,
+    index: cueIndex,
     skip: () =>
       setProgress({
         revision: latestRevision,
-        index: cues.length,
+        index: Math.min(cueIndex + 1, cues.length),
       }),
   };
-}
-
-function presentationCueDuration(cue: PresentationCue) {
-  if (cue.type === "pitch") return 460;
-  if (cue.type === "call") return 900;
-  if (cue.type === "batted_ball") return 820;
-  if (cue.type === "catch") return 650;
-  if (cue.type === "throw") return 760;
-  if (cue.type === "runner_move") return 720;
-  return 1_400;
 }
 
 type PlayReceiptGame = Pick<

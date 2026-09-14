@@ -12,8 +12,11 @@ export { chooseAiAction } from "./ai";
 export {
   buildPresentationCues,
   getAudioCues,
+  getPresentationBases,
+  getPresentationDuration,
   getPitchLocation,
   getPlateAppearancePitchHistory,
+  presentationCueDuration,
 } from "./presentation";
 export {
   BATTING_DIE_FACES,

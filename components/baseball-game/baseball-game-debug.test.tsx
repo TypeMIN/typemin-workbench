@@ -138,7 +138,11 @@ describe("BaseballGameDebug", () => {
     fireEvent.click(screen.getByRole("button", { name: "볼 선택" }));
     expect(screen.getByText("볼을 선택했습니다")).toBeVisible();
     expect(screen.getByText("원정팀 판단 중")).toBeVisible();
-    expect(document.querySelector(".bbg-choice-flash")).toHaveTextContent("볼");
+    expect(
+      screen.getByRole("button", {
+        name: "현재 연출 1/1, 다음 장면 보기",
+      }),
+    ).toHaveTextContent("투수 선택선택 완료");
     expect(document.querySelector(".bbg-choice-dock")).not.toBeInTheDocument();
     expect(screen.getByLabelText("현재 승부 진행 기록")).toHaveTextContent(
       "투수선택 완료타자판단 중카드대기판정대기",
@@ -150,7 +154,7 @@ describe("BaseballGameDebug", () => {
       screen.queryByRole("img", { name: /예상 투구 위치/ }),
     ).not.toBeInTheDocument();
     act(() => {
-      vi.advanceTimersByTime(950);
+      vi.advanceTimersByTime(1_500);
     });
     expect(screen.getByTestId("play-result")).toBeVisible();
     expect(screen.getByTestId("play-result")).toHaveTextContent(
@@ -165,17 +169,22 @@ describe("BaseballGameDebug", () => {
     expect(
       document.querySelector(".bbg-pitch-marker[data-current='true']"),
     ).toBeVisible();
-    act(() => {
-      vi.advanceTimersByTime(3_000);
-    });
+    const advanceScene = () => {
+      const button = screen.queryByRole("button", {
+        name: /현재 연출 \d+\/\d+, 다음 장면 보기/,
+      });
+      if (button) fireEvent.click(button);
+      return Boolean(button);
+    };
+    expect(advanceScene()).toBe(true);
+    expect(advanceScene()).toBe(true);
+    while (advanceScene()) {
+      // Every tap advances exactly one scene until the play is complete.
+    }
     expect(
-      screen.queryByRole("button", { name: "현재 연출 빠르게 넘기기" }),
-    ).toBeVisible();
-    act(() => {
-      vi.advanceTimersByTime(3_000);
-    });
-    expect(
-      screen.queryByRole("button", { name: "현재 연출 빠르게 넘기기" }),
+      screen.queryByRole("button", {
+        name: /현재 연출 \d+\/\d+, 다음 장면 보기/,
+      }),
     ).not.toBeInTheDocument();
     expect(screen.queryByText(/특정 면 강제 입력/)).not.toBeInTheDocument();
   });
@@ -351,24 +360,32 @@ describe("BaseballGameDebug", () => {
       "data-camera",
       "field",
     );
-    expect(container.querySelector(".bbg-live-runner")).toBeVisible();
-    expect(
-      screen.getByRole("button", { name: "현재 연출 빠르게 넘기기" }),
-    ).toHaveTextContent("주자 출발1루 주자 · 1루 승부");
-
-    act(() => vi.advanceTimersByTime(720));
     expect(container.querySelector(".bbg-live-throw")).toBeVisible();
     expect(
-      screen.getByRole("button", { name: "현재 연출 빠르게 넘기기" }),
+      screen.getByRole("button", {
+        name: "현재 연출 1/3, 다음 장면 보기",
+      }),
     ).toHaveTextContent("견제1루 견제");
 
-    act(() => vi.advanceTimersByTime(760));
+    act(() => vi.advanceTimersByTime(1_100));
+    expect(container.querySelector(".bbg-live-runner")).toBeVisible();
     expect(
-      screen.getByRole("button", { name: "현재 연출 빠르게 넘기기" }),
-    ).toHaveTextContent("OUT1루 견제 성공");
+      screen.getByRole("button", {
+        name: "현재 연출 2/3, 다음 장면 보기",
+      }),
+    ).toHaveTextContent("주자 출발1루 주자 · 1루 승부");
+
     act(() => vi.advanceTimersByTime(1_100));
     expect(
-      screen.getByRole("button", { name: "현재 연출 빠르게 넘기기" }),
+      screen.getByRole("button", {
+        name: "현재 연출 3/3, 다음 장면 보기",
+      }),
+    ).toHaveTextContent("OUT1루 견제 성공");
+    act(() => vi.advanceTimersByTime(1_500));
+    expect(
+      screen.getByRole("button", {
+        name: "현재 연출 3/3, 다음 장면 보기",
+      }),
     ).toBeVisible();
   });
 
@@ -436,15 +453,18 @@ describe("BaseballGameDebug", () => {
       vi.advanceTimersByTime(950);
     });
 
-    expect(document.querySelector(".bbg-choice-flash")).toHaveTextContent(
-      "투수 선택 완료",
-    );
     expect(
-      screen.queryByRole("region", { name: "타격 선택" }),
-    ).not.toBeInTheDocument();
+      screen.getByRole("button", {
+        name: "현재 연출 1/1, 다음 장면 보기",
+      }),
+    ).toHaveTextContent("투수 선택선택 완료");
+    expect(document.querySelector(".bbg-stadium")).toHaveAttribute(
+      "data-cue",
+      "choice",
+    );
 
     act(() => {
-      vi.advanceTimersByTime(850);
+      vi.advanceTimersByTime(1_300);
     });
 
     expect(screen.getByRole("region", { name: "타격 선택" })).toBeVisible();

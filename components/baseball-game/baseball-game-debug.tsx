@@ -19,7 +19,6 @@ import {
 import { BaseballDuelControl } from "@/components/baseball-game/baseball-duel-control";
 import { chooseAiAction } from "@/lib/baseball-game/ai";
 import { CARD_DEFINITIONS } from "@/lib/baseball-game/cards";
-import { PITCH_TARGET_LABELS } from "@/lib/baseball-game/duel";
 import {
   createGame,
   getActionOwner,
@@ -27,7 +26,11 @@ import {
   getLegalCards,
   transition,
 } from "@/lib/baseball-game/engine";
-import { getPlateAppearancePitchHistory } from "@/lib/baseball-game/presentation";
+import {
+  getPlateAppearancePitchHistory,
+  getPresentationBases,
+  getPresentationDuration,
+} from "@/lib/baseball-game/presentation";
 import { FACE_LABELS } from "@/lib/baseball-game/rules";
 import type {
   CardAvailability,
@@ -65,13 +68,6 @@ const DEFAULT_SESSION: SessionConfig = {
 };
 
 const AI_TURN_DELAY_MS = 650;
-const CHOICE_FLASH_MS = 560;
-
-type ChoiceFlash = {
-  id: number;
-  label: string;
-  tone: "pitch" | "swing" | "card";
-};
 
 export default function BaseballGameDebug() {
   const router = useRouter();
@@ -84,7 +80,6 @@ export default function BaseballGameDebug() {
   const [multiplayerCode, setMultiplayerCode] = useState("");
   const [creatingRoom, setCreatingRoom] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [choiceFlash, setChoiceFlash] = useState<ChoiceFlash | null>(null);
   const [acknowledgedInterlude, setAcknowledgedInterlude] = useState<
     number | null
   >(null);
@@ -95,6 +90,9 @@ export default function BaseballGameDebug() {
   } = useBaseballActionFeedback();
   const currentRevisionEvents = game.eventLog.filter(
     (event) => event.revision === game.revision,
+  );
+  const currentPresentationDuration = getPresentationDuration(
+    currentRevisionEvents,
   );
   const lastResult = game.eventLog.findLast((event) =>
     ["pitch_result", "batted_ball", "die_roll"].includes(event.kind),
@@ -115,42 +113,42 @@ export default function BaseballGameDebug() {
     session.mode === "solo_ai" ? session.humanTeam : actionOwner;
 
   useEffect(() => {
-    if (!choiceFlash) return;
-    const timer = window.setTimeout(
-      () => setChoiceFlash(null),
-      CHOICE_FLASH_MS,
-    );
-    return () => window.clearTimeout(timer);
-  }, [choiceFlash]);
-
-  useEffect(() => {
     if (!isAiTurn || !aiTeam || modalOpen) return;
     const action = chooseAiAction(game, aiTeam);
     if (!action) return;
 
-    const timer = window.setTimeout(() => {
-      const result = transition(game, action);
-      if (!result.ok) {
-        setError(result.error.message);
+    const timer = window.setTimeout(
+      () => {
+        const result = transition(game, action);
+        if (!result.ok) {
+          setError(result.error.message);
+          showActionFeedback({
+            status: "error",
+            title: "AI 행동을 처리하지 못했습니다",
+            detail: result.error.message,
+          });
+          return;
+        }
+        setError(null);
+        setGame(result.state);
         showActionFeedback({
-          status: "error",
-          title: "AI 행동을 처리하지 못했습니다",
-          detail: result.error.message,
+          status: "success",
+          title: `${teamNameFor(game, aiTeam)}이 ${gameActionLabel(action, game)}`,
+          detail: result.events.at(-1)?.summary,
         });
-        return;
-      }
-      setError(null);
-      setGame(result.state);
-      setChoiceFlash(choiceFlashForAction(action, game, true));
-      showActionFeedback({
-        status: "success",
-        title: `${teamNameFor(game, aiTeam)}이 ${gameActionLabel(action, game)}`,
-        detail: result.events.at(-1)?.summary,
-      });
-    }, AI_TURN_DELAY_MS);
+      },
+      Math.max(AI_TURN_DELAY_MS, currentPresentationDuration + 180),
+    );
 
     return () => window.clearTimeout(timer);
-  }, [aiTeam, game, isAiTurn, modalOpen, showActionFeedback]);
+  }, [
+    aiTeam,
+    currentPresentationDuration,
+    game,
+    isAiTurn,
+    modalOpen,
+    showActionFeedback,
+  ]);
 
   function dispatchAction(action: GameAction) {
     const result = transition(game, action);
@@ -165,7 +163,6 @@ export default function BaseballGameDebug() {
     }
     setError(null);
     setGame(result.state);
-    setChoiceFlash(choiceFlashForAction(action, game, false));
     showActionFeedback({
       status: "success",
       title: gameActionLabel(action, game),
@@ -219,7 +216,6 @@ export default function BaseballGameDebug() {
 
     setGame(createGame(draft, { seed: createRandomSeed() }));
     setSession(draftSession);
-    setChoiceFlash(null);
     setError(null);
     clearActionFeedback();
     setAcknowledgedInterlude(null);
@@ -230,7 +226,6 @@ export default function BaseballGameDebug() {
     setGame(createGame(game.config, { seed: createRandomSeed() }));
     setDraft(game.config);
     setDraftSession(session);
-    setChoiceFlash(null);
     setError(null);
     clearActionFeedback();
     setAcknowledgedInterlude(null);
@@ -302,18 +297,9 @@ export default function BaseballGameDebug() {
                   game={playerView}
                   key={`field-${game.revision}`}
                 />
-                {choiceFlash ? (
-                  <div
-                    className="bbg-choice-flash"
-                    data-tone={choiceFlash.tone}
-                    key={choiceFlash.id}
-                    role="status"
-                  >
-                    {choiceFlash.label}
-                  </div>
-                ) : !isAiTurn &&
-                  (game.phase === "awaiting_pitch" ||
-                    game.phase === "awaiting_swing") ? (
+                {!isAiTurn &&
+                (game.phase === "awaiting_pitch" ||
+                  game.phase === "awaiting_swing") ? (
                   <div className="bbg-choice-dock">
                     <BaseballDuelControl
                       game={playerView}
@@ -841,39 +827,6 @@ function createRandomSeed() {
   return values[0];
 }
 
-function choiceFlashForAction(
-  action: GameAction,
-  game: GameState,
-  isAi: boolean,
-): ChoiceFlash | null {
-  if (action.type === "SELECT_PITCH") {
-    return {
-      id: Date.now(),
-      label: isAi ? "투수 선택 완료" : PITCH_TARGET_LABELS[action.target],
-      tone: "pitch",
-    };
-  }
-  if (action.type === "SELECT_SWING") {
-    return {
-      id: Date.now(),
-      label: action.decision === "swing" ? "스윙" : "지켜보기",
-      tone: "swing",
-    };
-  }
-  if (action.type === "PLAY_CARD") {
-    const card = Object.values(game.cards)
-      .flatMap((zone) => zone.hand)
-      .find((item) => item.instanceId === action.cardInstanceId);
-    if (!card) return null;
-    return {
-      id: Date.now(),
-      label: CARD_DEFINITIONS[card.cardId].name,
-      tone: "card",
-    };
-  }
-  return null;
-}
-
 function BroadcastScoreboard({ game }: { game: GameState }) {
   return (
     <section
@@ -971,6 +924,15 @@ function fieldPath(
 }
 
 function presentationLabel(cue: PresentationCue) {
+  if (cue.type === "choice") {
+    const actor = {
+      pitcher: "투수 선택",
+      batter: "타자 선택",
+      offense: "공격 카드",
+      defense: "수비 카드",
+    }[cue.actor];
+    return { primary: actor, detail: cue.label };
+  }
   if (cue.type === "call") {
     const label = {
       ball: ["BALL", "볼"],
@@ -1019,14 +981,17 @@ export function BaseballStadium({
     pitchDuel?: GameState["pitchDuel"] | GameView["pitchDuel"];
   };
 }) {
-  const occupied = [
-    game.bases.first ? "1루" : null,
-    game.bases.second ? "2루" : null,
-    game.bases.third ? "3루" : null,
-  ].filter(Boolean);
   const flight = getBallFlight(face);
   const pitchHistory = getPlateAppearancePitchHistory(game.eventLog);
-  const { cue, skip } = usePresentation(game.eventLog);
+  const { cue, cues, index, skip } = usePresentation(game.eventLog);
+  const displayedBases = cue
+    ? getPresentationBases(game.bases, cues, index)
+    : game.bases;
+  const occupied = [
+    displayedBases.first ? "1루" : null,
+    displayedBases.second ? "2루" : null,
+    displayedBases.third ? "3루" : null,
+  ].filter(Boolean);
   const fieldAction = Boolean(
     cue &&
     (["batted_ball", "catch", "throw", "runner_move"].includes(cue.type) ||
@@ -1123,21 +1088,21 @@ export function BaseballStadium({
         <SvgBaseMarker
           base="second"
           label="2루"
-          occupied={game.bases.second}
+          occupied={displayedBases.second}
           x={450}
           y={470}
         />
         <SvgBaseMarker
           base="third"
           label="3루"
-          occupied={game.bases.third}
+          occupied={displayedBases.third}
           x={360}
           y={560}
         />
         <SvgBaseMarker
           base="first"
           label="1루"
-          occupied={game.bases.first}
+          occupied={displayedBases.first}
           x={540}
           y={560}
         />
@@ -1180,7 +1145,7 @@ export function BaseballStadium({
             />
             <circle className="bbg-live-throw" r="7">
               <animateMotion
-                dur="640ms"
+                dur="900ms"
                 fill="freeze"
                 path={fieldPath(cue.from, cue.to)}
               />
@@ -1207,7 +1172,7 @@ export function BaseballStadium({
             />
             <circle className="bbg-live-runner" r="10">
               <animateMotion
-                dur="620ms"
+                dur="900ms"
                 fill="freeze"
                 path={fieldPath(cue.origin, cue.destination)}
               />
@@ -1224,7 +1189,7 @@ export function BaseballStadium({
       ) : null}
       {cue && cueLabel ? (
         <button
-          aria-label="현재 연출 빠르게 넘기기"
+          aria-label={`현재 연출 ${index + 1}/${cues.length}, 다음 장면 보기`}
           className="bbg-presentation-cue"
           data-cue={cue.type}
           data-result={cue.type === "decision" ? cue.result : undefined}
@@ -1233,6 +1198,9 @@ export function BaseballStadium({
         >
           <strong>{cueLabel.primary}</strong>
           <span>{cueLabel.detail}</span>
+          <em aria-hidden="true">
+            {index + 1}/{cues.length}
+          </em>
         </button>
       ) : null}
     </div>

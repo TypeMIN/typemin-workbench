@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import {
   buildPresentationCues,
+  getPresentationBases,
   getPitchLocation,
   getPlateAppearancePitchHistory,
 } from "./presentation";
@@ -23,6 +24,51 @@ function event(overrides: Partial<GameEvent>): GameEvent {
 }
 
 describe("catcher-view-v1 presentation", () => {
+  it("reveals pitcher and batter choices one at a time before the pitch", () => {
+    const cues = buildPresentationCues([
+      event({
+        kind: "pitch_result",
+        face: "S",
+        pitchTarget: "strike",
+        swingDecision: "take",
+      }),
+    ]);
+    expect(cues.slice(0, 4)).toEqual([
+      { type: "choice", actor: "pitcher", label: "스트라이크" },
+      { type: "choice", actor: "batter", label: "지켜보기" },
+      expect.objectContaining({ type: "pitch", face: "S" }),
+      { type: "call", call: "strike" },
+    ]);
+  });
+
+  it("shows a played card before resolving its movement", () => {
+    const cues = buildPresentationCues([
+      event({
+        kind: "card_play",
+        cardId: "PO1",
+        cardRole: "defense",
+        summary: "수비 카드 · 1루 견제",
+      }),
+      event({
+        sequence: 2,
+        kind: "card_resolve",
+        cardId: "PO1",
+        summary: "1루 견제 성공",
+        moves: [{ runner: "first", from: "first", to: "out" }],
+      }),
+    ]);
+    expect(cues.slice(0, 4).map((cue) => cue.type)).toEqual([
+      "choice",
+      "throw",
+      "runner_move",
+      "decision",
+    ]);
+    expect(cues[0]).toEqual({
+      type: "choice",
+      actor: "defense",
+      label: "1루 견제",
+    });
+  });
   it("uses the server-recorded duel location without re-randomizing it", () => {
     const source = event({
       kind: "pitch_result",
@@ -155,17 +201,17 @@ describe("catcher-view-v1 presentation", () => {
     ]);
 
     expect(cues.map((cue) => cue.type)).toEqual([
-      "runner_move",
       "throw",
+      "runner_move",
       "decision",
     ]);
-    expect(cues[0]).toMatchObject({
+    expect(cues[1]).toMatchObject({
       type: "runner_move",
       label: "1루 주자 · 1루 승부",
       destination: { x: 540, y: 560 },
     });
-    expect(cues[0]).not.toMatchObject({ origin: { x: 540, y: 560 } });
-    expect(cues[1]).toMatchObject({
+    expect(cues[1]).not.toMatchObject({ origin: { x: 540, y: 560 } });
+    expect(cues[0]).toMatchObject({
       type: "throw",
       kind: "pickoff",
       label: "1루 견제",
@@ -222,5 +268,45 @@ describe("catcher-view-v1 presentation", () => {
       result: "score",
       label: "폭투 · 모든 주자 진루",
     });
+  });
+
+  it("reveals occupied bases only when each runner scene completes", () => {
+    const cues = buildPresentationCues([
+      event({
+        kind: "card_resolve",
+        cardId: "WP",
+        summary: "폭투 · 모든 주자 진루",
+        moves: [
+          { runner: "second", from: "second", to: "third" },
+          { runner: "first", from: "first", to: "second" },
+        ],
+      }),
+    ]);
+    const finalBases = { first: false, second: true, third: true };
+
+    expect(getPresentationBases(finalBases, cues, 0)).toEqual({
+      first: true,
+      second: true,
+      third: false,
+    });
+    expect(getPresentationBases(finalBases, cues, 1)).toEqual({
+      first: true,
+      second: false,
+      third: true,
+    });
+    expect(getPresentationBases(finalBases, cues, 2)).toEqual(finalBases);
+  });
+
+  it("does not truncate a long sequence before its final ruling", () => {
+    const longPlay = Array.from({ length: 18 }, (_, index) =>
+      event({
+        sequence: index + 1,
+        kind: "card_play",
+        cardId: index % 2 === 0 ? "BK" : "WP",
+        cardRole: index % 2 === 0 ? "defense" : "offense",
+      }),
+    );
+    const cues = buildPresentationCues(longPlay);
+    expect(cues).toHaveLength(18);
   });
 });

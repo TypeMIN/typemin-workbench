@@ -11259,6 +11259,28 @@
   white-space: normal;
 }
 
+.bbg-presentation-cue[data-cue="choice"] {
+  min-width: min(280px, calc(100% - 28px));
+  padding: 11px 18px;
+  border: 1px solid rgb(126 242 198 / 48%);
+  background: rgb(3 16 23 / 90%);
+  box-shadow:
+    0 14px 44px rgb(0 0 0 / 38%),
+    0 0 28px rgb(112 239 186 / 13%);
+  color: #7ff0c3;
+}
+
+.bbg-presentation-cue em {
+  position: absolute;
+  right: 7px;
+  bottom: 5px;
+  color: rgb(218 235 241 / 46%);
+  font-size: 7px;
+  font-style: normal;
+  font-weight: 850;
+  letter-spacing: 0.06em;
+}
+
 @media (max-width: 760px) {
   .bbg-presentation-cue {
     min-width: 132px;
@@ -11276,5 +11298,10 @@
   .bbg-presentation-cue[data-cue="decision"] {
     min-width: min(280px, calc(100% - 20px));
     padding: 11px 14px;
+  }
+
+  .bbg-presentation-cue[data-cue="choice"] {
+    min-width: min(230px, calc(100% - 20px));
+    padding: 10px 14px;
   }
 }
