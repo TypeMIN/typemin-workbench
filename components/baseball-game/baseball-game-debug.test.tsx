@@ -125,6 +125,11 @@ describe("BaseballGameDebug", () => {
     expect(
       container.querySelectorAll(".bbg-card-hand button[data-tier]"),
     ).toHaveLength(4);
+    expect(container.querySelectorAll(".bbg-card-effect")).toHaveLength(4);
+    expect(container.querySelectorAll(".bbg-card-timing")).toHaveLength(4);
+    for (const effect of container.querySelectorAll(".bbg-card-effect")) {
+      expect(effect.textContent).toMatch(/[가-힣]/);
+    }
     expect(
       screen.queryByRole("button", { name: "카드 없이 진행" }),
     ).not.toBeInTheDocument();

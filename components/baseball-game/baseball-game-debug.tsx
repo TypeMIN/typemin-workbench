@@ -17,6 +17,7 @@ import {
   usePresentation,
 } from "@/components/baseball-game/baseball-broadcast";
 import { BaseballDuelControl } from "@/components/baseball-game/baseball-duel-control";
+import { BaseballCardFace } from "@/components/baseball-game/baseball-card-face";
 import { chooseAiAction } from "@/lib/baseball-game/ai";
 import { CARD_DEFINITIONS } from "@/lib/baseball-game/cards";
 import {
@@ -412,7 +413,7 @@ export default function BaseballGameDebug() {
                   <option value="solo_ai">싱글플레이 · AI 대전</option>
                   <option value="multiplayer">멀티플레이 · 두 기기</option>
                   <option value="party">
-                    파티플레이 · 공용 화면 + 두 기기
+                    파티플레이 · 공용 화면 + 개인 기기
                   </option>
                 </select>
               </label>
@@ -765,6 +766,7 @@ function CardHand({
               return (
                 <button
                   aria-label={`${definition.id} ${definition.name}${playable ? " 사용 가능, 누르면 즉시 사용" : ` 사용 불가: ${reason}`}`}
+                  className="bbg-card-preview"
                   data-playable={playable}
                   data-tier={definition.tier}
                   disabled={!playable}
@@ -773,16 +775,7 @@ function CardHand({
                   title={reason ?? definition.description}
                   type="button"
                 >
-                  <i aria-hidden="true">
-                    {definition.tier === "advanced"
-                      ? "PRO"
-                      : definition.tier === "intermediate"
-                        ? "MID"
-                        : "BASIC"}
-                  </i>
-                  <b>{definition.id}</b>
-                  <span>{definition.name}</span>
-                  <small>{playable ? "사용 가능" : reason}</small>
+                  <BaseballCardFace definition={definition} />
                 </button>
               );
             })

@@ -62,7 +62,7 @@ describe("BaseballPartyPlayer", () => {
       "fetch",
       vi.fn().mockResolvedValue(response({ snapshot: snapshot(true) })),
     );
-    render(<BaseballPartyPlayer roomCode="ABC234" />);
+    const { container } = render(<BaseballPartyPlayer roomCode="ABC234" />);
     expect(
       await screen.findByRole("region", { name: "홈팀 수비 공용 손패" }),
     ).toBeVisible();
@@ -70,6 +70,8 @@ describe("BaseballPartyPlayer", () => {
       screen.getByRole("button", { name: "스트라이크 선택" }),
     ).toBeEnabled();
     expect(screen.queryByText("공격 카드")).not.toBeInTheDocument();
+    expect(container.querySelectorAll(".bbg-card-effect")).toHaveLength(4);
+    expect(container.querySelectorAll(".bbg-card-timing")).toHaveLength(4);
   });
 
   it("keeps a non-active teammate read-only", async () => {

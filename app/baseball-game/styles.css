@@ -6153,6 +6153,196 @@
   }
 }
 
+/* Card preview v2: the same readable face across solo, multiplayer and party. */
+.bbg-card-preview {
+  position: relative;
+  display: grid !important;
+  min-width: 0;
+  grid-template-columns: minmax(0, 1fr) auto !important;
+  grid-template-rows: auto auto minmax(0, 1fr);
+  grid-template-areas:
+    "code timing"
+    "name name"
+    "effect effect";
+  align-content: start !important;
+  align-items: center;
+  justify-items: stretch !important;
+  gap: 5px 6px !important;
+  padding: 8px !important;
+  text-align: left !important;
+}
+
+.bbg-card-preview .bbg-card-code {
+  grid-area: code !important;
+  align-self: center;
+  color: var(--bbg-yellow);
+  font-size: 10px;
+  line-height: 1;
+}
+
+.bbg-card-preview .bbg-card-name {
+  grid-area: name;
+  min-width: 0;
+  display: -webkit-box;
+  overflow: hidden;
+  color: currentColor;
+  font-size: 9px;
+  line-height: 1.15;
+  white-space: normal;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+}
+
+.bbg-card-preview .bbg-card-effect {
+  display: -webkit-box !important;
+  grid-area: effect;
+  align-self: start;
+  min-width: 0;
+  overflow: hidden;
+  color: #8199a6;
+  font-size: 7px;
+  line-height: 1.38;
+  white-space: normal !important;
+  text-overflow: clip !important;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 3;
+}
+
+.bbg-card-preview .bbg-card-timing {
+  grid-area: timing;
+  align-self: center;
+  border-radius: 999px;
+  padding: 3px 5px;
+  color: #9fb3bd;
+  background: rgb(150 178 190 / 9%);
+  font-size: 6px;
+  font-style: normal;
+  font-weight: 850;
+  line-height: 1;
+  white-space: nowrap;
+}
+
+.bbg-card-preview[data-playable="true"] .bbg-card-effect,
+.bbg-card-preview[data-playable="true"] .bbg-card-timing {
+  color: #c3e9d9;
+}
+
+.bbg-card-preview:disabled {
+  opacity: 0.68;
+}
+
+@media (min-width: 681px) {
+  .bbg-control-panel--broadcast > .bbg-card-hands {
+    min-height: 240px;
+    max-height: 390px;
+    flex: 0 1 390px;
+    align-content: stretch;
+    grid-template-rows: minmax(0, 1fr) minmax(0, 1fr);
+    margin-block: auto;
+  }
+
+  .bbg-control-panel--broadcast
+    > .bbg-card-hands:has(.bbg-card-hand:first-child[data-revealed="true"]) {
+    grid-template-rows: minmax(170px, 1fr) 64px;
+  }
+
+  .bbg-control-panel--broadcast
+    > .bbg-card-hands:has(.bbg-card-hand:nth-child(2)[data-revealed="true"]) {
+    grid-template-rows: 64px minmax(170px, 1fr);
+  }
+
+  .bbg-card-hand[data-revealed="true"] {
+    grid-template-rows: 20px minmax(0, 1fr) !important;
+  }
+
+  .bbg-card-hand[data-revealed="true"] > div {
+    grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+    grid-template-rows: repeat(2, minmax(0, 1fr));
+  }
+
+  .bbg-card-hand[data-revealed="true"] .bbg-card-preview {
+    min-height: 76px !important;
+  }
+
+  .bbg-card-hand[data-revealed="false"] {
+    grid-template-rows: 18px 44px !important;
+  }
+
+  .bbg-card-hand[data-revealed="false"] > div {
+    grid-template-columns: repeat(4, minmax(0, 1fr)) !important;
+  }
+
+  .bbg-card-preview {
+    align-content: center !important;
+  }
+
+  .bbg-card-preview .bbg-card-name {
+    font-size: 9.5px;
+  }
+
+  .bbg-card-preview .bbg-card-effect {
+    font-size: 7.5px;
+  }
+}
+
+@media (max-width: 680px) {
+  .bbg-game-console {
+    grid-template-rows: minmax(0, 1fr) 174px;
+  }
+
+  .bbg-control-panel--broadcast > .bbg-card-hands {
+    height: 158px;
+    min-height: 158px;
+    flex: 0 0 158px;
+    grid-template-columns: minmax(0, 1fr) !important;
+    grid-template-rows: minmax(108px, 1fr) 44px;
+  }
+
+  .bbg-card-hands:has(.bbg-card-hand:nth-child(2)[data-revealed="true"]) {
+    grid-template-rows: 44px minmax(108px, 1fr);
+  }
+
+  .bbg-card-hand[data-revealed="true"] > div {
+    grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+    grid-template-rows: repeat(2, minmax(0, 1fr));
+  }
+
+  .bbg-card-hand[data-revealed="false"] > div {
+    grid-template-columns: repeat(4, minmax(0, 1fr)) !important;
+  }
+
+  .bbg-card-hand[data-revealed="true"] .bbg-card-preview {
+    min-height: 50px;
+  }
+
+  .bbg-card-preview {
+    padding: 5px 6px !important;
+  }
+
+  .bbg-card-preview .bbg-card-effect {
+    font-size: 6.5px;
+    -webkit-line-clamp: 2;
+  }
+
+  .bbg-mp-hand > div {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    grid-template-rows: repeat(2, minmax(0, 1fr));
+  }
+
+  .bbg-mp-hand button small {
+    display: -webkit-box;
+  }
+}
+
+.bbg-mp-hand .bbg-card-preview,
+.bbg-party-player-hand .bbg-card-preview {
+  min-height: 68px;
+}
+
+.bbg-party-player-hand .bbg-card-effect {
+  -webkit-line-clamp: 2;
+}
+
 /* Multiplayer shares the same broadcast composition as solo play. */
 .bbg-mp-board {
   position: relative;

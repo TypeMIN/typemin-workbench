@@ -178,7 +178,9 @@ test("야구 게임에서 투타 심리전과 새 경기를 진행한다", async
     };
   });
   expect(strategyLayout.panelWidth).toBeLessThanOrEqual(283);
-  expect(strategyLayout.cardRows).toBe(1);
+  expect(strategyLayout.cardRows).toBe(2);
+  await expect(page.locator(".bbg-card-effect")).toHaveCount(4);
+  await expect(page.locator(".bbg-card-timing")).toHaveCount(4);
 
   await page.getByRole("button", { name: "스트라이크 선택" }).click();
   const firstChoiceCue = page.getByRole("button", {
@@ -283,7 +285,9 @@ test("야구 게임에서 투타 심리전과 새 경기를 진행한다", async
   });
   expect(cardsFit.bottom).toBeLessThanOrEqual(cardsFit.consoleBottom + 1);
   expect(cardsFit.bottom).toBeLessThanOrEqual(cardsFit.viewportBottom);
-  expect(cardsFit.fieldHeight).toBeGreaterThan(cardsFit.controlHeight * 3);
+  expect(cardsFit.fieldHeight).toBeGreaterThan(cardsFit.controlHeight * 2.6);
+  await expect(page.locator(".bbg-card-effect").first()).toBeVisible();
+  await expect(page.locator(".bbg-card-timing").first()).toBeVisible();
   expect(
     await page.evaluate(
       () => document.documentElement.scrollHeight <= window.innerHeight,

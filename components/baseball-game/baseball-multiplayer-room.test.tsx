@@ -63,6 +63,13 @@ describe("BaseballMultiplayerRoom", () => {
     expect(screen.getAllByRole("button", { name: /사용 불가/ })).toHaveLength(
       4,
     );
+    expect(container.querySelectorAll(".bbg-card-effect")).toHaveLength(4);
+    expect(container.querySelectorAll(".bbg-card-timing")).toHaveLength(4);
+    expect(
+      screen.getAllByRole("button", {
+        name: /사용 불가: 현재 행동 차례가 아닙니다/,
+      }),
+    ).toHaveLength(4);
     expect(
       container.querySelector(".bbg-mp-field .bbg-stadium svg"),
     ).toHaveAttribute("viewBox", "0 0 900 700");

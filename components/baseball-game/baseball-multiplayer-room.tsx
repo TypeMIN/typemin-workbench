@@ -10,6 +10,7 @@ import {
   useBaseballActionFeedback,
 } from "@/components/baseball-game/baseball-action-feedback";
 import { BaseballStadium } from "@/components/baseball-game/baseball-game-debug";
+import { BaseballCardFace } from "@/components/baseball-game/baseball-card-face";
 import { BaseballDuelControl } from "@/components/baseball-game/baseball-duel-control";
 import {
   BaseballAudio,
@@ -489,10 +490,15 @@ function MultiplayerBoard({
               const availability = legalById.get(card.instanceId);
               const playable =
                 snapshot.isYourTurn && Boolean(availability?.playable);
+              const unavailableReason = snapshot.isYourTurn
+                ? (availability?.reason ?? "현재 사용할 수 없습니다")
+                : "현재 행동 차례가 아닙니다";
               return (
                 <button
-                  aria-label={`${definition.id} ${definition.name}${playable ? " 사용 가능" : " 사용 불가"}`}
+                  aria-label={`${definition.id} ${definition.name}${playable ? " 사용 가능, 누르면 즉시 사용" : ` 사용 불가: ${unavailableReason}`}`}
+                  className="bbg-card-preview"
                   data-playable={playable}
+                  data-tier={definition.tier}
                   disabled={!playable || submitting}
                   key={card.instanceId}
                   onClick={() =>
@@ -504,9 +510,7 @@ function MultiplayerBoard({
                   title={availability?.reason ?? definition.description}
                   type="button"
                 >
-                  <b>{definition.id}</b>
-                  <strong>{definition.name}</strong>
-                  <small>{definition.description}</small>
+                  <BaseballCardFace definition={definition} />
                 </button>
               );
             })}

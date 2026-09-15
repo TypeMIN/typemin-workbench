@@ -35,6 +35,9 @@ test("두 기기가 방을 만들고 비공개 손패로 같은 경기를 진행
   await expect(
     host.getByRole("region", { name: "원정팀 공격 손패" }),
   ).toBeVisible();
+  await expect(host.locator(".bbg-card-effect")).toHaveCount(4);
+  await expect(host.locator(".bbg-card-timing")).toHaveCount(4);
+  await expect(host.locator(".bbg-card-effect").first()).toBeVisible();
   await expect(host.getByLabel("이닝별 점수와 경기 기록")).toBeVisible();
   await expect(host.getByLabel("투구 위치")).toBeVisible();
   await expect(
@@ -73,6 +76,9 @@ test("두 기기가 방을 만들고 비공개 손패로 같은 경기를 진행
   await expect(
     home.getByRole("region", { name: "홈팀 수비 손패" }),
   ).toBeVisible();
+  await expect(home.locator(".bbg-card-effect")).toHaveCount(4);
+  await expect(home.locator(".bbg-card-timing")).toHaveCount(4);
+  await expect(home.locator(".bbg-card-effect").first()).toBeVisible();
   await expect(home.getByRole("region", { name: "투구 선택" })).toBeVisible();
   await expect(host.getByText("상대 팀의 결정을 기다리는 중")).toBeVisible({
     timeout: 4_000,

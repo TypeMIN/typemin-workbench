@@ -76,6 +76,9 @@ test("공용 화면과 2대2 개인기기가 한 파티 경기를 실제로 진�
   ).toBeVisible();
   for (const page of players) {
     await expect(page.getByLabel("이닝별 점수와 경기 기록")).toBeVisible();
+    await expect(page.locator(".bbg-card-effect")).toHaveCount(4);
+    await expect(page.locator(".bbg-card-timing")).toHaveCount(4);
+    await expect(page.locator(".bbg-card-effect").first()).toBeVisible();
     await expect(page.getByRole("button", { name: /경기 음향/ })).toHaveCount(
       0,
     );

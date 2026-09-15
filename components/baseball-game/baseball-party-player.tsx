@@ -10,6 +10,7 @@ import {
   useBaseballActionFeedback,
 } from "./baseball-action-feedback";
 import { CARD_DEFINITIONS } from "@/lib/baseball-game/cards";
+import { BaseballCardFace } from "./baseball-card-face";
 import { PITCH_TARGET_LABELS } from "@/lib/baseball-game/duel";
 import type { MultiplayerCommand } from "@/lib/baseball-game/multiplayer/types";
 import type { PartyPlayerSnapshot } from "@/lib/baseball-game/party/types";
@@ -297,10 +298,15 @@ function PartyPlayerBoard({
             const definition = CARD_DEFINITIONS[card.cardId];
             const availability = legal.get(card.instanceId);
             const highlighted = Boolean(availability?.playable);
+            const unavailableReason = snapshot.canAct
+              ? (availability?.reason ?? "현재 사용할 수 없습니다")
+              : "현재 행동 차례가 아닙니다";
             return (
               <button
-                aria-label={`${definition.id} ${definition.name}${highlighted ? " 사용 가능" : " 사용 불가"}`}
+                aria-label={`${definition.id} ${definition.name}${snapshot.canAct && highlighted ? " 사용 가능, 누르면 즉시 사용" : ` 사용 불가: ${unavailableReason}`}`}
+                className="bbg-card-preview"
                 data-playable={highlighted}
+                data-tier={definition.tier}
                 disabled={!snapshot.canAct || !highlighted || busy}
                 key={card.instanceId}
                 onClick={() =>
@@ -312,9 +318,7 @@ function PartyPlayerBoard({
                 title={availability?.reason ?? definition.description}
                 type="button"
               >
-                <b>{definition.id}</b>
-                <strong>{definition.name}</strong>
-                <small>{definition.description}</small>
+                <BaseballCardFace definition={definition} />
               </button>
             );
           })}
