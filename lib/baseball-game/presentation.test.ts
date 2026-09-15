@@ -6,7 +6,7 @@ import {
   getPitchLocation,
   getPlateAppearancePitchHistory,
 } from "./presentation";
-import type { GameEvent, PitchFace } from "./types";
+import type { GameEvent, PitchFace, PresentationCue } from "./types";
 
 function event(overrides: Partial<GameEvent>): GameEvent {
   return {
@@ -81,6 +81,46 @@ describe("catcher-view-v1 presentation", () => {
       face: "S",
       location: source.pitchLocation,
     });
+  });
+  it("moves legacy ball centers far enough out for the marker to clear the zone", () => {
+    expect(
+      getPitchLocation(
+        event({
+          kind: "pitch_result",
+          face: "B",
+          pitchLocation: {
+            x: 23,
+            y: 50,
+            zone: "ball",
+            pitchNumber: 2,
+          },
+        }),
+        2,
+      ),
+    ).toMatchObject({ x: 12, y: 50, zone: "ball", pitchNumber: 2 });
+  });
+
+  it("varies a batted-ball lane deterministically with the preceding pitch", () => {
+    const run = (x: number, y: number) =>
+      buildPresentationCues([
+        event({
+          kind: "pitch_result",
+          face: "C",
+          pitchLocation: { x, y, zone: "strike", pitchNumber: 1 },
+        }),
+        event({ sequence: 2, kind: "batted_ball", face: "FO" }),
+      ]).find(
+        (cue): cue is Extract<PresentationCue, { type: "batted_ball" }> =>
+          cue.type === "batted_ball",
+      );
+
+    const first = run(31, 32);
+    const replay = run(31, 32);
+    const otherPitch = run(68, 71);
+    expect(first).toEqual(replay);
+    expect(first?.variation).toBeGreaterThanOrEqual(-1);
+    expect(first?.variation).toBeLessThanOrEqual(1);
+    expect(otherPitch?.variation).not.toBe(first?.variation);
   });
   it.each(["S", "SM", "F", "B", "C"] as PitchFace[])(
     "creates a deterministic valid location for %s",

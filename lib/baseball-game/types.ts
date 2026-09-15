@@ -202,7 +202,11 @@ export type PresentationCue =
     }
   | { type: "pitch"; location: PitchLocation; face: PitchFace }
   | { type: "call"; call: "ball" | "strike" | "foul" | "contact" }
-  | { type: "batted_ball"; face: BattingFace | HitFace }
+  | {
+      type: "batted_ball";
+      face: BattingFace | HitFace;
+      variation: number;
+    }
   | { type: "catch"; location: FieldPoint; label: string }
   | {
       type: "throw";

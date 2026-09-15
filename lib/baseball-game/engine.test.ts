@@ -586,6 +586,31 @@ describe("pro-cards-v1 strategy cards", () => {
     }
   });
 
+  it("varies opening hands and pitch locations across fresh game seeds", () => {
+    const hands = new Set<string>();
+    const locations = new Set<string>();
+
+    for (let seed = 1; seed <= 32; seed += 1) {
+      const initial = createGame(CONFIG, { seed });
+      hands.add(
+        [...initial.cards.offense.hand, ...initial.cards.defense.hand]
+          .map((card) => card.cardId)
+          .join(","),
+      );
+      const selected = transition(initial, {
+        type: "SELECT_PITCH",
+        target: "ball",
+      });
+      if (!selected.ok) throw new Error(selected.error.message);
+      const location = selected.state.pitchDuel?.actualLocation;
+      if (location)
+        locations.add(`${location.x.toFixed(3)},${location.y.toFixed(3)}`);
+    }
+
+    expect(hands.size).toBeGreaterThan(28);
+    expect(locations.size).toBeGreaterThan(28);
+  });
+
   it("redacts hands for public and opposing viewers", () => {
     const state = createGame(CONFIG, { seed: 7 });
     const publicView = getGameView(state, "public");

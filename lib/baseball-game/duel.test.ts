@@ -102,6 +102,29 @@ describe("pitch duel balance", () => {
     }
   });
 
+  it("keeps the entire visible ball marker clear of every strike-zone edge", () => {
+    const markerRadiusPercent = 10.3;
+    for (const side of [0, 1, 2, 3]) {
+      for (const unitX of [0, 0.5, 0.999]) {
+        for (const unitY of [0, 0.5, 0.999]) {
+          const values = [unitX, unitY, (side + 0.1) / 4];
+          let index = 0;
+          const location = createActualPitchLocation(
+            "ball",
+            1,
+            () => values[index++],
+          );
+          const clearsZone =
+            location.x + markerRadiusPercent < 24 ||
+            location.x - markerRadiusPercent > 76 ||
+            location.y + markerRadiusPercent < 20 ||
+            location.y - markerRadiusPercent > 80;
+          expect(clearsZone).toBe(true);
+        }
+      }
+    }
+  });
+
   it("creates reproducible locations and batted-ball results", () => {
     const values = [0.4, 0.2, 0.7, 0.1, 0.8, 0.3];
     const run = () => {

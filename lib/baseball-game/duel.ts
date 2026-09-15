@@ -28,6 +28,49 @@ export const PITCH_TARGET_LABELS: Record<PitchTarget, string> = {
   ball: "볼",
 };
 
+/**
+ * The visible ball marker can be wider than ten percent of the catcher-view
+ * canvas. Keep its center well outside the painted zone so a called ball never
+ * appears to clip a strike-zone edge.
+ */
+export function placeBallOutsideStrikeZone(
+  unitX: number,
+  unitY: number,
+  side: number,
+  pitchNumber: number,
+): PitchLocation {
+  if (side === 0) {
+    return {
+      x: 4 + unitX * 8,
+      y: 24 + unitY * 52,
+      zone: "ball",
+      pitchNumber,
+    };
+  }
+  if (side === 1) {
+    return {
+      x: 88 + unitX * 8,
+      y: 24 + unitY * 52,
+      zone: "ball",
+      pitchNumber,
+    };
+  }
+  if (side === 2) {
+    return {
+      x: 25 + unitX * 50,
+      y: 3 + unitY * 5,
+      zone: "ball",
+      pitchNumber,
+    };
+  }
+  return {
+    x: 25 + unitX * 50,
+    y: 92 + unitY * 5,
+    zone: "ball",
+    pitchNumber,
+  };
+}
+
 export const PITCH_TENDENCIES: Record<PitchTarget, PitchTendency> = {
   strike: {
     contact: 82,
@@ -132,13 +175,7 @@ export function createActualPitchLocation(
   const y = random();
   if (target === "ball") {
     const side = Math.floor(random() * 4);
-    if (side === 0)
-      return { x: 8 + x * 15, y: 22 + y * 56, zone: "ball", pitchNumber };
-    if (side === 1)
-      return { x: 77 + x * 15, y: 22 + y * 56, zone: "ball", pitchNumber };
-    if (side === 2)
-      return { x: 22 + x * 56, y: 7 + y * 14, zone: "ball", pitchNumber };
-    return { x: 22 + x * 56, y: 79 + y * 14, zone: "ball", pitchNumber };
+    return placeBallOutsideStrikeZone(x, y, side, pitchNumber);
   }
 
   return {

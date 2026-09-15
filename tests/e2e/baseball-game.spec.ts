@@ -363,6 +363,30 @@ test("새 경기 설정은 싱글 AI·멀티·파티 모드만 제공한다", as
   );
 });
 
+test("새 AI 경기마다 첫 손패가 고정되지 않는다", async ({ browser }) => {
+  const signatures = new Set<string>();
+
+  for (let index = 0; index < 3; index += 1) {
+    const context = await browser.newContext({
+      viewport: { width: 1280, height: 720 },
+    });
+    const page = await context.newPage();
+    await page.route("**/api/workbench/auth/me", (route) =>
+      route.fulfill({ status: 200, json: { account: null } }),
+    );
+    await page.goto(`/baseball-game?fresh=${index}`);
+    const labels = await page
+      .locator(".bbg-card-hand[data-revealed='true'] .bbg-card-preview")
+      .evaluateAll((cards) =>
+        cards.map((card) => card.getAttribute("aria-label")).join("|"),
+      );
+    signatures.add(labels);
+    await context.close();
+  }
+
+  expect(signatures.size).toBeGreaterThan(1);
+});
+
 test("주요 데스크톱·태블릿·모바일 화면비율에서 게임 UI가 잘리지 않는다", async ({
   page,
 }) => {

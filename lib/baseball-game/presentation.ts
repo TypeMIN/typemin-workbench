@@ -13,6 +13,7 @@ import type {
   RunnerOrigin,
 } from "./types";
 import { CARD_DEFINITIONS } from "./cards";
+import { placeBallOutsideStrikeZone } from "./duel";
 
 const FIELD_POINTS: Record<RunnerOrigin | RunnerDestination, FieldPoint> = {
   batter: { x: 450, y: 650 },
@@ -50,7 +51,9 @@ export function getPitchLocation(
   event: Pick<GameEvent, "sequence" | "revision" | "face" | "pitchLocation">,
   pitchNumber = 1,
 ): PitchLocation | null {
-  if (event.pitchLocation) return { ...event.pitchLocation };
+  if (event.pitchLocation) {
+    return keepBallMarkerOutsideStrikeZone(event.pitchLocation);
+  }
   const face = event.face;
   if (
     face !== "S" &&
@@ -69,33 +72,7 @@ export function getPitchLocation(
 
   if (face === "B" || (face === "SM" && seed % 3 === 0)) {
     const side = seed % 4;
-    if (side === 0)
-      return {
-        x: 8 + unitA * 14,
-        y: 20 + unitB * 60,
-        zone: "ball",
-        pitchNumber,
-      };
-    if (side === 1)
-      return {
-        x: 78 + unitA * 14,
-        y: 20 + unitB * 60,
-        zone: "ball",
-        pitchNumber,
-      };
-    if (side === 2)
-      return {
-        x: 20 + unitA * 60,
-        y: 7 + unitB * 13,
-        zone: "ball",
-        pitchNumber,
-      };
-    return {
-      x: 20 + unitA * 60,
-      y: 80 + unitB * 13,
-      zone: "ball",
-      pitchNumber,
-    };
+    return placeBallOutsideStrikeZone(unitA, unitB, side, pitchNumber);
   }
 
   if (face === "F") {
@@ -116,6 +93,23 @@ export function getPitchLocation(
     zone: "strike",
     pitchNumber,
   };
+}
+
+function keepBallMarkerOutsideStrikeZone(
+  location: PitchLocation,
+): PitchLocation {
+  if (location.zone !== "ball") return { ...location };
+  const sides = [
+    { side: "left" as const, score: 24 - location.x },
+    { side: "right" as const, score: location.x - 76 },
+    { side: "top" as const, score: 20 - location.y },
+    { side: "bottom" as const, score: location.y - 80 },
+  ].sort((a, b) => b.score - a.score);
+  const side = sides[0].side;
+  if (side === "left") return { ...location, x: Math.min(location.x, 12) };
+  if (side === "right") return { ...location, x: Math.max(location.x, 88) };
+  if (side === "top") return { ...location, y: Math.min(location.y, 8) };
+  return { ...location, y: Math.max(location.y, 92) };
 }
 
 export function getPlateAppearancePitchHistory(events: GameEvent[]) {
@@ -166,16 +160,17 @@ export function getPlateAppearancePitchHistory(events: GameEvent[]) {
         Math.abs(pitch.location.x - location.x) < 7 &&
         Math.abs(pitch.location.y - location.y) < 7,
     ).length;
+    const displayedLocation = overlapCount
+      ? {
+          ...location,
+          x: Math.max(3, Math.min(97, location.x + overlapCount * 3)),
+          y: Math.max(3, Math.min(97, location.y + overlapCount * 2)),
+        }
+      : location;
     history.push({
       event,
       face: event.face,
-      location: overlapCount
-        ? {
-            ...location,
-            x: Math.max(3, Math.min(97, location.x + overlapCount * 3)),
-            y: Math.max(3, Math.min(97, location.y + overlapCount * 2)),
-          }
-        : location,
+      location: keepBallMarkerOutsideStrikeZone(displayedLocation),
     });
   });
   return history;
@@ -185,6 +180,7 @@ export function buildPresentationCues(events: GameEvent[]): PresentationCue[] {
   const cues: PresentationCue[] = [];
   let battedFace: BattingFace | HitFace | null = null;
   let throwOrigin: FieldPoint = { x: 450, y: 650 };
+  let latestPitchLocation: PitchLocation | null = null;
   const pitchEventsBefore = events.filter(
     (event) =>
       event.kind === "pitch_result" ||
@@ -231,7 +227,10 @@ export function buildPresentationCues(events: GameEvent[]): PresentationCue[] {
           (pitch) => pitch.sequence === event.sequence,
         ) + 1;
       const location = getPitchLocation(event, pitchNumber);
-      if (location) cues.push({ type: "pitch", location, face: event.face });
+      if (location) {
+        latestPitchLocation = location;
+        cues.push({ type: "pitch", location, face: event.face });
+      }
       cues.push({ type: "call", call: pitchCall(event.face) });
     }
     if (
@@ -242,7 +241,11 @@ export function buildPresentationCues(events: GameEvent[]): PresentationCue[] {
     ) {
       battedFace = event.face;
       throwOrigin = CATCH_POINTS[event.face];
-      cues.push({ type: "batted_ball", face: event.face });
+      cues.push({
+        type: "batted_ball",
+        face: event.face,
+        variation: battedBallVariation(event, latestPitchLocation),
+      });
       if (isCaughtFace(event.face))
         cues.push({
           type: "catch",
@@ -519,6 +522,21 @@ function isPitchFace(face: GameEvent["face"]): face is PitchFace {
 
 function isBattedFace(face: GameEvent["face"]): face is BattingFace | HitFace {
   return Boolean(face && face in CATCH_POINTS);
+}
+
+function battedBallVariation(
+  event: GameEvent,
+  pitchLocation: PitchLocation | null,
+) {
+  const pitchKey = pitchLocation
+    ? Math.round(pitchLocation.x * 100) * 31 +
+      Math.round(pitchLocation.y * 100) * 17
+    : 0;
+  const faceKey = event.face?.charCodeAt(0) ?? 0;
+  const value = hash(
+    event.sequence * 131 + event.revision * 977 + pitchKey + faceKey,
+  );
+  return ((value % 2_001) - 1_000) / 1_000;
 }
 
 function isCaughtFace(face: BattingFace | HitFace) {

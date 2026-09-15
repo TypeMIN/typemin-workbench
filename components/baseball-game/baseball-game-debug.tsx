@@ -70,13 +70,19 @@ const DEFAULT_SESSION: SessionConfig = {
 
 const AI_TURN_DELAY_MS = 650;
 
-export default function BaseballGameDebug() {
+export default function BaseballGameDebug({
+  initialSeed,
+}: {
+  initialSeed?: number;
+}) {
   const router = useRouter();
   const setupDetailsRef = useRef<HTMLDetailsElement>(null);
   const [draft, setDraft] = useState<GameConfig>(DEFAULT_CONFIG);
   const [draftSession, setDraftSession] =
     useState<SessionConfig>(DEFAULT_SESSION);
-  const [game, setGame] = useState(() => createGame(DEFAULT_CONFIG));
+  const [game, setGame] = useState(() =>
+    createGame(DEFAULT_CONFIG, { seed: initialSeed }),
+  );
   const [session, setSession] = useState<SessionConfig>(DEFAULT_SESSION);
   const [multiplayerCode, setMultiplayerCode] = useState("");
   const [creatingRoom, setCreatingRoom] = useState(false);
@@ -907,6 +913,7 @@ type BallFlight = {
   label: string;
   path: string;
   target: { x: number; y: number };
+  rotation: number;
 };
 
 function fieldPath(
@@ -974,9 +981,13 @@ export function BaseballStadium({
     pitchDuel?: GameState["pitchDuel"] | GameView["pitchDuel"];
   };
 }) {
-  const flight = getBallFlight(face);
   const pitchHistory = getPlateAppearancePitchHistory(game.eventLog);
   const { cue, cues, index, skip } = usePresentation(game.eventLog);
+  const battedBallCue = cues.findLast(
+    (item): item is Extract<PresentationCue, { type: "batted_ball" }> =>
+      item.type === "batted_ball",
+  );
+  const flight = getBallFlight(face, battedBallCue?.variation ?? 0);
   const displayedBases = cue
     ? getPresentationBases(game.bases, cues, index)
     : game.bases;
@@ -1377,27 +1388,31 @@ function BallFlightVisual({
   face?: DieFace;
   flight: BallFlight;
 }) {
+  const target = rotateFieldPoint(flight.target, flight.rotation);
   return (
     <g
       aria-label={`${face ?? ""} ${flight.label} 타구 궤적`}
       className="bbg-ball-flight"
       data-kind={flight.kind}
+      data-variation={flight.rotation.toFixed(2)}
       role="img"
     >
-      <path className="bbg-ball-trail-shadow" d={flight.path} />
-      <path className="bbg-ball-trail" d={flight.path} />
-      <circle
-        className="bbg-ball-landing"
-        cx={flight.target.x}
-        cy={flight.target.y}
-        r="18"
-      />
-      <circle className="bbg-live-ball" filter="url(#ball-glow)" r="7">
-        <animateMotion dur="850ms" fill="freeze" path={flight.path} />
-      </circle>
+      <g transform={`rotate(${flight.rotation} 450 650)`}>
+        <path className="bbg-ball-trail-shadow" d={flight.path} />
+        <path className="bbg-ball-trail" d={flight.path} />
+        <circle
+          className="bbg-ball-landing"
+          cx={flight.target.x}
+          cy={flight.target.y}
+          r="18"
+        />
+        <circle className="bbg-live-ball" filter="url(#ball-glow)" r="7">
+          <animateMotion dur="850ms" fill="freeze" path={flight.path} />
+        </circle>
+      </g>
       <g
         className="bbg-flight-label"
-        transform={`translate(${flight.target.x} ${flight.target.y - 27})`}
+        transform={`translate(${target.x} ${target.y - 27})`}
       >
         <rect height="29" rx="14" width="112" x="-56" y="-17" />
         <text dy="2" textAnchor="middle">
@@ -1408,9 +1423,19 @@ function BallFlightVisual({
   );
 }
 
-function getBallFlight(face?: DieFace): BallFlight | null {
+function rotateFieldPoint(point: { x: number; y: number }, degrees: number) {
+  const radians = (degrees * Math.PI) / 180;
+  const x = point.x - 450;
+  const y = point.y - 650;
+  return {
+    x: 450 + x * Math.cos(radians) - y * Math.sin(radians),
+    y: 650 + x * Math.sin(radians) + y * Math.cos(radians),
+  };
+}
+
+function getBallFlight(face?: DieFace, variation = 0): BallFlight | null {
   if (!face) return null;
-  const flights: Partial<Record<DieFace, BallFlight>> = {
+  const flights: Partial<Record<DieFace, Omit<BallFlight, "rotation">>> = {
     C: {
       kind: "contact",
       label: "컨택",
@@ -1538,7 +1563,20 @@ function getBallFlight(face?: DieFace): BallFlight | null {
       target: { x: 700, y: 260 },
     },
   };
-  return flights[face] ?? null;
+  const flight = flights[face];
+  if (!flight) return null;
+  const maximumRotation =
+    flight.kind === "contact"
+      ? 0
+      : flight.kind === "fly"
+        ? 8
+        : flight.kind === "line"
+          ? 6
+          : 5;
+  return {
+    ...flight,
+    rotation: Math.max(-1, Math.min(1, variation)) * maximumRotation,
+  };
 }
 
 function SvgBaseMarker({
