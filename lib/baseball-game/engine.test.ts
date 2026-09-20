@@ -345,6 +345,32 @@ describe("batted-ball and hit tables", () => {
     }
   });
 
+  it("describes a fly as a tag-up only when an eligible runner advances", () => {
+    const empty = batting(game(), "F2");
+    expect(
+      empty.eventLog.findLast((event) => event.kind === "plate_appearance")
+        ?.summary,
+    ).toBe("외야 플라이 아웃");
+
+    const secondOnly = batting(
+      game({ bases: { first: false, second: true, third: false } }),
+      "F2",
+    );
+    expect(
+      secondOnly.eventLog.findLast((event) => event.kind === "plate_appearance")
+        ?.summary,
+    ).toBe("F2 태그업");
+
+    const thirdOnly = batting(
+      game({ bases: { first: false, second: false, third: true } }),
+      "F3",
+    );
+    expect(
+      thirdOnly.eventLog.findLast((event) => event.kind === "plate_appearance")
+        ?.summary,
+    ).toBe("F3 희생플라이");
+  });
+
   it("treats D3 as a bases-clearing double and HR as all runners plus batter", () => {
     const loaded = game({
       bases: { first: true, second: true, third: true },
@@ -1148,7 +1174,7 @@ describe("catcher-view-v1 box score", () => {
   it("initializes schema 7 and keeps structured inning totals", () => {
     const state = createGame(CONFIG);
     expect(state.schemaVersion).toBe(7);
-    expect(state.presentationVersion).toBe("catcher-view-v1");
+    expect(state.presentationVersion).toBe("rts-scenes-v1");
     expect(state.boxScore).toEqual({
       innings: [{ away: 0, home: null }],
       totals: {

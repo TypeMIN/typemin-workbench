@@ -31,6 +31,7 @@ import {
   getPlateAppearancePitchHistory,
   getPresentationBases,
   getPresentationDuration,
+  hasResolutionOutcome,
 } from "@/lib/baseball-game/presentation";
 import { FACE_LABELS } from "@/lib/baseball-game/rules";
 import type {
@@ -87,6 +88,7 @@ export default function BaseballGameDebug({
   const [multiplayerCode, setMultiplayerCode] = useState("");
   const [creatingRoom, setCreatingRoom] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [presentationActive, setPresentationActive] = useState(false);
   const [acknowledgedInterlude, setAcknowledgedInterlude] = useState<
     number | null
   >(null);
@@ -101,6 +103,8 @@ export default function BaseballGameDebug({
   const currentPresentationDuration = getPresentationDuration(
     currentRevisionEvents,
   );
+  const concealingOutcome =
+    presentationActive && hasResolutionOutcome(currentRevisionEvents);
   const lastResult = game.eventLog.findLast((event) =>
     ["pitch_result", "batted_ball", "die_roll"].includes(event.kind),
   );
@@ -302,9 +306,10 @@ export default function BaseballGameDebug({
                 <BaseballStadium
                   face={lastResult?.face}
                   game={playerView}
-                  key={`field-${game.revision}`}
+                  onPresentationChange={setPresentationActive}
                 />
-                {!isAiTurn &&
+                {!presentationActive &&
+                !isAiTurn &&
                 (game.phase === "awaiting_pitch" ||
                   game.phase === "awaiting_swing") ? (
                   <div className="bbg-choice-dock">
@@ -320,12 +325,16 @@ export default function BaseballGameDebug({
                 events={currentRevisionEvents}
                 game={game}
                 key={game.revision}
+                presenting={concealingOutcome}
               />
             </div>
           </section>
 
           <section
+            aria-busy={presentationActive}
             className="bbg-control-panel bbg-control-panel--broadcast"
+            data-presentation-active={presentationActive}
+            inert={presentationActive ? true : undefined}
             aria-label="전략카드와 경기 조작"
           >
             {game.phase === "finished" ? (
@@ -638,21 +647,10 @@ function MiniScore({ game }: { game: GameState }) {
 }
 
 function AiTurnIndicator({ game, team }: { game: GameState; team: TeamSide }) {
-  const role = roleForTeam(game, team);
-  const isCardDecision = game.phase === "awaiting_card";
   return (
     <div className="bbg-ai-turn" role="status" aria-live="polite">
       <span>AI</span>
-      <div>
-        <strong>{teamNameFor(game, team)} 판단 중</strong>
-        <p>
-          {isCardDecision
-            ? `${role === "offense" ? "공격" : "수비"} 전략카드를 검토하고 있습니다.`
-            : game.phase === "awaiting_pitch"
-              ? "스트라이크와 볼 사이에서 승부를 고르고 있습니다."
-              : "스윙과 지켜보기 사이에서 판단하고 있습니다."}
-        </p>
-      </div>
+      <strong>{teamNameFor(game, team)} 판단 중</strong>
       <i aria-hidden="true" />
     </div>
   );
@@ -952,7 +950,7 @@ function presentationLabel(cue: PresentationCue) {
     return { primary: `${cue.location.pitchNumber}구`, detail: "투구" };
   }
   if (cue.type === "batted_ball") {
-    return { primary: "타격", detail: FACE_LABELS[cue.face] };
+    return { primary: "타격", detail: cue.label };
   }
   if (cue.type === "catch") {
     return { primary: "포구", detail: cue.label };
@@ -968,26 +966,42 @@ function presentationLabel(cue: PresentationCue) {
       detail: cue.label,
     };
   }
-  return { primary: "주자 출발", detail: cue.label };
+  const primary = {
+    batter_run: "타자 주루",
+    advance: "주자 진루",
+    tag_up: "태그업",
+    steal: "도루 시도",
+    pickoff_return: "귀루",
+    force_play: "포스 플레이",
+    score: "홈 쇄도",
+  }[cue.action];
+  return { primary, detail: cue.label };
 }
 
 export function BaseballStadium({
   face,
   game,
+  onPresentationChange,
 }: {
   face?: DieFace;
   game: Pick<GameState, "bases" | "battingTeam" | "config" | "eventLog"> & {
     phase?: GamePhase;
     pitchDuel?: GameState["pitchDuel"] | GameView["pitchDuel"];
   };
+  onPresentationChange?: (active: boolean) => void;
 }) {
   const pitchHistory = getPlateAppearancePitchHistory(game.eventLog);
-  const { cue, cues, index, skip } = usePresentation(game.eventLog);
-  const battedBallCue = cues.findLast(
-    (item): item is Extract<PresentationCue, { type: "batted_ball" }> =>
-      item.type === "batted_ball",
+  const { cue, cues, index, isPresenting, scene, skip } = usePresentation(
+    game.eventLog,
   );
-  const flight = getBallFlight(face, battedBallCue?.variation ?? 0);
+  useEffect(() => {
+    onPresentationChange?.(isPresenting);
+  }, [isPresenting, onPresentationChange]);
+  const latestPitchLocation = pitchHistory.at(-1)?.location;
+  const activeBattedBallCue = cue?.type === "batted_ball" ? cue : undefined;
+  const flight = activeBattedBallCue
+    ? getBallFlight(activeBattedBallCue.face, activeBattedBallCue.variation)
+    : null;
   const displayedBases = cue
     ? getPresentationBases(game.bases, cues, index)
     : game.bases;
@@ -1001,7 +1015,16 @@ export function BaseballStadium({
     (["batted_ball", "catch", "throw", "runner_move"].includes(cue.type) ||
       (cue.type === "decision" && cue.camera === "field")),
   );
-  const catcherView = !fieldAction && shouldUseCatcherView(game.phase, face);
+  const pitchAction = Boolean(
+    cue &&
+    (cue.type === "pitch" ||
+      cue.type === "call" ||
+      (cue.type === "choice" &&
+        (cue.actor === "pitcher" || cue.actor === "batter")) ||
+      (cue.type === "decision" && cue.camera === "catcher")),
+  );
+  const catcherView =
+    pitchAction || (!fieldAction && shouldUseCatcherView(game.phase, face));
   const cueLabel = cue ? presentationLabel(cue) : null;
   const battingTeamName =
     game.config[game.battingTeam === "away" ? "awayTeamName" : "homeTeamName"];
@@ -1015,6 +1038,7 @@ export function BaseballStadium({
       className="bbg-diamond bbg-stadium"
       data-camera={catcherView ? "catcher" : "field"}
       data-cue={cue?.type ?? "idle"}
+      data-scene={scene?.template ?? "idle"}
     >
       {catcherView ? (
         <CatcherPitchStage cue={cue} pitchHistory={pitchHistory} />
@@ -1123,9 +1147,18 @@ export function BaseballStadium({
           </text>
         </g>
 
-        {flight ? <BallFlightVisual face={face} flight={flight} /> : null}
+        {flight ? (
+          <BallFlightVisual
+            face={activeBattedBallCue?.face}
+            flight={flight}
+            key={`flight-${scene?.beats[index]?.id ?? activeBattedBallCue?.face}`}
+          />
+        ) : null}
         {cue?.type === "pitch" ? (
-          <g className="bbg-pitch-flight">
+          <g
+            className="bbg-pitch-flight"
+            key={`pitch-${scene?.beats[index]?.id}`}
+          >
             <path
               d={`M450 555 Q${430 + cue.location.x * 0.4} 600 ${438 + cue.location.x * 0.24} 650`}
             />
@@ -1138,8 +1171,18 @@ export function BaseballStadium({
             </circle>
           </g>
         ) : null}
+        {cue?.type !== "pitch" && latestPitchLocation && !catcherView ? (
+          <path
+            className="bbg-last-pitch-path"
+            d={`M450 555 Q${430 + latestPitchLocation.x * 0.4} 600 ${438 + latestPitchLocation.x * 0.24} 650`}
+          />
+        ) : null}
         {cue?.type === "throw" ? (
-          <g className="bbg-throw-cue" data-kind={cue.kind}>
+          <g
+            className="bbg-throw-cue"
+            data-kind={cue.kind}
+            key={`throw-${scene?.beats[index]?.id}`}
+          >
             <path d={fieldPath(cue.from, cue.to)} />
             <circle
               className="bbg-throw-target"
@@ -1166,7 +1209,11 @@ export function BaseballStadium({
           </g>
         ) : null}
         {cue?.type === "runner_move" ? (
-          <g className="bbg-runner-cue" data-out={cue.move.to === "out"}>
+          <g
+            className="bbg-runner-cue"
+            data-out={cue.move.to === "out"}
+            key={`runner-${scene?.beats[index]?.id}`}
+          >
             <path d={fieldPath(cue.origin, cue.destination)} />
             <circle
               className="bbg-runner-origin"
@@ -1185,11 +1232,14 @@ export function BaseballStadium({
         ) : null}
       </svg>
       {!catcherView ? (
-        <div className="bbg-strike-zone" aria-label="투구 위치">
-          <span className="bbg-strike-zone-label">PITCH MAP</span>
-          <div aria-hidden="true" className="bbg-zone-grid" />
-          <PitchMarkers pitchHistory={pitchHistory} />
-        </div>
+        <>
+          <div className="bbg-strike-zone" aria-label="투구 위치">
+            <span className="bbg-strike-zone-label">PITCH MAP</span>
+            <div aria-hidden="true" className="bbg-zone-grid" />
+            <PitchMarkers pitchHistory={pitchHistory} />
+          </div>
+          <PitchSequence pitchHistory={pitchHistory} />
+        </>
       ) : null}
       {cue && cueLabel ? (
         <button
@@ -1619,9 +1669,11 @@ function SvgBaseMarker({
 function PlayResult({
   events,
   game,
+  presenting,
 }: {
   events: GameEvent[];
   game: GameState;
+  presenting: boolean;
 }) {
   const event =
     events.findLast((item) => item.kind === "game_end") ??
@@ -1629,17 +1681,19 @@ function PlayResult({
     events.findLast((item) => item.kind === "count") ??
     events.findLast((item) => item.kind === "half_inning") ??
     events.at(-1);
-  const tone = !event
-    ? "ready"
-    : event.kind === "game_end"
-      ? "final"
-      : event.runs > 0
-        ? "score"
-        : event.outsRecorded > 0
-          ? "out"
-          : game.phase === "awaiting_batting" || game.phase === "awaiting_hit"
-            ? "contact"
-            : "count";
+  const tone = presenting
+    ? "playing"
+    : !event
+      ? "ready"
+      : event.kind === "game_end"
+        ? "final"
+        : event.runs > 0
+          ? "score"
+          : event.outsRecorded > 0
+            ? "out"
+            : game.phase === "awaiting_batting" || game.phase === "awaiting_hit"
+              ? "contact"
+              : "count";
 
   return (
     <div
@@ -1650,20 +1704,26 @@ function PlayResult({
     >
       <div className="bbg-result-die" aria-hidden="true">
         <strong>
-          {!event
-            ? "▶"
-            : event.kind === "game_end"
-              ? "F"
-              : event.runs > 0
-                ? "+"
-                : event.outsRecorded > 0
-                  ? "O"
-                  : "•"}
+          {presenting
+            ? "•"
+            : !event
+              ? "▶"
+              : event.kind === "game_end"
+                ? "F"
+                : event.runs > 0
+                  ? "+"
+                  : event.outsRecorded > 0
+                    ? "O"
+                    : "•"}
         </strong>
       </div>
       <div className="bbg-result-copy">
-        <h2>{event?.summary ?? "첫 투구를 준비하세요"}</h2>
-        <BaseballPlayReceipt game={game} />
+        <h2>
+          {presenting
+            ? "플레이 진행 중"
+            : (event?.summary ?? "첫 투구를 준비하세요")}
+        </h2>
+        {presenting ? null : <BaseballPlayReceipt game={game} />}
       </div>
     </div>
   );

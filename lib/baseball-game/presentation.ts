@@ -2,12 +2,17 @@ import type {
   AudioCue,
   Bases,
   BattingFace,
+  CardId,
   FieldPoint,
   GameEvent,
   HitFace,
   PitchFace,
   PitchLocation,
+  PresentationBeat,
   PresentationCue,
+  PresentationScene,
+  PresentationSceneCamera,
+  PresentationSceneTemplate,
   RunnerDestination,
   RunnerMove,
   RunnerOrigin,
@@ -176,18 +181,33 @@ export function getPlateAppearancePitchHistory(events: GameEvent[]) {
   return history;
 }
 
-export function buildPresentationCues(events: GameEvent[]): PresentationCue[] {
+export function buildPresentationCues(
+  events: GameEvent[],
+  context: { battedFace?: BattingFace | HitFace | null } = {},
+): PresentationCue[] {
   const cues: PresentationCue[] = [];
-  let battedFace: BattingFace | HitFace | null = null;
-  let throwOrigin: FieldPoint = { x: 450, y: 650 };
+  let battedFace: BattingFace | HitFace | null = context.battedFace ?? null;
+  let throwOrigin: FieldPoint = battedFace
+    ? CATCH_POINTS[battedFace]
+    : FIELD_POINTS.home;
   let latestPitchLocation: PitchLocation | null = null;
+  let resolutionCardId: CardId | null = null;
   const pitchEventsBefore = events.filter(
     (event) =>
       event.kind === "pitch_result" ||
       (event.kind === "die_roll" && event.die === "pitch"),
   );
+  const hasResolvedHit = events.some(
+    (event) =>
+      event.kind === "batted_ball" &&
+      isBattedFace(event.face) &&
+      event.face !== "HIT",
+  );
 
   events.forEach((event) => {
+    if (event.kind === "card_resolve" && event.cardId) {
+      resolutionCardId = event.cardId;
+    }
     if (event.kind === "pitch_commit") {
       cues.push({
         type: "choice",
@@ -237,7 +257,8 @@ export function buildPresentationCues(events: GameEvent[]): PresentationCue[] {
       (event.kind === "batted_ball" ||
         (event.kind === "die_roll" &&
           (event.die === "batting" || event.die === "hit"))) &&
-      isBattedFace(event.face)
+      isBattedFace(event.face) &&
+      !(event.face === "HIT" && hasResolvedHit)
     ) {
       battedFace = event.face;
       throwOrigin = CATCH_POINTS[event.face];
@@ -245,6 +266,7 @@ export function buildPresentationCues(events: GameEvent[]): PresentationCue[] {
         type: "batted_ball",
         face: event.face,
         variation: battedBallVariation(event, latestPitchLocation),
+        label: battedBallLabel(event.face),
       });
       if (isCaughtFace(event.face))
         cues.push({
@@ -253,19 +275,53 @@ export function buildPresentationCues(events: GameEvent[]): PresentationCue[] {
           label: "타구 포구",
         });
     }
+    if (
+      event.kind === "card_resolve" &&
+      event.cardId === "LDP" &&
+      battedFace === "HIT"
+    ) {
+      throwOrigin = CATCH_POINTS.HIT;
+      cues.push({
+        type: "catch",
+        location: CATCH_POINTS.HIT,
+        label: "직선타 포구",
+      });
+    }
+    if (event.kind === "card_resolve" && event.cardId === "FFO") {
+      throwOrigin = CATCH_POINTS.PO;
+      cues.push({
+        type: "catch",
+        location: CATCH_POINTS.PO,
+        label: "파울 타구 포구",
+      });
+    }
 
-    const safeMoves: RunnerMove[] = [];
-    for (const move of event.moves) {
+    const outMoves = event.moves.filter((move) => move.to === "out");
+    const safeMoves = event.moves
+      .filter((move) => move.to !== "out")
+      .sort(
+        (left, right) =>
+          runnerDestinationRank(right.to) - runnerDestinationRank(left.to) ||
+          runnerOriginRank(right.from) - runnerOriginRank(left.from),
+      );
+    const orderedMoves = [...outMoves, ...safeMoves];
+    for (const move of orderedMoves) {
       if (move.to === "out") {
         if (
           move.runner === "batter" &&
           ((battedFace && isCaughtFace(battedFace)) ||
+            resolutionCardId === "LDP" ||
+            resolutionCardId === "FFO" ||
             event.summary.includes("삼진"))
         ) {
           cues.push({
             type: "decision",
             result: "out",
-            label: event.summary || "타자 아웃",
+            label:
+              event.summary.includes("삼진") ||
+              (outMoves.length === 1 && safeMoves.length === 0)
+                ? event.summary || "타자 아웃"
+                : "플라이 아웃",
             camera: event.summary.includes("삼진") ? "catcher" : "field",
           });
           continue;
@@ -282,6 +338,13 @@ export function buildPresentationCues(events: GameEvent[]): PresentationCue[] {
           origin,
           destination,
           label: runnerMoveLabel(move.from, destination, true),
+          action: inferRunnerAction(
+            event,
+            move,
+            battedFace,
+            kind,
+            resolutionCardId,
+          ),
         };
         const throwCue: PresentationCue = {
           type: "throw",
@@ -296,17 +359,26 @@ export function buildPresentationCues(events: GameEvent[]): PresentationCue[] {
         cues.push({
           type: "decision",
           result: "out",
-          label: event.summary || "주자 아웃",
+          label:
+            outMoves.at(-1) === move && safeMoves.length === 0
+              ? event.summary || "주자 아웃"
+              : `${baseName(destination)} 아웃`,
           camera: "field",
         });
       } else {
-        safeMoves.push(move);
         cues.push({
           type: "runner_move",
           move,
           origin: FIELD_POINTS[move.from],
           destination: FIELD_POINTS[move.to],
           label: runnerMoveLabel(move.from, FIELD_POINTS[move.to], false),
+          action: inferRunnerAction(
+            event,
+            move,
+            battedFace,
+            "throw",
+            resolutionCardId,
+          ),
         });
       }
     }
@@ -337,10 +409,74 @@ export function buildPresentationCues(events: GameEvent[]): PresentationCue[] {
 }
 
 export function getPresentationDuration(events: GameEvent[]) {
-  return buildPresentationCues(events).reduce(
-    (total, cue) => total + presentationCueDuration(cue),
+  return buildPresentationScenes(events).reduce(
+    (total, scene) => total + scene.durationMs,
     0,
   );
+}
+
+export function hasResolutionOutcome(events: GameEvent[]) {
+  return events.some((event) =>
+    [
+      "pitch_result",
+      "batted_ball",
+      "die_roll",
+      "card_resolve",
+      "plate_appearance",
+      "half_inning",
+      "game_end",
+    ].includes(event.kind),
+  );
+}
+
+export function buildPresentationScenes(events: GameEvent[]) {
+  const revisions = new Map<number, GameEvent[]>();
+  for (const event of events) {
+    const revisionEvents = revisions.get(event.revision) ?? [];
+    revisionEvents.push(event);
+    revisions.set(event.revision, revisionEvents);
+  }
+
+  let activeBattedFace: BattingFace | HitFace | null = null;
+  return Array.from(revisions.entries()).flatMap(([revision, sceneEvents]) => {
+    const cues = buildPresentationCues(sceneEvents, {
+      battedFace: activeBattedFace,
+    });
+    for (const event of sceneEvents) {
+      if (event.kind === "batted_ball" && isBattedFace(event.face)) {
+        activeBattedFace = event.face;
+      }
+      if (
+        event.kind === "plate_appearance" ||
+        event.kind === "half_inning" ||
+        event.kind === "game_end"
+      ) {
+        activeBattedFace = null;
+      }
+    }
+    if (cues.length === 0) return [];
+    const firstSequence = sceneEvents.at(0)?.sequence ?? 0;
+    const lastSequence = sceneEvents.at(-1)?.sequence ?? firstSequence;
+    const id = `scene-${revision}-${firstSequence}-${lastSequence}`;
+    const beats = cues.map((cue, index) =>
+      createPresentationBeat(id, cue, index),
+    );
+    const template = inferSceneTemplate(sceneEvents, cues);
+    return [
+      {
+        id,
+        revision,
+        template,
+        camera: inferSceneCamera(template, cues),
+        seed: hash(revision * 977 + firstSequence * 131 + lastSequence * 31),
+        beats,
+        durationMs: beats.reduce(
+          (total, beat) => total + beat.durationMs + beat.holdMs,
+          0,
+        ),
+      } satisfies PresentationScene,
+    ];
+  });
 }
 
 export function getPresentationBases(
@@ -365,14 +501,110 @@ export function getPresentationBases(
 }
 
 export function presentationCueDuration(cue: PresentationCue) {
-  if (cue.type === "choice") return 1_250;
-  if (cue.type === "pitch") return 850;
-  if (cue.type === "call") return 1_350;
-  if (cue.type === "batted_ball") return 1_050;
-  if (cue.type === "catch") return 950;
-  if (cue.type === "throw") return 1_100;
-  if (cue.type === "runner_move") return 1_100;
-  return 1_900;
+  const timing = presentationCueTiming(cue);
+  return timing.durationMs + timing.holdMs;
+}
+
+function createPresentationBeat(
+  sceneId: string,
+  cue: PresentationCue,
+  index: number,
+): PresentationBeat {
+  return {
+    id: `${sceneId}-beat-${index}`,
+    phase: presentationBeatPhase(cue),
+    cue,
+    ...presentationCueTiming(cue),
+  };
+}
+
+function presentationCueTiming(cue: PresentationCue) {
+  if (cue.type === "choice") return { durationMs: 500, holdMs: 750 };
+  if (cue.type === "pitch") return { durationMs: 700, holdMs: 150 };
+  if (cue.type === "call") return { durationMs: 400, holdMs: 950 };
+  if (cue.type === "batted_ball") return { durationMs: 850, holdMs: 200 };
+  if (cue.type === "catch") return { durationMs: 650, holdMs: 300 };
+  if (cue.type === "throw") return { durationMs: 850, holdMs: 250 };
+  if (cue.type === "runner_move") return { durationMs: 850, holdMs: 250 };
+  return { durationMs: 500, holdMs: 1_400 };
+}
+
+function presentationBeatPhase(
+  cue: PresentationCue,
+): PresentationBeat["phase"] {
+  if (cue.type === "choice") return "anticipation";
+  if (cue.type === "pitch" || cue.type === "runner_move") return "action";
+  if (
+    cue.type === "batted_ball" ||
+    cue.type === "catch" ||
+    cue.type === "throw"
+  )
+    return "impact";
+  if (cue.type === "call") return "resolution";
+  return "settle";
+}
+
+function inferSceneTemplate(
+  events: GameEvent[],
+  cues: PresentationCue[],
+): PresentationSceneTemplate {
+  if (events.some((event) => event.kind === "game_end")) return "game_end";
+  if (events.some((event) => event.kind === "half_inning"))
+    return "inning_change";
+  if (
+    events.some(
+      (event) => event.kind === "card_play" || event.kind === "card_resolve",
+    )
+  )
+    return "card_action";
+  const batted = cues.find(
+    (cue): cue is Extract<PresentationCue, { type: "batted_ball" }> =>
+      cue.type === "batted_ball",
+  );
+  if (batted) {
+    if (["GF", "G3", "GA", "IH"].includes(batted.face)) return "ground_play";
+    if (["PO", "FO", "F2", "F3", "FA"].includes(batted.face)) return "fly_play";
+    return "hit_play";
+  }
+  if (
+    cues.some(
+      (cue) =>
+        cue.type === "throw" ||
+        cue.type === "runner_move" ||
+        cue.type === "catch",
+    )
+  )
+    return "base_play";
+  if (
+    events.some((event) => event.kind === "pitch_commit") ||
+    cues.some(
+      (cue) =>
+        cue.type === "pitch" ||
+        (cue.type === "choice" &&
+          (cue.actor === "pitcher" || cue.actor === "batter")),
+    )
+  )
+    return "pitch_duel";
+  return "generic";
+}
+
+function inferSceneCamera(
+  template: PresentationSceneTemplate,
+  cues: PresentationCue[],
+): PresentationSceneCamera {
+  if (template === "pitch_duel") return "catcher";
+  if (template === "inning_change" || template === "game_end")
+    return "scoreboard";
+  if (
+    template === "base_play" ||
+    cues.some(
+      (cue) =>
+        cue.type === "throw" &&
+        (cue.kind === "pickoff" || cue.kind === "caught_stealing"),
+    )
+  )
+    return "base";
+  return "field";
 }
 
 export function getAudioCues(events: GameEvent[]): AudioCue[] {
@@ -445,6 +677,36 @@ function inferThrowStart(
   return current;
 }
 
+function inferRunnerAction(
+  event: GameEvent,
+  move: RunnerMove,
+  battedFace: BattingFace | HitFace | null,
+  throwKind: Extract<PresentationCue, { type: "throw" }>["kind"],
+  resolutionCardId: CardId | null,
+): Extract<PresentationCue, { type: "runner_move" }>["action"] {
+  if (move.runner === "batter") return "batter_run";
+  if (throwKind === "pickoff") return "pickoff_return";
+  if (
+    throwKind === "caught_stealing" ||
+    ["SB2", "SB3", "SBH"].includes(event.cardId ?? "")
+  ) {
+    return "steal";
+  }
+  if (
+    battedFace === "F2" ||
+    battedFace === "F3" ||
+    battedFace === "FA" ||
+    event.cardId === "A3F" ||
+    event.cardId === "AHF"
+  ) {
+    return "tag_up";
+  }
+  if (resolutionCardId === "LDP") return "pickoff_return";
+  if (move.to === "home") return "score";
+  if (move.to === "out") return "force_play";
+  return "advance";
+}
+
 function inferOutDestination(event: GameEvent, move: RunnerMove): FieldPoint {
   if (event.cardId === "PO1" || event.cardId === "CO1") {
     return FIELD_POINTS.first;
@@ -486,6 +748,21 @@ function runnerMoveLabel(
   return isOutAttempt
     ? `${fromLabel}${from === "batter" ? "" : " 주자"} · ${toLabel} 승부`
     : `${fromLabel} → ${toLabel}`;
+}
+
+function runnerDestinationRank(destination: RunnerMove["to"]) {
+  if (destination === "home") return 4;
+  if (destination === "third") return 3;
+  if (destination === "second") return 2;
+  if (destination === "first") return 1;
+  return 0;
+}
+
+function runnerOriginRank(origin: RunnerMove["from"]) {
+  if (origin === "third") return 3;
+  if (origin === "second") return 2;
+  if (origin === "first") return 1;
+  return 0;
 }
 
 function throwLabel(
@@ -547,6 +824,21 @@ function isCaughtFace(face: BattingFace | HitFace) {
     face === "F3" ||
     face === "FA"
   );
+}
+
+function battedBallLabel(face: BattingFace | HitFace) {
+  if (face === "GF") return "땅볼";
+  if (face === "G3" || face === "GA") return "진루타";
+  if (face === "PO") return "내야 플라이";
+  if (face === "FO" || face === "F2" || face === "F3" || face === "FA") {
+    return "외야 플라이";
+  }
+  if (face === "HR") return "홈런 타구";
+  if (face === "HIT") return "안타성 타구";
+  if (face === "IH") return "내야 안타";
+  if (face === "D2" || face === "D3") return "2루타";
+  if (face === "T3") return "3루타";
+  return "외야 안타";
 }
 
 function hash(value: number) {

@@ -11,7 +11,9 @@ export { PITCH_TARGET_LABELS, PITCH_TARGETS, PITCH_TENDENCIES } from "./duel";
 export { chooseAiAction } from "./ai";
 export {
   buildPresentationCues,
+  buildPresentationScenes,
   getAudioCues,
+  hasResolutionOutcome,
   getPresentationBases,
   getPresentationDuration,
   getPitchLocation,

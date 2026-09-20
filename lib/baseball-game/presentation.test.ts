@@ -2,11 +2,21 @@ import { describe, expect, it } from "vitest";
 
 import {
   buildPresentationCues,
+  buildPresentationScenes,
   getPresentationBases,
   getPitchLocation,
   getPlateAppearancePitchHistory,
 } from "./presentation";
-import type { GameEvent, PitchFace, PresentationCue } from "./types";
+import { createGame, transition } from "./engine";
+import { BATTING_DIE_FACES, HIT_DIE_FACES } from "./rules";
+import type {
+  Bases,
+  BattingFace,
+  GameEvent,
+  HitFace,
+  PitchFace,
+  PresentationCue,
+} from "./types";
 
 function event(overrides: Partial<GameEvent>): GameEvent {
   return {
@@ -23,7 +33,149 @@ function event(overrides: Partial<GameEvent>): GameEvent {
   };
 }
 
+const BASE_COMBINATIONS: Bases[] = Array.from({ length: 8 }, (_, mask) => ({
+  first: Boolean(mask & 1),
+  second: Boolean(mask & 2),
+  third: Boolean(mask & 4),
+}));
+
+function emptyCardGame(
+  phase: "awaiting_batting" | "awaiting_hit",
+  bases: Bases,
+  outs: 0 | 1 | 2,
+) {
+  const state = createGame({
+    innings: 3,
+    awayTeamName: "원정",
+    homeTeamName: "홈",
+  });
+  state.phase = phase;
+  state.bases = { ...bases };
+  state.outs = outs;
+  state.cards = {
+    offense: { drawPile: [], hand: [], discardPile: [] },
+    defense: { drawPile: [], hand: [], discardPile: [] },
+  };
+  return state;
+}
+
+function resolveForPresentation(
+  face: BattingFace | HitFace,
+  bases: Bases,
+  outs: 0 | 1 | 2,
+) {
+  const battingFace = (BATTING_DIE_FACES as readonly string[]).includes(face);
+  const state = emptyCardGame(
+    battingFace ? "awaiting_batting" : "awaiting_hit",
+    bases,
+    outs,
+  );
+  const result = transition(
+    state,
+    battingFace
+      ? { type: "BATTING_RESULT", face: face as BattingFace }
+      : { type: "HIT_RESULT", face: face as HitFace },
+  );
+  if (!result.ok) throw new Error(result.error.message);
+  return buildPresentationCues(result.events);
+}
+
 describe("catcher-view-v1 presentation", () => {
+  it.each(
+    BASE_COMBINATIONS.flatMap((bases) =>
+      ([0, 1, 2] as const).flatMap((outs) =>
+        [...new Set(BATTING_DIE_FACES), ...new Set(HIT_DIE_FACES)].map(
+          (face) => [bases, outs, face] as const,
+        ),
+      ),
+    ),
+  )(
+    "only animates runners that exist for bases %o, %i outs, %s",
+    (bases, outs, face) => {
+      const cues = resolveForPresentation(face, bases, outs);
+      const runnerCues = cues.filter(
+        (cue): cue is Extract<PresentationCue, { type: "runner_move" }> =>
+          cue.type === "runner_move",
+      );
+
+      for (const cue of runnerCues) {
+        if (cue.move.runner === "batter") continue;
+        expect(bases[cue.move.runner]).toBe(true);
+      }
+
+      const tagUps = runnerCues.filter((cue) => cue.action === "tag_up");
+      if (tagUps.length > 0) {
+        expect(["F2", "F3", "FA"]).toContain(face);
+        expect(outs).toBeLessThan(2);
+      }
+
+      const firstSafeMove = runnerCues.findIndex(
+        (cue) => cue.move.to !== "out",
+      );
+      const lastOutMove = runnerCues.findLastIndex(
+        (cue) => cue.move.to === "out",
+      );
+      if (firstSafeMove >= 0 && lastOutMove >= 0) {
+        expect(lastOutMove).toBeLessThan(firstSafeMove);
+      }
+    },
+  );
+
+  it("groups a revision into a deterministic RTS-style scene", () => {
+    const events = [
+      event({
+        sequence: 7,
+        revision: 4,
+        kind: "pitch_result",
+        face: "C",
+        pitchTarget: "strike",
+        swingDecision: "swing",
+      }),
+      event({
+        sequence: 8,
+        revision: 4,
+        kind: "batted_ball",
+        face: "GF",
+      }),
+    ];
+
+    const [scene] = buildPresentationScenes(events);
+
+    expect(scene).toMatchObject({
+      id: "scene-4-7-8",
+      revision: 4,
+      template: "ground_play",
+      camera: "field",
+    });
+    expect(scene.beats.map((beat) => beat.phase)).toEqual([
+      "anticipation",
+      "anticipation",
+      "action",
+      "resolution",
+      "impact",
+    ]);
+    expect(scene.durationMs).toBe(
+      scene.beats.reduce(
+        (total, beat) => total + beat.durationMs + beat.holdMs,
+        0,
+      ),
+    );
+    expect(buildPresentationScenes(events)).toEqual([scene]);
+  });
+
+  it("keeps separate revisions as ordered scenes", () => {
+    const scenes = buildPresentationScenes([
+      event({ sequence: 1, revision: 2, kind: "pitch_result", face: "S" }),
+      event({ sequence: 2, revision: 3, face: "FO", die: "batting" }),
+    ]);
+
+    expect(scenes.map((scene) => scene.revision)).toEqual([2, 3]);
+    expect(scenes.map((scene) => scene.template)).toEqual([
+      "pitch_duel",
+      "fly_play",
+    ]);
+  });
+
   it("reveals pitcher and batter choices one at a time before the pitch", () => {
     const cues = buildPresentationCues([
       event({
@@ -212,6 +364,223 @@ describe("catcher-view-v1 presentation", () => {
     });
   });
 
+  it("does not invent a tag-up or runner animation on an empty-base fly ball", () => {
+    const cues = buildPresentationCues([
+      event({ sequence: 1, kind: "batted_ball", face: "F2" }),
+      event({
+        sequence: 2,
+        kind: "plate_appearance",
+        summary: "외야 플라이 아웃",
+        outsRecorded: 1,
+        moves: [{ runner: "batter", from: "batter", to: "out" }],
+      }),
+    ]);
+
+    expect(cues.map((cue) => cue.type)).toEqual([
+      "batted_ball",
+      "catch",
+      "decision",
+    ]);
+    expect(cues[0]).toMatchObject({ label: "외야 플라이" });
+    expect(cues.some((cue) => cue.type === "runner_move")).toBe(false);
+  });
+
+  it("orders representative batted plays from contact through the final call", () => {
+    const forcePlay = resolveForPresentation(
+      "GF",
+      { first: true, second: false, third: false },
+      0,
+    );
+    expect(
+      forcePlay.map((cue) =>
+        cue.type === "runner_move" ? `${cue.type}:${cue.action}` : cue.type,
+      ),
+    ).toEqual([
+      "batted_ball",
+      "runner_move:force_play",
+      "throw",
+      "decision",
+      "runner_move:batter_run",
+      "decision",
+    ]);
+
+    const tagUp = resolveForPresentation(
+      "F3",
+      { first: false, second: false, third: true },
+      0,
+    );
+    expect(
+      tagUp.map((cue) =>
+        cue.type === "runner_move" ? `${cue.type}:${cue.action}` : cue.type,
+      ),
+    ).toEqual([
+      "batted_ball",
+      "catch",
+      "decision",
+      "runner_move:tag_up",
+      "decision",
+    ]);
+
+    const single = resolveForPresentation(
+      "L2",
+      { first: true, second: true, third: true },
+      0,
+    );
+    expect(
+      single
+        .filter(
+          (cue): cue is Extract<PresentationCue, { type: "runner_move" }> =>
+            cue.type === "runner_move",
+        )
+        .map((cue) => cue.move),
+    ).toEqual([
+      { runner: "third", from: "third", to: "home" },
+      { runner: "second", from: "second", to: "home" },
+      { runner: "first", from: "first", to: "second" },
+      { runner: "batter", from: "batter", to: "first" },
+    ]);
+  });
+
+  it("adds a tag-up scene only for a runner contained in the outcome", () => {
+    const cues = buildPresentationCues([
+      event({ sequence: 1, kind: "batted_ball", face: "F2" }),
+      event({
+        sequence: 2,
+        kind: "plate_appearance",
+        summary: "F2 태그업",
+        outsRecorded: 1,
+        moves: [
+          { runner: "batter", from: "batter", to: "out" },
+          { runner: "second", from: "second", to: "third" },
+        ],
+      }),
+    ]);
+
+    expect(cues.filter((cue) => cue.type === "runner_move")).toEqual([
+      expect.objectContaining({
+        action: "tag_up",
+        move: { runner: "second", from: "second", to: "third" },
+      }),
+    ]);
+  });
+
+  it("carries the batted-ball context into a later card response revision", () => {
+    const scenes = buildPresentationScenes([
+      event({
+        sequence: 1,
+        revision: 1,
+        kind: "batted_ball",
+        face: "FA",
+      }),
+      event({
+        sequence: 2,
+        revision: 2,
+        kind: "card_play",
+        cardId: "AHF",
+        cardRole: "defense",
+      }),
+      event({
+        sequence: 3,
+        revision: 2,
+        kind: "plate_appearance",
+        summary: "홈 보살",
+        outsRecorded: 2,
+        moves: [
+          { runner: "batter", from: "batter", to: "out" },
+          { runner: "third", from: "third", to: "out" },
+        ],
+      }),
+    ]);
+    const responseCues = scenes[1].beats.map((beat) => beat.cue);
+
+    expect(responseCues.filter((cue) => cue.type === "runner_move")).toEqual([
+      expect.objectContaining({
+        action: "tag_up",
+        move: { runner: "third", from: "third", to: "out" },
+      }),
+    ]);
+    expect(
+      responseCues.some(
+        (cue) => cue.type === "runner_move" && cue.move.runner === "batter",
+      ),
+    ).toBe(false);
+  });
+
+  it("shows a line-drive catch before the runner is doubled off", () => {
+    const scenes = buildPresentationScenes([
+      event({
+        sequence: 1,
+        revision: 1,
+        kind: "batted_ball",
+        face: "HIT",
+      }),
+      event({
+        sequence: 2,
+        revision: 2,
+        kind: "card_resolve",
+        cardId: "LDP",
+        cardRole: "defense",
+      }),
+      event({
+        sequence: 3,
+        revision: 2,
+        kind: "plate_appearance",
+        summary: "직선타 병살",
+        outsRecorded: 2,
+        moves: [
+          { runner: "batter", from: "batter", to: "out" },
+          { runner: "first", from: "first", to: "out" },
+        ],
+      }),
+    ]);
+    const responseCues = scenes[1].beats.map((beat) => beat.cue);
+
+    expect(responseCues.map((cue) => cue.type)).toEqual([
+      "catch",
+      "decision",
+      "runner_move",
+      "throw",
+      "decision",
+    ]);
+    expect(responseCues[2]).toMatchObject({
+      type: "runner_move",
+      action: "pickoff_return",
+      move: { runner: "first", from: "first", to: "out" },
+    });
+  });
+
+  it("shows a foul catch without inventing a batter run or throw", () => {
+    const cues = buildPresentationCues([
+      event({ kind: "card_resolve", cardId: "FFO", cardRole: "defense" }),
+      event({
+        sequence: 2,
+        kind: "plate_appearance",
+        summary: "파울 플라이 아웃",
+        outsRecorded: 1,
+        moves: [{ runner: "batter", from: "batter", to: "out" }],
+      }),
+    ]);
+
+    expect(cues.map((cue) => cue.type)).toEqual(["catch", "decision"]);
+  });
+
+  it("collapses the intermediate HIT result when its final lane is known", () => {
+    const cues = buildPresentationCues([
+      event({ sequence: 1, kind: "batted_ball", face: "HIT" }),
+      event({ sequence: 2, kind: "batted_ball", face: "L1" }),
+      event({
+        sequence: 3,
+        kind: "plate_appearance",
+        summary: "L1 단타",
+        moves: [{ runner: "batter", from: "batter", to: "first" }],
+      }),
+    ]);
+
+    expect(cues.filter((cue) => cue.type === "batted_ball")).toEqual([
+      expect.objectContaining({ face: "L1", label: "외야 안타" }),
+    ]);
+  });
+
   it("represents a double play as two sequential throws and calls", () => {
     const cues = buildPresentationCues([
       event({ sequence: 1, die: "batting", face: "GF" }),
@@ -247,6 +616,7 @@ describe("catcher-view-v1 presentation", () => {
     ]);
     expect(cues[1]).toMatchObject({
       type: "runner_move",
+      action: "pickoff_return",
       label: "1루 주자 · 1루 승부",
       destination: { x: 540, y: 560 },
     });

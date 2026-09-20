@@ -5219,11 +5219,11 @@
 
 .bbg-ai-turn {
   display: grid;
-  min-height: 112px;
+  min-height: 68px;
   grid-template-columns: auto minmax(0, 1fr) auto;
   align-items: center;
   gap: 12px;
-  padding: 15px;
+  padding: 10px 12px;
   border: 1px solid rgba(112, 240, 186, 0.3);
   border-radius: 13px;
   background:
@@ -5248,25 +5248,13 @@
   letter-spacing: 0.08em;
 }
 
-.bbg-ai-turn > div {
-  display: grid;
-  min-width: 0;
-  gap: 4px;
-}
-
 .bbg-ai-turn strong {
+  min-width: 0;
   overflow: hidden;
   color: #f5fbff;
   font-size: 14px;
   text-overflow: ellipsis;
   white-space: nowrap;
-}
-
-.bbg-ai-turn p {
-  margin: 0;
-  color: var(--bbg-muted);
-  font-size: 9px;
-  line-height: 1.45;
 }
 
 .bbg-ai-turn > i {
@@ -6150,6 +6138,45 @@
 
   .bbg-mp-field-result strong {
     font-size: 9px;
+  }
+}
+
+.bbg-control-panel[data-presentation-active="true"],
+.bbg-mp-controls[data-presentation-active="true"] {
+  opacity: 0.62;
+  transition: opacity 180ms ease;
+}
+
+.bbg-stadium[data-scene="pitch_duel"] .bbg-catcher-zone {
+  box-shadow:
+    0 0 0 1px rgb(116 238 189 / 24%),
+    0 0 42px rgb(48 199 147 / 12%);
+}
+
+.bbg-stadium[data-scene="ground_play"] .bbg-field-overview,
+.bbg-stadium[data-scene="fly_play"] .bbg-field-overview,
+.bbg-stadium[data-scene="hit_play"] .bbg-field-overview,
+.bbg-stadium[data-scene="base_play"] .bbg-field-overview {
+  animation: bbg-scene-field-arrive 360ms ease-out both;
+}
+
+@keyframes bbg-scene-field-arrive {
+  from {
+    filter: brightness(0.8) saturate(0.82);
+  }
+  to {
+    filter: brightness(1) saturate(1);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .bbg-control-panel[data-presentation-active="true"],
+  .bbg-mp-controls[data-presentation-active="true"] {
+    transition: none;
+  }
+
+  .bbg-stadium[data-scene] .bbg-field-overview {
+    animation: none;
   }
 }
 

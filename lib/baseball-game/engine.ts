@@ -84,7 +84,7 @@ export function createGame(
   const state: GameState = {
     schemaVersion: 7,
     rulesetVersion: "pitch-duel-v3",
-    presentationVersion: "catcher-view-v1",
+    presentationVersion: "rts-scenes-v1",
     revision: 0,
     config: {
       innings: config.innings,
@@ -365,7 +365,7 @@ function cloneState(state: GameState): GameState {
     activeStrategy: state.activeStrategy ? { ...state.activeStrategy } : null,
     schemaVersion: 7,
     rulesetVersion: "pitch-duel-v3",
-    presentationVersion: "catcher-view-v1",
+    presentationVersion: "rts-scenes-v1",
     pitchDuel: state.pitchDuel
       ? {
           sequence: state.pitchDuel.sequence,
@@ -819,7 +819,10 @@ function resolveBattingFace(
 
   const outcome =
     face === "GF"
-      ? resolveGroundForce(state.bases, "선행주자 땅볼")
+      ? resolveGroundForce(
+          state.bases,
+          state.bases.first ? "선행주자 땅볼" : "땅볼 아웃",
+        )
       : face === "G3"
         ? resolveGroundThree(state.bases)
         : face === "GA"
@@ -878,7 +881,10 @@ function resolveGroundForce(
 
 function resolveGroundThree(bases: Bases): PlateAppearanceOutcome {
   const remaining = { ...bases, third: false };
-  const ground = resolveGroundForce(remaining, "3루 주자 진루 땅볼");
+  const ground = resolveGroundForce(
+    remaining,
+    remaining.first ? "선행주자 땅볼" : "땅볼 아웃",
+  );
   if (!bases.third) return ground;
 
   return {
@@ -899,7 +905,7 @@ function resolveGroundAdvance(bases: Bases): PlateAppearanceOutcome {
   if (bases.third) moves.push({ runner: "third", from: "third", to: "home" });
 
   return {
-    summary: "모든 주자 진루 땅볼",
+    summary: occupiedBaseCount(bases) > 0 ? "주자 진루 땅볼" : "땅볼 아웃",
     bases: { first: false, second: bases.first, third: bases.second },
     runs: bases.third ? 1 : 0,
     outsRecorded: 1,
@@ -955,7 +961,12 @@ function resolveTagUp(
   }
 
   return {
-    summary: `${face} 희생플라이`,
+    summary:
+      runs > 0
+        ? `${face} 희생플라이`
+        : moves.length > 1
+          ? `${face} 태그업`
+          : "외야 플라이 아웃",
     bases: nextBases,
     runs,
     outsRecorded: 1,

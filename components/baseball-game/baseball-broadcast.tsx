@@ -3,16 +3,14 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Volume2, VolumeX } from "lucide-react";
 import {
-  buildPresentationCues,
+  buildPresentationScenes,
   CARD_DEFINITIONS,
   FACE_LABELS,
   getAudioCues,
-  presentationCueDuration,
   PITCH_TARGET_LABELS,
   type GameEvent,
   type GameState,
   type GameView,
-  type PresentationCue,
   type TeamSide,
 } from "@/lib/baseball-game";
 
@@ -252,37 +250,93 @@ export function BaseballAudio({
 
 export function usePresentation(events: GameEvent[]) {
   const latestRevision = events.at(-1)?.revision ?? 0;
-  const cues = useMemo(
-    () =>
-      buildPresentationCues(
-        events.filter((event) => event.revision === latestRevision),
-      ),
-    [events, latestRevision],
+  const scenes = useMemo(() => buildPresentationScenes(events), [events]);
+  const [cursor, setCursor] = useState(() => ({
+    floorRevision: latestRevision,
+    sceneIndex: 0,
+    beatIndex: 0,
+  }));
+  const previousLogRef = useRef({
+    firstSequence: events.at(0)?.sequence ?? 0,
+    eventCount: events.length,
+    latestRevision,
+  });
+  const eligibleScenes = useMemo(
+    () => scenes.filter((scene) => scene.revision >= cursor.floorRevision),
+    [cursor.floorRevision, scenes],
   );
-  const [progress, setProgress] = useState({ revision: 0, index: 0 });
-  const cueIndex = progress.revision === latestRevision ? progress.index : 0;
-  const cueSignature = JSON.stringify(cues);
+  const scene = eligibleScenes[cursor.sceneIndex];
+  const beat = scene?.beats[cursor.beatIndex];
+  const cue = beat?.cue;
+  const beatId = beat?.id;
+  const beatDuration = beat ? beat.durationMs + beat.holdMs : 0;
+  const sceneBeatCount = scene?.beats.length ?? 0;
 
   useEffect(() => {
-    if (cues.length === 0) return;
-    const stableCues = JSON.parse(cueSignature) as PresentationCue[];
-    const activeCue = stableCues[cueIndex];
-    if (!activeCue) return;
+    const previous = previousLogRef.current;
+    const firstSequence = events.at(0)?.sequence ?? 0;
+    const reset =
+      latestRevision < previous.latestRevision ||
+      events.length < previous.eventCount ||
+      (previous.firstSequence !== 0 &&
+        firstSequence !== previous.firstSequence);
+    previousLogRef.current = {
+      firstSequence,
+      eventCount: events.length,
+      latestRevision,
+    };
+    if (!reset) return;
+    setCursor({
+      floorRevision: latestRevision,
+      sceneIndex: 0,
+      beatIndex: 0,
+    });
+  }, [events, latestRevision]);
+
+  useEffect(() => {
+    if (!beatId || sceneBeatCount === 0) return;
     const timer = window.setTimeout(() => {
-      setProgress({ revision: latestRevision, index: cueIndex + 1 });
-    }, presentationCueDuration(activeCue));
+      setCursor((current) =>
+        current.beatIndex + 1 < sceneBeatCount
+          ? { ...current, beatIndex: current.beatIndex + 1 }
+          : {
+              ...current,
+              sceneIndex: current.sceneIndex + 1,
+              beatIndex: 0,
+            },
+      );
+    }, beatDuration);
     return () => window.clearTimeout(timer);
-  }, [cueIndex, cueSignature, cues.length, latestRevision]);
+  }, [beatDuration, beatId, sceneBeatCount]);
+
+  const advanceBeat = () => {
+    if (!scene) return;
+    setCursor((current) =>
+      current.beatIndex + 1 < scene.beats.length
+        ? { ...current, beatIndex: current.beatIndex + 1 }
+        : {
+            ...current,
+            sceneIndex: current.sceneIndex + 1,
+            beatIndex: 0,
+          },
+    );
+  };
 
   return {
-    cue: cues[cueIndex] as PresentationCue | undefined,
-    cues,
-    index: cueIndex,
-    skip: () =>
-      setProgress({
-        revision: latestRevision,
-        index: Math.min(cueIndex + 1, cues.length),
-      }),
+    cue,
+    cues: scene?.beats.map((item) => item.cue) ?? [],
+    index: cursor.beatIndex,
+    scene,
+    sceneIndex: cursor.sceneIndex,
+    queuedScenes: Math.max(0, eligibleScenes.length - cursor.sceneIndex - 1),
+    isPresenting: Boolean(beat),
+    skip: advanceBeat,
+    skipScene: () =>
+      setCursor((current) => ({
+        ...current,
+        sceneIndex: current.sceneIndex + 1,
+        beatIndex: 0,
+      })),
   };
 }
 
@@ -337,7 +391,8 @@ export function getBaseballPlayReceipt(
       ),
     ),
   );
-  const latestOutcome = cycle.findLast((event) =>
+  const outcomeCycle = hasPendingPitch ? events.slice(commitIndex) : cycle;
+  const latestOutcome = outcomeCycle.findLast((event) =>
     [
       "game_end",
       "half_inning",

@@ -19,6 +19,7 @@ import {
 } from "@/components/baseball-game/baseball-broadcast";
 import { CARD_DEFINITIONS } from "@/lib/baseball-game/cards";
 import { PITCH_TARGET_LABELS } from "@/lib/baseball-game/duel";
+import { hasResolutionOutcome } from "@/lib/baseball-game/presentation";
 import type {
   MultiplayerCommand,
   MultiplayerRoomSnapshot,
@@ -324,6 +325,7 @@ function MultiplayerBoard({
   snapshot: MultiplayerRoomSnapshot;
   submitting: boolean;
 }) {
+  const [presentationActive, setPresentationActive] = useState(false);
   const game = snapshot.view;
   const ownRole: CardRole =
     snapshot.seat === game.battingTeam ? "offense" : "defense";
@@ -336,6 +338,11 @@ function MultiplayerBoard({
     [snapshot.legalCards],
   );
   const latestEvent = game.eventLog.at(-1);
+  const latestRevisionEvents = game.eventLog.filter(
+    (event) => event.revision === game.revision,
+  );
+  const concealingOutcome =
+    presentationActive && hasResolutionOutcome(latestRevisionEvents);
   const latestFace = game.eventLog.findLast(
     (event) =>
       event.kind === "pitch_result" ||
@@ -388,9 +395,10 @@ function MultiplayerBoard({
         <BaseballStadium
           face={latestFace}
           game={game}
-          key={`multiplayer-field-${game.revision}`}
+          onPresentationChange={setPresentationActive}
         />
         {snapshot.status !== "lobby" &&
+        !presentationActive &&
         snapshot.isYourTurn &&
         (game.phase === "awaiting_pitch" || game.phase === "awaiting_swing") ? (
           <div className="bbg-choice-dock">
@@ -410,18 +418,36 @@ function MultiplayerBoard({
         ) : null}
         <div className="bbg-mp-field-result" aria-live="polite">
           <span className="bbg-mp-result-token" aria-hidden="true">
-            <small>{latestFace ? "PLAY" : "NEXT"}</small>
-            <b>{latestFace ?? "▶"}</b>
+            <small>
+              {concealingOutcome ? "LIVE" : latestFace ? "PLAY" : "NEXT"}
+            </small>
+            <b>{concealingOutcome ? "•" : (latestFace ?? "▶")}</b>
           </span>
           <div className="bbg-mp-result-copy">
-            <small>{latestEvent ? "방금 판정" : "PLAY BALL"}</small>
-            <strong>{latestEvent?.summary ?? "첫 투구를 준비하세요"}</strong>
-            <BaseballPlayReceipt game={game} />
+            <small>
+              {concealingOutcome
+                ? "NOW PLAYING"
+                : latestEvent
+                  ? "방금 판정"
+                  : "PLAY BALL"}
+            </small>
+            <strong>
+              {concealingOutcome
+                ? "플레이 진행 중"
+                : (latestEvent?.summary ?? "첫 투구를 준비하세요")}
+            </strong>
+            {concealingOutcome ? null : <BaseballPlayReceipt game={game} />}
           </div>
         </div>
       </section>
 
-      <aside className="bbg-mp-controls" aria-label="멀티플레이 조작부">
+      <aside
+        aria-busy={presentationActive}
+        aria-label="멀티플레이 조작부"
+        className="bbg-mp-controls"
+        data-presentation-active={presentationActive}
+        inert={presentationActive ? true : undefined}
+      >
         <div className="bbg-panel-heading bbg-mp-panel-heading">
           <div>
             <p>ON DECK</p>

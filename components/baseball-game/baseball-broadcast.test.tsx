@@ -126,6 +126,45 @@ describe("broadcast UI", () => {
     expect(result.current.cue?.type).toBe("pitch");
   });
 
+  it("queues a newer server revision until the current scene completes", () => {
+    vi.useFakeTimers();
+    const first: GameEvent = {
+      sequence: 1,
+      revision: 1,
+      inning: 1,
+      half: "top",
+      kind: "pitch_result",
+      summary: "스트라이크",
+      face: "S",
+      runs: 0,
+      outsRecorded: 0,
+      moves: [],
+    };
+    const second: GameEvent = {
+      ...first,
+      sequence: 2,
+      revision: 2,
+      kind: "batted_ball",
+      summary: "외야 뜬공",
+      face: "FO",
+    };
+    const { result, rerender } = renderHook(
+      ({ events }) => usePresentation(events),
+      { initialProps: { events: [first] } },
+    );
+
+    expect(result.current.scene?.revision).toBe(1);
+    rerender({ events: [first, second] });
+    expect(result.current.scene?.revision).toBe(1);
+    expect(result.current.queuedScenes).toBe(1);
+
+    act(() => vi.advanceTimersByTime(850));
+    expect(result.current.cue).toEqual({ type: "call", call: "strike" });
+    act(() => vi.advanceTimersByTime(1_350));
+    expect(result.current.scene?.revision).toBe(2);
+    expect(result.current.cue?.type).toBe("batted_ball");
+  });
+
   it("keeps pitcher, batter, card and ruling visible as one play receipt", () => {
     const game = createGame(CONFIG);
     game.phase = "awaiting_pitch";
@@ -204,6 +243,42 @@ describe("broadcast UI", () => {
       {
         sequence: 1,
         revision: 1,
+        inning: 1,
+        half: "top",
+        kind: "pitch_commit",
+        summary: "투수가 코스를 선택했습니다.",
+        runs: 0,
+        outsRecorded: 0,
+        moves: [],
+      },
+    ];
+
+    expect(getBaseballPlayReceipt(game)).toEqual({
+      pitcher: "선택 완료",
+      batter: "판단 중",
+      cards: "대기",
+      result: "대기",
+    });
+  });
+
+  it("does not carry the previous at-bat ruling into a newly locked pitch", () => {
+    const game = createGame(CONFIG);
+    game.phase = "awaiting_swing";
+    game.eventLog = [
+      {
+        sequence: 1,
+        revision: 1,
+        inning: 1,
+        half: "top",
+        kind: "plate_appearance",
+        summary: "땅볼 아웃",
+        runs: 0,
+        outsRecorded: 1,
+        moves: [{ runner: "batter", from: "batter", to: "out" }],
+      },
+      {
+        sequence: 2,
+        revision: 2,
         inning: 1,
         half: "top",
         kind: "pitch_commit",

@@ -163,14 +163,17 @@ describe("BaseballGameDebug", () => {
     });
     expect(screen.getByTestId("play-result")).toBeVisible();
     expect(screen.getByTestId("play-result")).toHaveTextContent(
+      "플레이 진행 중",
+    );
+    expect(screen.getByTestId("play-result")).not.toHaveTextContent(
       "F3 희생플라이",
     );
     expect(
       screen.getByRole("list", { name: "현재 타자 누적 투구" }),
     ).toBeVisible();
-    expect(screen.getByLabelText("현재 승부 진행 기록")).toHaveTextContent(
-      "투수볼",
-    );
+    expect(
+      screen.queryByLabelText("현재 승부 진행 기록"),
+    ).not.toBeInTheDocument();
     expect(
       document.querySelector(".bbg-pitch-marker[data-current='true']"),
     ).toBeVisible();
@@ -186,6 +189,12 @@ describe("BaseballGameDebug", () => {
     while (advanceScene()) {
       // Every tap advances exactly one scene until the play is complete.
     }
+    expect(screen.getByTestId("play-result")).toHaveTextContent(
+      "외야 플라이 아웃",
+    );
+    expect(screen.getByLabelText("현재 승부 진행 기록")).toHaveTextContent(
+      "투수볼",
+    );
     expect(
       screen.queryByRole("button", {
         name: /현재 연출 \d+\/\d+, 다음 장면 보기/,
@@ -336,6 +345,95 @@ describe("BaseballGameDebug", () => {
     expect(container.querySelector(".bbg-fence")).toBeVisible();
   });
 
+  it("keeps the batting flight hidden until the contact scene reaches the field", () => {
+    vi.useFakeTimers();
+    const game = createGame({
+      innings: 3,
+      awayTeamName: "원정팀",
+      homeTeamName: "홈팀",
+    });
+    game.phase = "awaiting_pitch";
+    game.bases.first = true;
+    game.eventLog = [
+      {
+        sequence: 1,
+        revision: 1,
+        inning: 1,
+        half: "top",
+        kind: "pitch_result",
+        summary: "스트라이크 · 스윙 · 컨택",
+        face: "C",
+        pitchTarget: "strike",
+        swingDecision: "swing",
+        duelWinner: "batter",
+        runs: 0,
+        outsRecorded: 0,
+        moves: [],
+      },
+      {
+        sequence: 2,
+        revision: 1,
+        inning: 1,
+        half: "top",
+        kind: "batted_ball",
+        summary: "타구 판정 · GF",
+        face: "GF",
+        runs: 0,
+        outsRecorded: 0,
+        moves: [],
+      },
+      {
+        sequence: 3,
+        revision: 1,
+        inning: 1,
+        half: "top",
+        kind: "plate_appearance",
+        summary: "선행주자 땅볼",
+        runs: 0,
+        outsRecorded: 1,
+        moves: [
+          { runner: "batter", from: "batter", to: "first" },
+          { runner: "first", from: "first", to: "out" },
+        ],
+      },
+    ];
+
+    const { container } = render(<BaseballStadium face="GF" game={game} />);
+    const advance = () =>
+      fireEvent.click(
+        screen.getByRole("button", {
+          name: /현재 연출 \d+\/\d+, 다음 장면 보기/,
+        }),
+      );
+
+    for (const expected of ["투수 선택", "타자 선택", "1구", "CONTACT"]) {
+      expect(container.querySelector(".bbg-stadium")).toHaveAttribute(
+        "data-camera",
+        "catcher",
+      );
+      expect(
+        container.querySelector(".bbg-ball-flight"),
+      ).not.toBeInTheDocument();
+      expect(
+        screen.getByRole("button", {
+          name: /현재 연출 \d+\/\d+, 다음 장면 보기/,
+        }),
+      ).toHaveTextContent(expected);
+      advance();
+    }
+
+    expect(container.querySelector(".bbg-stadium")).toHaveAttribute(
+      "data-camera",
+      "field",
+    );
+    expect(container.querySelector(".bbg-ball-flight")).toBeVisible();
+    expect(
+      screen.getByRole("button", {
+        name: /현재 연출 \d+\/\d+, 다음 장면 보기/,
+      }),
+    ).toHaveTextContent("타격땅볼");
+  });
+
   it("shows a pickoff as runner movement, a live throw and a held ruling", () => {
     vi.useFakeTimers();
     const game = createGame({
@@ -378,7 +476,7 @@ describe("BaseballGameDebug", () => {
       screen.getByRole("button", {
         name: "현재 연출 2/3, 다음 장면 보기",
       }),
-    ).toHaveTextContent("주자 출발1루 주자 · 1루 승부");
+    ).toHaveTextContent("귀루1루 주자 · 1루 승부");
 
     act(() => vi.advanceTimersByTime(1_100));
     expect(

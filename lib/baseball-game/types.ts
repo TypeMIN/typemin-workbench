@@ -206,6 +206,7 @@ export type PresentationCue =
       type: "batted_ball";
       face: BattingFace | HitFace;
       variation: number;
+      label: string;
     }
   | { type: "catch"; location: FieldPoint; label: string }
   | {
@@ -221,6 +222,14 @@ export type PresentationCue =
       origin: FieldPoint;
       destination: FieldPoint;
       label: string;
+      action:
+        | "batter_run"
+        | "advance"
+        | "tag_up"
+        | "steal"
+        | "pickoff_return"
+        | "force_play"
+        | "score";
     }
   | {
       type: "decision";
@@ -228,6 +237,41 @@ export type PresentationCue =
       label: string;
       camera: "catcher" | "field";
     };
+
+export type PresentationSceneTemplate =
+  | "pitch_duel"
+  | "card_action"
+  | "ground_play"
+  | "fly_play"
+  | "hit_play"
+  | "base_play"
+  | "inning_change"
+  | "game_end"
+  | "generic";
+
+export type PresentationSceneCamera =
+  "catcher" | "field" | "base" | "scoreboard";
+
+export type PresentationBeatPhase =
+  "anticipation" | "action" | "impact" | "resolution" | "settle";
+
+export type PresentationBeat = {
+  id: string;
+  phase: PresentationBeatPhase;
+  cue: PresentationCue;
+  durationMs: number;
+  holdMs: number;
+};
+
+export type PresentationScene = {
+  id: string;
+  revision: number;
+  template: PresentationSceneTemplate;
+  camera: PresentationSceneCamera;
+  seed: number;
+  beats: PresentationBeat[];
+  durationMs: number;
+};
 
 export type AudioCue =
   | "pitch"
@@ -280,7 +324,7 @@ export type GameEvent = {
 export type GameState = {
   schemaVersion: 7;
   rulesetVersion: "pitch-duel-v3";
-  presentationVersion: "catcher-view-v1";
+  presentationVersion: "rts-scenes-v1";
   revision: number;
   config: GameConfig;
   phase: GamePhase;

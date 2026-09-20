@@ -27,6 +27,7 @@ import {
   BaseballPlayReceipt,
   BroadcastLineScore,
 } from "@/components/baseball-game/baseball-broadcast";
+import { hasResolutionOutcome } from "@/lib/baseball-game/presentation";
 import type {
   PartyHostCommand,
   PartyPlayer,
@@ -496,8 +497,14 @@ function PartyLive({
   onHost: (command: PartyHostCommand) => void;
   snapshot: PartyPublicSnapshot;
 }) {
+  const [presentationActive, setPresentationActive] = useState(false);
   const game = snapshot.view;
   const latest = game.eventLog.at(-1);
+  const latestRevisionEvents = game.eventLog.filter(
+    (event) => event.revision === game.revision,
+  );
+  const concealingOutcome =
+    presentationActive && hasResolutionOutcome(latestRevisionEvents);
   const face = game.eventLog.findLast(
     (event) => event.kind === "die_roll",
   )?.face;
@@ -514,13 +521,21 @@ function PartyLive({
       >
         <PartyScoreboard game={game} />
         <BaseballAudio events={game.eventLog} />
-        <BaseballStadium face={face} game={game} key={game.revision} />
+        <BaseballStadium
+          face={face}
+          game={game}
+          onPresentationChange={setPresentationActive}
+        />
         <div className="bbg-party-live-result">
-          <span>{face ?? "▶"}</span>
+          <span>{concealingOutcome ? "•" : (face ?? "▶")}</span>
           <div>
-            <small>방금 판정</small>
-            <strong>{latest?.summary ?? "경기 시작"}</strong>
-            <BaseballPlayReceipt game={game} />
+            <small>{concealingOutcome ? "NOW PLAYING" : "방금 판정"}</small>
+            <strong>
+              {concealingOutcome
+                ? "플레이 진행 중"
+                : (latest?.summary ?? "경기 시작")}
+            </strong>
+            {concealingOutcome ? null : <BaseballPlayReceipt game={game} />}
           </div>
         </div>
       </section>
