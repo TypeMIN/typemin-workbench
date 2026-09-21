@@ -454,7 +454,14 @@ describe("BaseballGameDebug", () => {
         cardId: "PO1",
         runs: 0,
         outsRecorded: 1,
-        moves: [{ runner: "first", from: "first", to: "out" }],
+        moves: [
+          {
+            runner: "first",
+            from: "first",
+            to: "out",
+            outAt: "first",
+          },
+        ],
       },
     ];
 
@@ -464,6 +471,10 @@ describe("BaseballGameDebug", () => {
       "field",
     );
     expect(container.querySelector(".bbg-live-throw")).toBeVisible();
+    expect(container.querySelector(".bbg-throw-route")).toHaveAttribute(
+      "d",
+      expect.stringContaining(" Q"),
+    );
     expect(
       screen.getByRole("button", {
         name: "현재 연출 1/3, 다음 장면 보기",
@@ -472,6 +483,10 @@ describe("BaseballGameDebug", () => {
 
     act(() => vi.advanceTimersByTime(1_100));
     expect(container.querySelector(".bbg-live-runner")).toBeVisible();
+    expect(container.querySelector(".bbg-runner-route")).toHaveAttribute(
+      "d",
+      expect.stringContaining(" Q"),
+    );
     expect(
       screen.getByRole("button", {
         name: "현재 연출 2/3, 다음 장면 보기",

@@ -845,7 +845,7 @@ function resolveGroundForce(
       summary,
       bases: { ...bases },
       outsRecorded: 1,
-      moves: [{ runner: "batter", from: "batter", to: "out" }],
+      moves: [{ runner: "batter", from: "batter", to: "out", outAt: "first" }],
     };
   }
 
@@ -865,13 +865,19 @@ function resolveGroundForce(
       runner: bases.third ? "third" : "second",
       from: bases.third ? "third" : "second",
       to: "out",
+      outAt: bases.third ? "home" : "third",
     });
     if (!bases.third) nextBases.third = false;
     if (bases.third) {
       moves.push({ runner: "second", from: "second", to: "third" });
     }
   } else {
-    moves.push({ runner: "first", from: "first", to: "out" });
+    moves.push({
+      runner: "first",
+      from: "first",
+      to: "out",
+      outAt: "second",
+    });
     moves.splice(1, 1);
     nextBases.second = false;
   }
@@ -898,7 +904,9 @@ function resolveGroundThree(bases: Bases): PlateAppearanceOutcome {
 }
 
 function resolveGroundAdvance(bases: Bases): PlateAppearanceOutcome {
-  const moves: RunnerMove[] = [{ runner: "batter", from: "batter", to: "out" }];
+  const moves: RunnerMove[] = [
+    { runner: "batter", from: "batter", to: "out", outAt: "first" },
+  ];
   if (bases.first) moves.push({ runner: "first", from: "first", to: "second" });
   if (bases.second)
     moves.push({ runner: "second", from: "second", to: "third" });
@@ -1784,7 +1792,7 @@ function resolvePrimaryCard(
       summary: "주자 묶어두기",
       bases: { ...state.bases },
       outsRecorded: 1,
-      moves: [{ runner: "batter", from: "batter", to: "out" }],
+      moves: [{ runner: "batter", from: "batter", to: "out", outAt: "first" }],
     });
   }
 }
@@ -1989,13 +1997,33 @@ function recordRunnerOut(
     summary,
     cardId,
     outsRecorded: 1,
-    moves: [{ runner: base, from: base, to: "out" }],
+    moves: [
+      {
+        runner: base,
+        from: base,
+        to: "out",
+        outAt: cardOutDestination(cardId, base),
+      },
+    ],
   });
   if (state.outs === 2) {
     advanceHalfInning(state, events);
   } else {
     state.outs = (state.outs + 1) as GameState["outs"];
   }
+}
+
+function cardOutDestination(
+  cardId: CardId,
+  base: "first" | "second" | "third",
+): "first" | "second" | "third" | "home" {
+  if (cardId === "PO1" || cardId === "CO1") return "first";
+  if (cardId === "PO2") return "second";
+  if (cardId === "CO3") return "third";
+  if (cardId === "CS2") return "second";
+  if (cardId === "CS3") return "third";
+  if (cardId === "CSH") return "home";
+  return base === "first" ? "second" : base === "second" ? "third" : "home";
 }
 
 function resolveSuccessfulSteal(
@@ -2046,7 +2074,7 @@ function squeezeOutcome(
       ...(bases.third
         ? ([{ runner: "third", from: "third", to: "home" }] as RunnerMove[])
         : []),
-      { runner: "batter", from: "batter", to: "out" },
+      { runner: "batter", from: "batter", to: "out", outAt: "first" },
     ],
   };
 }
@@ -2070,8 +2098,18 @@ function doublePlayOutcome(bases: Bases): PlateAppearanceOutcome {
     bases: { ...bases, [forcedOut]: false },
     outsRecorded: 2,
     moves: [
-      { runner: forcedOut, from: forcedOut, to: "out" },
-      { runner: "batter", from: "batter", to: "out" },
+      {
+        runner: forcedOut,
+        from: forcedOut,
+        to: "out",
+        outAt:
+          forcedOut === "first"
+            ? "second"
+            : forcedOut === "second"
+              ? "third"
+              : "home",
+      },
+      { runner: "batter", from: "batter", to: "out", outAt: "first" },
     ],
   };
 }
@@ -2089,8 +2127,14 @@ function triplePlayOutcome(bases: Bases): PlateAppearanceOutcome {
         runner,
         from: runner,
         to: "out" as const,
+        outAt:
+          runner === "first"
+            ? ("second" as const)
+            : runner === "second"
+              ? ("third" as const)
+              : ("home" as const),
       })),
-      { runner: "batter", from: "batter", to: "out" },
+      { runner: "batter", from: "batter", to: "out", outAt: "first" },
     ],
   };
 }
@@ -2106,7 +2150,7 @@ function lineDriveDoublePlayOutcome(
     outsRecorded: 2,
     moves: [
       { runner: "batter", from: "batter", to: "out" },
-      { runner, from: runner, to: "out" },
+      { runner, from: runner, to: "out", outAt: runner },
     ],
   };
 }
@@ -2125,7 +2169,7 @@ function runnerHitByBallOutcome(bases: Bases): PlateAppearanceOutcome {
     bases: nextBases,
     outsRecorded: 1,
     moves: [
-      { runner, from: runner, to: "out" },
+      { runner, from: runner, to: "out", outAt: runner },
       ...(firstForced
         ? ([{ runner: "first", from: "first", to: "second" }] as RunnerMove[])
         : []),
@@ -2143,7 +2187,7 @@ function flyAssistOutcome(
   const runner = cardId === "A3F" ? "second" : "third";
   const destination = cardId === "A3F" ? "third" : "home";
   const moves = (outcome.moves ?? []).filter((move) => move.runner !== runner);
-  moves.push({ runner, from: runner, to: "out" });
+  moves.push({ runner, from: runner, to: "out", outAt: destination });
   return {
     ...outcome,
     summary: CARD_DEFINITIONS[cardId].name,
@@ -2182,7 +2226,12 @@ function hitAssistOutcome(
     outsRecorded: 1,
     moves: [
       ...(outcome.moves ?? []).filter((move) => move.runner !== runner),
-      { runner, from: runner, to: "out" },
+      {
+        runner,
+        from: runner,
+        to: "out",
+        outAt: safeMove?.to && safeMove.to !== "out" ? safeMove.to : undefined,
+      },
     ],
   };
 }
@@ -2268,7 +2317,12 @@ function buntDefenseOutcome(bases: Bases): PlateAppearanceOutcome {
   const lead = bases.third ? "third" : bases.second ? "second" : "first";
   const nextBases: Bases = { first: true, second: false, third: false };
   const moves: RunnerMove[] = [
-    { runner: lead, from: lead, to: "out" },
+    {
+      runner: lead,
+      from: lead,
+      to: "out",
+      outAt: lead === "first" ? "second" : lead === "second" ? "third" : "home",
+    },
     { runner: "batter", from: "batter", to: "first" },
   ];
   if ((lead === "second" || lead === "third") && bases.first) {

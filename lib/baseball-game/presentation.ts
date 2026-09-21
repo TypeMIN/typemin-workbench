@@ -326,30 +326,44 @@ export function buildPresentationCues(
           });
           continue;
         }
+        if (resolutionCardId === "RHB" && move.runner !== "batter") {
+          cues.push({
+            type: "decision",
+            result: "out",
+            label: "타구 맞음 · 주자 아웃",
+            camera: "field",
+          });
+          continue;
+        }
         const destination = inferOutDestination(event, move);
         const kind = inferThrowKind(event);
+        const action = inferRunnerAction(
+          event,
+          move,
+          battedFace,
+          kind,
+          resolutionCardId,
+        );
         const origin =
-          kind === "pickoff"
+          kind === "pickoff" || action === "pickoff_return"
             ? leadOffPoint(move.from)
             : FIELD_POINTS[move.from];
+        const runnerPath = buildRunnerPath(move, origin, destination, action);
+        const throwFrom = inferThrowStart(event, kind, throwOrigin);
         const runnerCue: PresentationCue = {
           type: "runner_move",
           move,
           origin,
           destination,
+          path: runnerPath,
           label: runnerMoveLabel(move.from, destination, true),
-          action: inferRunnerAction(
-            event,
-            move,
-            battedFace,
-            kind,
-            resolutionCardId,
-          ),
+          action,
         };
         const throwCue: PresentationCue = {
           type: "throw",
-          from: inferThrowStart(event, kind, throwOrigin),
+          from: throwFrom,
           to: destination,
+          path: buildThrowPath(throwFrom, destination),
           kind,
           label: throwLabel(event, destination, kind),
         };
@@ -366,31 +380,40 @@ export function buildPresentationCues(
           camera: "field",
         });
       } else {
+        const origin = FIELD_POINTS[move.from];
+        const destination = FIELD_POINTS[move.to];
+        const action = inferRunnerAction(
+          event,
+          move,
+          battedFace,
+          "throw",
+          resolutionCardId,
+        );
         cues.push({
           type: "runner_move",
           move,
-          origin: FIELD_POINTS[move.from],
-          destination: FIELD_POINTS[move.to],
-          label: runnerMoveLabel(move.from, FIELD_POINTS[move.to], false),
-          action: inferRunnerAction(
-            event,
-            move,
-            battedFace,
-            "throw",
-            resolutionCardId,
-          ),
+          origin,
+          destination,
+          path: buildRunnerPath(move, origin, destination, action),
+          label: runnerMoveLabel(move.from, destination, false),
+          action,
         });
       }
     }
     if (event.cardId === "POE" && safeMoves.length > 0) {
       const pickoffBase = safeMoves.find((move) => move.to !== "home")?.from;
       if (pickoffBase && pickoffBase !== "batter") {
+        const missedTarget = {
+          x: FIELD_POINTS[pickoffBase].x + (pickoffBase === "first" ? 38 : -28),
+          y: FIELD_POINTS[pickoffBase].y - 24,
+        };
         cues.splice(Math.max(0, cues.length - safeMoves.length), 0, {
           type: "throw",
           from: FIELD_POINTS.out,
-          to: FIELD_POINTS[pickoffBase],
-          kind: "pickoff",
-          label: "견제 송구",
+          to: missedTarget,
+          path: buildThrowPath(FIELD_POINTS.out, missedTarget),
+          kind: "error",
+          label: "견제 악송구",
         });
       }
     }
@@ -627,8 +650,13 @@ export function getAudioCues(events: GameEvent[]): AudioCue[] {
     }
     if (event.kind === "die_roll" && event.die === "hit") cues.push("contact");
     if (event.face === "HR" || event.cardId === "HRC") cues.push("home_run");
-    if (event.moves.some((move) => move.to === "out"))
-      cues.push("throw", "out");
+    if (event.moves.some((move) => move.to === "out")) {
+      const needsThrow =
+        !event.summary.includes("타구에 맞은") &&
+        event.moves.some((move) => move.to === "out" && Boolean(move.outAt));
+      if (needsThrow) cues.push("throw");
+      cues.push("out");
+    }
     if (event.runs > 0) cues.push("score");
     if (event.kind === "count") {
       if (event.summary.startsWith("볼")) cues.push("mitt", "ball");
@@ -708,6 +736,7 @@ function inferRunnerAction(
 }
 
 function inferOutDestination(event: GameEvent, move: RunnerMove): FieldPoint {
+  if (move.outAt) return FIELD_POINTS[move.outAt];
   if (event.cardId === "PO1" || event.cardId === "CO1") {
     return FIELD_POINTS.first;
   }
@@ -720,6 +749,53 @@ function inferOutDestination(event: GameEvent, move: RunnerMove): FieldPoint {
   if (move.from === "first") return FIELD_POINTS.second;
   if (move.from === "second") return FIELD_POINTS.third;
   return FIELD_POINTS.home;
+}
+
+function buildRunnerPath(
+  move: RunnerMove,
+  origin: FieldPoint,
+  destination: FieldPoint,
+  action: Extract<PresentationCue, { type: "runner_move" }>["action"],
+) {
+  if (action === "pickoff_return") {
+    return curvedFieldPath(origin, destination, 10);
+  }
+
+  const target = move.to === "out" ? move.outAt : move.to;
+  if (!target) return straightFieldPath(origin, destination);
+
+  const start = move.from === "batter" ? "home" : move.from;
+  const order = ["home", "first", "second", "third", "home"] as const;
+  const startIndex = start === "home" ? 0 : order.indexOf(start);
+  let targetIndex = order.indexOf(target, startIndex + 1);
+  if (target === start && move.runner === "batter")
+    targetIndex = order.length - 1;
+  if (targetIndex < 0) return straightFieldPath(origin, destination);
+
+  const points: FieldPoint[] = [origin];
+  for (let index = startIndex + 1; index <= targetIndex; index += 1) {
+    points.push(FIELD_POINTS[order[index]]);
+  }
+  if (points.length === 1) points.push(destination);
+  return points
+    .map((point, index) => `${index === 0 ? "M" : "L"}${point.x} ${point.y}`)
+    .join(" ");
+}
+
+function buildThrowPath(from: FieldPoint, to: FieldPoint) {
+  const distance = Math.hypot(to.x - from.x, to.y - from.y);
+  const lift = Math.min(54, Math.max(18, distance * 0.16));
+  return curvedFieldPath(from, to, lift);
+}
+
+function curvedFieldPath(from: FieldPoint, to: FieldPoint, lift: number) {
+  const midpointX = (from.x + to.x) / 2;
+  const midpointY = (from.y + to.y) / 2 - lift;
+  return `M${from.x} ${from.y} Q${midpointX} ${midpointY} ${to.x} ${to.y}`;
+}
+
+function straightFieldPath(from: FieldPoint, to: FieldPoint) {
+  return `M${from.x} ${from.y} L${to.x} ${to.y}`;
 }
 
 function leadOffPoint(from: RunnerOrigin): FieldPoint {

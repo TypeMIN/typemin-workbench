@@ -3383,6 +3383,7 @@
 }
 
 .bbg-ball-trail-shadow,
+.bbg-ball-trail-glow,
 .bbg-ball-trail {
   fill: none;
   stroke-linecap: round;
@@ -3391,6 +3392,13 @@
 .bbg-ball-trail-shadow {
   stroke: rgba(0, 0, 0, 0.5);
   stroke-width: 11;
+}
+
+.bbg-ball-trail-glow {
+  stroke: rgb(255 239 174 / 26%);
+  stroke-width: 12;
+  filter: blur(5px);
+  animation: bbg-trail-glow 820ms ease-out both;
 }
 
 .bbg-ball-trail {
@@ -3416,6 +3424,12 @@
   stroke-width: 2;
 }
 
+.bbg-live-ball-shadow {
+  fill: rgb(0 0 0 / 32%);
+  transform: translate(4px, 6px);
+  filter: blur(2px);
+}
+
 .bbg-ball-landing {
   fill: rgba(255, 209, 102, 0.18);
   stroke: #ffe19b;
@@ -3423,6 +3437,25 @@
   transform-box: fill-box;
   transform-origin: center;
   animation: bbg-landing-pulse 900ms 650ms ease-out both;
+}
+
+.bbg-ball-landing--inner {
+  fill: rgb(255 225 155 / 28%);
+  stroke-width: 2;
+  animation-delay: 720ms;
+}
+
+.bbg-ground-bounces circle {
+  fill: rgb(244 215 174 / 22%);
+  stroke: #f4d7ae;
+  stroke-width: 2;
+  transform-box: fill-box;
+  transform-origin: center;
+  animation: bbg-ground-bounce 360ms ease-out both;
+}
+
+.bbg-ground-bounces circle:last-child {
+  animation-delay: 260ms;
 }
 
 .bbg-flight-label rect {
@@ -3458,6 +3491,36 @@
   to {
     opacity: 1;
     stroke-dashoffset: 0;
+  }
+}
+
+@keyframes bbg-trail-glow {
+  from {
+    opacity: 0;
+    stroke-dasharray: 0 420;
+  }
+
+  to {
+    opacity: 1;
+    stroke-dasharray: 420 0;
+  }
+}
+
+@keyframes bbg-ground-bounce {
+  0%,
+  45% {
+    opacity: 0;
+    transform: scale(0.25);
+  }
+
+  72% {
+    opacity: 1;
+    transform: scale(1.55);
+  }
+
+  100% {
+    opacity: 0.28;
+    transform: scale(0.8);
   }
 }
 
@@ -8983,18 +9046,37 @@
 .bbg-presentation-cue[data-result="score"] {
   color: #ffd76b;
 }
-.bbg-throw-cue path,
-.bbg-runner-cue path {
+.bbg-throw-route,
+.bbg-runner-route,
+.bbg-throw-route-shadow,
+.bbg-runner-route-shadow {
   fill: none;
-  stroke: #fff3a1;
-  stroke-width: 4;
   stroke-linecap: round;
   stroke-dasharray: 12 9;
-  animation: bbg-route 460ms linear both;
+  animation: bbg-route 700ms cubic-bezier(0.22, 0.75, 0.2, 1) both;
+}
+.bbg-throw-route-shadow,
+.bbg-runner-route-shadow {
+  stroke: rgb(0 0 0 / 48%);
+  stroke-width: 12;
+  stroke-dasharray: none;
+  filter: blur(1.5px);
+}
+.bbg-throw-route {
+  stroke: #fff3a1;
+  stroke-width: 4;
+  filter: drop-shadow(0 0 7px rgb(255 235 142 / 55%));
 }
 .bbg-live-throw {
   fill: white;
+  stroke: #cb3044;
+  stroke-width: 1.5;
   filter: url(#ball-glow);
+}
+.bbg-live-throw-shadow {
+  fill: rgb(0 0 0 / 32%);
+  transform: translate(3px, 5px);
+  filter: blur(2px);
 }
 .bbg-throw-target {
   fill: rgb(255 238 157 / 14%);
@@ -9004,19 +9086,32 @@
   transform-origin: center;
   animation: bbg-field-target 760ms ease-out both;
 }
-.bbg-throw-cue[data-kind="pickoff"] path,
+.bbg-throw-target--inner {
+  fill: rgb(255 238 157 / 26%);
+  stroke-width: 2;
+  animation-delay: 170ms;
+}
+.bbg-throw-cue[data-kind="pickoff"] .bbg-throw-route,
 .bbg-throw-cue[data-kind="pickoff"] .bbg-throw-target {
   stroke: #ffbe66;
 }
-.bbg-throw-cue[data-kind="caught_stealing"] path,
+.bbg-throw-cue[data-kind="caught_stealing"] .bbg-throw-route,
 .bbg-throw-cue[data-kind="caught_stealing"] .bbg-throw-target {
   stroke: #ff7d83;
 }
-.bbg-runner-cue path {
+.bbg-throw-cue[data-kind="error"] .bbg-throw-route,
+.bbg-throw-cue[data-kind="error"] .bbg-throw-target {
+  stroke: #ff9a72;
+}
+.bbg-throw-cue[data-kind="error"] .bbg-throw-route {
+  stroke-dasharray: 4 10;
+}
+.bbg-runner-route {
   stroke: #72efbd;
   stroke-width: 7;
+  filter: drop-shadow(0 0 7px rgb(114 239 189 / 46%));
 }
-.bbg-runner-cue[data-out="true"] path {
+.bbg-runner-cue[data-out="true"] .bbg-runner-route {
   stroke: #ff9a72;
 }
 .bbg-runner-origin {
@@ -9024,17 +9119,39 @@
   stroke: rgb(114 239 189 / 70%);
   stroke-width: 2;
 }
+.bbg-runner-destination {
+  fill: rgb(114 239 189 / 12%);
+  stroke: #72efbd;
+  stroke-width: 3;
+  transform-box: fill-box;
+  transform-origin: center;
+  animation: bbg-destination-pulse 820ms ease-out both;
+}
 .bbg-live-runner {
+  filter: drop-shadow(0 0 9px rgb(114 239 189 / 84%));
+}
+.bbg-live-runner circle {
   fill: #72efbd;
   stroke: #05271b;
   stroke-width: 3;
-  filter: drop-shadow(0 0 9px rgb(114 239 189 / 84%));
+}
+.bbg-live-runner path {
+  fill: none;
+  stroke: rgb(114 239 189 / 58%);
+  stroke-width: 5;
+  stroke-linecap: round;
+}
+.bbg-runner-cue[data-out="true"] .bbg-live-runner circle {
+  fill: #ff9a72;
 }
 .bbg-runner-cue[data-out="true"] .bbg-live-runner {
-  fill: #ff9a72;
   filter: drop-shadow(0 0 9px rgb(255 126 102 / 72%));
 }
-.bbg-catch-cue circle:first-child {
+.bbg-runner-cue[data-out="true"] .bbg-runner-destination {
+  fill: rgb(255 154 114 / 12%);
+  stroke: #ff9a72;
+}
+.bbg-catch-ring {
   fill: rgb(126 240 196 / 12%);
   stroke: #7ff0c3;
   stroke-width: 3;
@@ -9042,9 +9159,18 @@
   transform-origin: center;
   animation: bbg-field-target 650ms ease-out both;
 }
-.bbg-catch-cue circle:last-child {
+.bbg-catch-ring--inner {
+  animation-delay: 120ms;
+}
+.bbg-catch-ball {
   fill: white;
   filter: url(#ball-glow);
+}
+.bbg-catch-glove {
+  fill: rgb(255 198 105 / 70%);
+  stroke: #ffe0a2;
+  stroke-width: 2;
+  animation: bbg-catch-snap 420ms cubic-bezier(0.22, 0.8, 0.2, 1.25) both;
 }
 .bbg-pitch-flight path {
   fill: none;
@@ -9119,6 +9245,35 @@
   100% {
     opacity: 0.72;
     transform: scale(1);
+  }
+}
+@keyframes bbg-destination-pulse {
+  0%,
+  42% {
+    opacity: 0;
+    transform: scale(0.3);
+  }
+  72% {
+    opacity: 1;
+    transform: scale(1.28);
+  }
+  100% {
+    opacity: 0.78;
+    transform: scale(1);
+  }
+}
+@keyframes bbg-catch-snap {
+  0% {
+    opacity: 0;
+    transform: rotate(-30deg) scale(1.8);
+  }
+  65% {
+    opacity: 1;
+    transform: rotate(8deg) scale(0.82);
+  }
+  100% {
+    opacity: 1;
+    transform: rotate(0) scale(1);
   }
 }
 
@@ -9227,11 +9382,24 @@
   .bbg-throw-cue path,
   .bbg-runner-cue path,
   .bbg-live-ball,
+  .bbg-live-ball-shadow,
   .bbg-live-throw,
+  .bbg-live-throw-shadow,
   .bbg-live-runner,
   .bbg-catch-cue circle,
+  .bbg-catch-glove,
+  .bbg-ground-bounces circle,
+  .bbg-ball-trail-glow,
   .bbg-throw-target {
     animation: none !important;
+  }
+
+  .bbg-live-ball,
+  .bbg-live-ball-shadow,
+  .bbg-live-throw,
+  .bbg-live-throw-shadow,
+  .bbg-live-runner {
+    display: none;
   }
 }
 
@@ -11520,5 +11688,64 @@
   .bbg-presentation-cue[data-cue="choice"] {
     min-width: min(230px, calc(100% - 20px));
     padding: 10px 14px;
+  }
+}
+
+/* Mobile hands must never be clipped by the field-first height override. */
+@media (max-width: 680px) {
+  .bbg-game-console {
+    grid-template-rows: minmax(0, 1fr) 174px;
+  }
+
+  .bbg-game-console:has(.bbg-card-hands[data-card-window="true"]) {
+    grid-template-rows: minmax(0, 1fr) 220px;
+  }
+
+  .bbg-control-panel--broadcast > .bbg-card-hands {
+    height: 158px;
+    min-height: 158px;
+    flex: 0 0 158px;
+  }
+
+  .bbg-control-panel--broadcast > .bbg-card-hands[data-card-window="true"] {
+    height: 204px;
+    min-height: 0;
+    flex: 1 1 auto;
+  }
+}
+
+/* Portrait tablets use their vertical space instead of shrinking the field. */
+@media (min-width: 681px) and (max-width: 820px) and (orientation: portrait) {
+  .bbg-game-console {
+    height: min(850px, calc(100dvh - 174px));
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-rows: minmax(0, 1fr) 220px;
+  }
+
+  .bbg-field-content {
+    grid-column: 1;
+    grid-row: 1;
+  }
+
+  .bbg-game-console .bbg-control-panel--broadcast {
+    grid-column: 1;
+    grid-row: 2;
+    padding: 8px;
+  }
+
+  .bbg-control-panel--broadcast > .bbg-card-hands,
+  .bbg-control-panel--broadcast
+    > .bbg-card-hands:has(.bbg-card-hand:first-child[data-revealed="true"]),
+  .bbg-control-panel--broadcast
+    > .bbg-card-hands:has(.bbg-card-hand:nth-child(2)[data-revealed="true"]) {
+    width: 100%;
+    height: 204px;
+    min-height: 0;
+    max-height: none;
+    flex: 1 1 auto;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    grid-template-rows: minmax(0, 1fr);
+    gap: 8px;
+    margin: 0;
   }
 }

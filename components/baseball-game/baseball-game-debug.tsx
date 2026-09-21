@@ -914,13 +914,6 @@ type BallFlight = {
   rotation: number;
 };
 
-function fieldPath(
-  from: { x: number; y: number },
-  to: { x: number; y: number },
-) {
-  return `M${from.x} ${from.y} L${to.x} ${to.y}`;
-}
-
 function presentationLabel(cue: PresentationCue) {
   if (cue.type === "choice") {
     const actor = {
@@ -958,11 +951,13 @@ function presentationLabel(cue: PresentationCue) {
   if (cue.type === "throw") {
     return {
       primary:
-        cue.kind === "pickoff"
-          ? "견제"
-          : cue.kind === "caught_stealing"
-            ? "도루 저지"
-            : "송구",
+        cue.kind === "error"
+          ? "악송구"
+          : cue.kind === "pickoff"
+            ? "견제"
+            : cue.kind === "caught_stealing"
+              ? "도루 저지"
+              : "송구",
       detail: cue.label,
     };
   }
@@ -1183,19 +1178,25 @@ export function BaseballStadium({
             data-kind={cue.kind}
             key={`throw-${scene?.beats[index]?.id}`}
           >
-            <path d={fieldPath(cue.from, cue.to)} />
+            <path className="bbg-throw-route-shadow" d={cue.path} />
+            <path className="bbg-throw-route" d={cue.path} />
             <circle
-              className="bbg-throw-target"
+              className="bbg-throw-target bbg-throw-target--outer"
               cx={cue.to.x}
               cy={cue.to.y}
-              r="18"
+              r="23"
             />
-            <circle className="bbg-live-throw" r="7">
-              <animateMotion
-                dur="900ms"
-                fill="freeze"
-                path={fieldPath(cue.from, cue.to)}
-              />
+            <circle
+              className="bbg-throw-target bbg-throw-target--inner"
+              cx={cue.to.x}
+              cy={cue.to.y}
+              r="10"
+            />
+            <circle className="bbg-live-throw-shadow" r="9">
+              <animateMotion dur="820ms" fill="freeze" path={cue.path} />
+            </circle>
+            <circle className="bbg-live-throw" r="6">
+              <animateMotion dur="820ms" fill="freeze" path={cue.path} />
             </circle>
           </g>
         ) : null}
@@ -1204,8 +1205,10 @@ export function BaseballStadium({
             className="bbg-catch-cue"
             transform={`translate(${cue.location.x} ${cue.location.y})`}
           >
-            <circle r="24" />
-            <circle r="7" />
+            <circle className="bbg-catch-ring bbg-catch-ring--outer" r="29" />
+            <circle className="bbg-catch-ring bbg-catch-ring--inner" r="18" />
+            <path className="bbg-catch-glove" d="M-9 1 L0 -9 L9 1 L0 10 Z" />
+            <circle className="bbg-catch-ball" r="5" />
           </g>
         ) : null}
         {cue?.type === "runner_move" ? (
@@ -1214,20 +1217,25 @@ export function BaseballStadium({
             data-out={cue.move.to === "out"}
             key={`runner-${scene?.beats[index]?.id}`}
           >
-            <path d={fieldPath(cue.origin, cue.destination)} />
+            <path className="bbg-runner-route-shadow" d={cue.path} />
+            <path className="bbg-runner-route" d={cue.path} />
             <circle
               className="bbg-runner-origin"
               cx={cue.origin.x}
               cy={cue.origin.y}
               r="11"
             />
-            <circle className="bbg-live-runner" r="10">
-              <animateMotion
-                dur="900ms"
-                fill="freeze"
-                path={fieldPath(cue.origin, cue.destination)}
-              />
-            </circle>
+            <circle
+              className="bbg-runner-destination"
+              cx={cue.destination.x}
+              cy={cue.destination.y}
+              r="17"
+            />
+            <g className="bbg-live-runner">
+              <animateMotion dur="820ms" fill="freeze" path={cue.path} />
+              <circle r="10" />
+              <path d="M-15 0 H-5" />
+            </g>
           </g>
         ) : null}
       </svg>
@@ -1449,15 +1457,39 @@ function BallFlightVisual({
     >
       <g transform={`rotate(${flight.rotation} 450 650)`}>
         <path className="bbg-ball-trail-shadow" d={flight.path} />
+        <path className="bbg-ball-trail-glow" d={flight.path} />
         <path className="bbg-ball-trail" d={flight.path} />
+        {flight.kind === "ground" ? (
+          <g className="bbg-ground-bounces">
+            <circle
+              cx={450 + (flight.target.x - 450) * 0.34}
+              cy={650 + (flight.target.y - 650) * 0.34}
+              r="5"
+            />
+            <circle
+              cx={450 + (flight.target.x - 450) * 0.67}
+              cy={650 + (flight.target.y - 650) * 0.67}
+              r="4"
+            />
+          </g>
+        ) : null}
         <circle
-          className="bbg-ball-landing"
+          className="bbg-ball-landing bbg-ball-landing--outer"
           cx={flight.target.x}
           cy={flight.target.y}
-          r="18"
+          r="24"
         />
-        <circle className="bbg-live-ball" filter="url(#ball-glow)" r="7">
-          <animateMotion dur="850ms" fill="freeze" path={flight.path} />
+        <circle
+          className="bbg-ball-landing bbg-ball-landing--inner"
+          cx={flight.target.x}
+          cy={flight.target.y}
+          r="10"
+        />
+        <circle className="bbg-live-ball-shadow" r="10">
+          <animateMotion dur="820ms" fill="freeze" path={flight.path} />
+        </circle>
+        <circle className="bbg-live-ball" filter="url(#ball-glow)" r="6">
+          <animateMotion dur="820ms" fill="freeze" path={flight.path} />
         </circle>
       </g>
       <g

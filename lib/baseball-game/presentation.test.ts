@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 import {
   buildPresentationCues,
   buildPresentationScenes,
+  getAudioCues,
   getPresentationBases,
   getPitchLocation,
   getPlateAppearancePitchHistory,
@@ -101,6 +102,13 @@ describe("catcher-view-v1 presentation", () => {
       for (const cue of runnerCues) {
         if (cue.move.runner === "batter") continue;
         expect(bases[cue.move.runner]).toBe(true);
+      }
+
+      for (const cue of runnerCues) {
+        expect(cue.path).toMatch(/^M\d+ \d+ [LQ]/);
+        expect(cue.path).not.toBe(
+          `M${cue.origin.x} ${cue.origin.y} L${cue.origin.x} ${cue.origin.y}`,
+        );
       }
 
       const tagUps = runnerCues.filter((cue) => cue.action === "tag_up");
@@ -529,7 +537,7 @@ describe("catcher-view-v1 presentation", () => {
         outsRecorded: 2,
         moves: [
           { runner: "batter", from: "batter", to: "out" },
-          { runner: "first", from: "first", to: "out" },
+          { runner: "first", from: "first", to: "out", outAt: "first" },
         ],
       }),
     ]);
@@ -545,7 +553,11 @@ describe("catcher-view-v1 presentation", () => {
     expect(responseCues[2]).toMatchObject({
       type: "runner_move",
       action: "pickoff_return",
-      move: { runner: "first", from: "first", to: "out" },
+      move: { runner: "first", from: "first", to: "out", outAt: "first" },
+      destination: { x: 540, y: 560 },
+    });
+    expect(responseCues[2]).not.toMatchObject({
+      origin: { x: 540, y: 560 },
     });
   });
 
@@ -596,6 +608,139 @@ describe("catcher-view-v1 presentation", () => {
     ]);
     expect(cues.filter((cue) => cue.type === "throw")).toHaveLength(2);
     expect(cues.filter((cue) => cue.type === "decision")).toHaveLength(2);
+  });
+
+  it("runs extra-base hits and home runs around the base paths", () => {
+    const double = resolveForPresentation(
+      "D3",
+      { first: false, second: false, third: false },
+      0,
+    ).find(
+      (cue): cue is Extract<PresentationCue, { type: "runner_move" }> =>
+        cue.type === "runner_move" && cue.move.runner === "batter",
+    );
+    const homeRun = resolveForPresentation(
+      "HR",
+      { first: false, second: false, third: false },
+      0,
+    ).find(
+      (cue): cue is Extract<PresentationCue, { type: "runner_move" }> =>
+        cue.type === "runner_move" && cue.move.runner === "batter",
+    );
+
+    expect(double?.path).toBe("M450 650 L540 560 L450 470");
+    expect(homeRun?.path).toBe("M450 650 L540 560 L450 470 L360 560 L450 650");
+  });
+
+  it("uses the recorded assist base instead of guessing the next base", () => {
+    const cues = buildPresentationCues([
+      event({ kind: "batted_ball", face: "R2" }),
+      event({
+        sequence: 2,
+        kind: "plate_appearance",
+        summary: "3루 보살",
+        outsRecorded: 1,
+        moves: [
+          { runner: "first", from: "first", to: "out", outAt: "third" },
+          { runner: "batter", from: "batter", to: "first" },
+        ],
+      }),
+    ]);
+    const assistedRunner = cues.find(
+      (cue): cue is Extract<PresentationCue, { type: "runner_move" }> =>
+        cue.type === "runner_move" && cue.move.runner === "first",
+    );
+    const assistThrow = cues.find(
+      (cue): cue is Extract<PresentationCue, { type: "throw" }> =>
+        cue.type === "throw",
+    );
+
+    expect(assistedRunner).toMatchObject({
+      destination: { x: 360, y: 560 },
+      path: "M540 560 L450 470 L360 560",
+    });
+    expect(assistThrow).toMatchObject({
+      to: { x: 360, y: 560 },
+    });
+    expect(assistThrow?.path).toContain(" Q");
+  });
+
+  it("does not invent a run or throw when a runner is hit by the ball", () => {
+    const cues = buildPresentationCues([
+      event({ kind: "batted_ball", face: "GF" }),
+      event({ kind: "card_resolve", cardId: "RHB", cardRole: "defense" }),
+      event({
+        sequence: 3,
+        kind: "plate_appearance",
+        summary: "타구에 맞은 주자 아웃 · 타자 세이프",
+        outsRecorded: 1,
+        moves: [
+          { runner: "first", from: "first", to: "out", outAt: "first" },
+          { runner: "batter", from: "batter", to: "first" },
+        ],
+      }),
+    ]);
+
+    expect(
+      cues.some(
+        (cue) => cue.type === "runner_move" && cue.move.runner === "first",
+      ),
+    ).toBe(false);
+    expect(cues.some((cue) => cue.type === "throw")).toBe(false);
+    expect(cues).toContainEqual({
+      type: "decision",
+      result: "out",
+      label: "타구 맞음 · 주자 아웃",
+      camera: "field",
+    });
+  });
+
+  it("shows a pickoff error as an off-line throw before runners advance", () => {
+    const cues = buildPresentationCues([
+      event({
+        kind: "card_resolve",
+        cardId: "POE",
+        summary: "견제 송구 실책 · 모든 주자 진루",
+        moves: [{ runner: "first", from: "first", to: "second" }],
+      }),
+    ]);
+
+    expect(cues.map((cue) => cue.type)).toEqual([
+      "throw",
+      "runner_move",
+      "decision",
+    ]);
+    expect(cues[0]).toMatchObject({
+      type: "throw",
+      kind: "error",
+      label: "견제 악송구",
+    });
+    expect(cues[0]).not.toMatchObject({ to: { x: 540, y: 560 } });
+  });
+
+  it("plays throw audio only when the recorded out has a throw destination", () => {
+    const caughtFly = event({
+      kind: "plate_appearance",
+      summary: "외야 플라이 아웃",
+      outsRecorded: 1,
+      moves: [{ runner: "batter", from: "batter", to: "out" }],
+    });
+    const groundOut = event({
+      kind: "plate_appearance",
+      summary: "땅볼 아웃",
+      outsRecorded: 1,
+      moves: [{ runner: "batter", from: "batter", to: "out", outAt: "first" }],
+    });
+    const runnerHit = event({
+      kind: "plate_appearance",
+      summary: "타구에 맞은 주자 아웃 · 타자 세이프",
+      outsRecorded: 1,
+      moves: [{ runner: "first", from: "first", to: "out", outAt: "first" }],
+    });
+
+    expect(getAudioCues([caughtFly])).toEqual(["out"]);
+    expect(getAudioCues([groundOut])).toEqual(["throw", "out"]);
+    expect(getAudioCues([runnerHit])).toEqual(["out"]);
   });
 
   it("animates a pickoff as a runner dive, pickoff throw and final out", () => {

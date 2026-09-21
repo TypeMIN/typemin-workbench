@@ -159,6 +159,8 @@ export type RunnerMove = {
   runner: RunnerOrigin;
   from: RunnerOrigin;
   to: RunnerDestination;
+  /** The base where an out was recorded. Present when `to` is `out`. */
+  outAt?: Exclude<RunnerDestination, "out">;
 };
 
 export type InningScore = {
@@ -213,7 +215,8 @@ export type PresentationCue =
       type: "throw";
       from: FieldPoint;
       to: FieldPoint;
-      kind: "throw" | "pickoff" | "caught_stealing";
+      path: string;
+      kind: "throw" | "pickoff" | "caught_stealing" | "error";
       label: string;
     }
   | {
@@ -221,6 +224,7 @@ export type PresentationCue =
       move: RunnerMove;
       origin: FieldPoint;
       destination: FieldPoint;
+      path: string;
       label: string;
       action:
         | "batter_run"

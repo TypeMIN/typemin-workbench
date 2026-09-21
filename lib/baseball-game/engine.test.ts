@@ -846,6 +846,14 @@ describe("pro-cards-v1 strategy cards", () => {
     expect(getActionOwner(state)).toBe("home");
     state = playCardId(state, "CS2");
     expect(state.bases).toEqual({ first: false, second: false, third: true });
+    expect(
+      state.eventLog.findLast((event) => event.cardId === "CS2")?.moves,
+    ).toContainEqual({
+      runner: "first",
+      from: "first",
+      to: "out",
+      outAt: "second",
+    });
     state = playCardId(state, "WP");
     expect(state.score.away).toBe(1);
     expect(state.balls).toBe(1);

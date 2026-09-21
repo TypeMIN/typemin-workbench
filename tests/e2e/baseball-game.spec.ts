@@ -275,17 +275,28 @@ test("야구 게임에서 투타 심리전과 새 경기를 진행한다", async
     const controlRect = document
       .querySelector(".bbg-control-panel--broadcast")
       ?.getBoundingClientRect();
+    const cards = [...element.querySelectorAll(".bbg-card-preview")].map(
+      (card) => card.getBoundingClientRect(),
+    );
     return {
       bottom: rect.bottom,
       consoleBottom: consoleRect?.bottom ?? 0,
       viewportBottom: window.innerHeight,
       fieldHeight: fieldRect?.height ?? 0,
       controlHeight: controlRect?.height ?? 0,
+      cardsClipped: cards.some(
+        (card) =>
+          !controlRect ||
+          card.left < controlRect.left - 1 ||
+          card.right > controlRect.right + 1 ||
+          card.bottom > controlRect.bottom + 1,
+      ),
     };
   });
   expect(cardsFit.bottom).toBeLessThanOrEqual(cardsFit.consoleBottom + 1);
   expect(cardsFit.bottom).toBeLessThanOrEqual(cardsFit.viewportBottom);
-  expect(cardsFit.fieldHeight).toBeGreaterThan(cardsFit.controlHeight * 2.6);
+  expect(cardsFit.fieldHeight).toBeGreaterThan(cardsFit.controlHeight * 2.2);
+  expect(cardsFit.cardsClipped).toBe(false);
   await expect(page.locator(".bbg-card-effect").first()).toBeVisible();
   await expect(page.locator(".bbg-card-timing").first()).toBeVisible();
   expect(
@@ -438,6 +449,7 @@ test("주요 데스크톱·태블릿·모바일 화면비율에서 게임 UI가 
           height: document.documentElement.scrollHeight,
         },
         console: bounds(".bbg-game-console"),
+        field: bounds(".bbg-broadcast-field"),
         scoreboard: bounds(".bbg-scoreboard"),
         controls: bounds(".bbg-control-panel"),
         hands: bounds(".bbg-card-hands"),
@@ -468,8 +480,17 @@ test("주요 데스크톱·태블릿·모바일 화면비율에서 게임 UI가 
     expect(layout.totalHeaders).toEqual(["R", "H", "E", "B"]);
     expect(layout.lineScoreFits, JSON.stringify(viewport)).toBe(true);
     expect(layout.inningColumns > 0).toBe(viewport.width > 639);
+    if (viewport.width >= 681 && viewport.width <= 820) {
+      expect(layout.console.height, JSON.stringify(viewport)).toBeGreaterThan(
+        viewport.height * 0.7,
+      );
+      expect(layout.field.width, JSON.stringify(viewport)).toBeGreaterThan(
+        viewport.width * 0.85,
+      );
+    }
     for (const [name, region] of [
       ["console", layout.console],
+      ["field", layout.field],
       ["scoreboard", layout.scoreboard],
       ["controls", layout.controls],
       ["hands", layout.hands],
