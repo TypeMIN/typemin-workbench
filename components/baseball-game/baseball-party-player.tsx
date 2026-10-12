@@ -15,7 +15,7 @@ import { PITCH_TARGET_LABELS } from "@/lib/baseball-game/duel";
 import type { MultiplayerCommand } from "@/lib/baseball-game/multiplayer/types";
 import type { PartyPlayerSnapshot } from "@/lib/baseball-game/party/types";
 import {
-  BaseballAudio,
+  BaseballHaptics,
   BaseballPlayReceipt,
   BroadcastLineScore,
 } from "./baseball-broadcast";
@@ -217,7 +217,7 @@ function PartyPlayerBoard({
   );
   return (
     <main aria-busy={busy} className="bbg-party-player-shell">
-      <BaseballAudio events={game.eventLog} mode="personal" />
+      <BaseballHaptics events={game.eventLog} />
       <BaseballActionFeedback
         className="bbg-party-player-feedback"
         feedback={feedback}

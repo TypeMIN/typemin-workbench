@@ -7,6 +7,13 @@ import type { Json } from "@/lib/supabase/database.types";
 
 import type { GameState, TeamSide } from "../types";
 import type {
+  SeatPresenceMap,
+  SeatVisibility,
+  StoredSeatPresence,
+} from "./presence";
+import type { MultiplayerClockState } from "./shot-clock";
+import type {
+  MultiplayerClockUpdateInput,
   MultiplayerCommitInput,
   MultiplayerCommitResult,
   MultiplayerRoomRecord,
@@ -25,25 +32,32 @@ export interface MultiplayerStorage {
   getSeatContext(
     roomId: string,
     tokenHash: string,
-  ): Promise<{
-    seat: TeamSide | null;
-    occupied: Record<TeamSide, boolean>;
-  }>;
+  ): Promise<MultiplayerSeatContext>;
+  touchSeat(
+    roomId: string,
+    tokenHash: string,
+    visibility: SeatVisibility,
+  ): Promise<TeamSide | null>;
   getIdempotencyRevision(
     roomId: string,
     idempotencyKey: string,
   ): Promise<number | null>;
   claimHomeSeat(roomCode: string, tokenHash: string): Promise<boolean>;
   commitAction(input: MultiplayerCommitInput): Promise<MultiplayerCommitResult>;
+  updateClock(
+    input: MultiplayerClockUpdateInput,
+  ): Promise<"applied" | "conflict">;
 }
 
-type MultiplayerSeatContext = {
+export type MultiplayerSeatContext = {
   seat: TeamSide | null;
   occupied: Record<TeamSide, boolean>;
+  presence: SeatPresenceMap;
 };
 
 type MemoryRoom = MultiplayerRoomRecord & {
   seats: Partial<Record<TeamSide, string>>;
+  presence: Partial<Record<TeamSide, StoredSeatPresence>>;
   idempotency: Map<string, number>;
 };
 
@@ -67,8 +81,11 @@ class MemoryMultiplayerStorage implements MultiplayerStorage {
       status: "lobby",
       state: structuredClone(input.state),
       revision: input.state.revision,
+      revisionStartedAt: new Date(now).toISOString(),
+      clock: null,
       expiresAt: new Date(now + 24 * 60 * 60 * 1000).toISOString(),
       seats: { away: input.awayTokenHash },
+      presence: { away: freshPresence("visible") },
       idempotency: new Map(),
     };
     rooms.set(room.roomCode, room);
@@ -104,7 +121,28 @@ class MemoryMultiplayerStorage implements MultiplayerStorage {
         away: Boolean(room?.seats.away),
         home: Boolean(room?.seats.home),
       },
+      presence: {
+        away: room?.presence.away ? { ...room.presence.away } : null,
+        home: room?.presence.home ? { ...room.presence.home } : null,
+      },
     };
+  }
+
+  async touchSeat(
+    roomId: string,
+    tokenHash: string,
+    visibility: SeatVisibility,
+  ) {
+    const room = findMemoryRoom(roomId);
+    if (!room) return null;
+    const seat =
+      room.seats.away === tokenHash
+        ? "away"
+        : room.seats.home === tokenHash
+          ? "home"
+          : null;
+    if (seat) room.presence[seat] = freshPresence(visibility);
+    return seat;
   }
 
   async getIdempotencyRevision(roomId: string, idempotencyKey: string) {
@@ -115,7 +153,9 @@ class MemoryMultiplayerStorage implements MultiplayerStorage {
     const room = memoryRooms().get(roomCode);
     if (!room || room.status !== "lobby" || room.seats.home) return false;
     room.seats.home = tokenHash;
+    room.presence.home = freshPresence("visible");
     room.status = "playing";
+    room.revisionStartedAt = new Date().toISOString();
     return true;
   }
 
@@ -137,9 +177,26 @@ class MemoryMultiplayerStorage implements MultiplayerStorage {
     }
     room.state = structuredClone(input.newState);
     room.revision = input.newState.revision;
+    room.revisionStartedAt = new Date().toISOString();
+    room.clock = structuredClone(input.clock);
     room.status = input.newState.phase === "finished" ? "finished" : "playing";
     room.idempotency.set(input.idempotencyKey, room.revision);
     return { status: "applied", revision: room.revision } as const;
+  }
+
+  async updateClock(input: MultiplayerClockUpdateInput) {
+    const room = findMemoryRoom(input.roomId);
+    if (
+      !room ||
+      room.status !== "playing" ||
+      room.revision !== input.revision ||
+      JSON.stringify(room.clock) !== JSON.stringify(input.expectedClock)
+    ) {
+      return "conflict" as const;
+    }
+    room.clock = structuredClone(input.clock);
+    if (input.finish) room.status = "finished";
+    return "applied" as const;
   }
 }
 
@@ -154,7 +211,7 @@ class SupabaseMultiplayerStorage implements MultiplayerStorage {
         state: input.state as unknown as Json,
         revision: input.state.revision,
       })
-      .select("id, room_code, status, state, revision, expires_at")
+      .select(ROOM_COLUMNS)
       .single();
     if (error || !data) {
       if (error?.code === "23505") throw new Error("ROOM_CODE_CONFLICT");
@@ -177,7 +234,7 @@ class SupabaseMultiplayerStorage implements MultiplayerStorage {
   async getRoom(roomCode: string) {
     const { data, error } = await getSupabaseAdmin()
       .from("baseball_games")
-      .select("id, room_code, status, state, revision, expires_at")
+      .select(ROOM_COLUMNS)
       .eq("room_code", roomCode)
       .maybeSingle();
     if (error) throw new Error("ROOM_READ_FAILED");
@@ -190,7 +247,7 @@ class SupabaseMultiplayerStorage implements MultiplayerStorage {
   ): Promise<MultiplayerSeatContext> {
     const { data, error } = await getSupabaseAdmin()
       .from("baseball_game_seats")
-      .select("team, token_hash")
+      .select("team, token_hash, last_seen_at, visibility")
       .eq("game_id", roomId)
       .limit(2);
     if (error) throw new Error("ROOM_SEAT_READ_FAILED");
@@ -207,7 +264,27 @@ class SupabaseMultiplayerStorage implements MultiplayerStorage {
         away: Boolean(away),
         home: Boolean(home),
       },
+      presence: {
+        away: away ? rowToPresence(away) : null,
+        home: home ? rowToPresence(home) : null,
+      },
     };
+  }
+
+  async touchSeat(
+    roomId: string,
+    tokenHash: string,
+    visibility: SeatVisibility,
+  ) {
+    const { data, error } = await getSupabaseAdmin()
+      .from("baseball_game_seats")
+      .update({ last_seen_at: new Date().toISOString(), visibility })
+      .eq("game_id", roomId)
+      .eq("token_hash", tokenHash)
+      .select("team")
+      .maybeSingle();
+    if (error) throw new Error("ROOM_SEAT_TOUCH_FAILED");
+    return data?.team === "away" || data?.team === "home" ? data.team : null;
   }
 
   async getIdempotencyRevision(roomId: string, idempotencyKey: string) {
@@ -243,6 +320,7 @@ class SupabaseMultiplayerStorage implements MultiplayerStorage {
         p_action: input.action as unknown as Json,
         p_events: input.events as unknown as Json,
         p_idempotency_key: input.idempotencyKey,
+        p_clock: input.clock as unknown as Json,
       },
     );
     if (error) throw new Error("ROOM_COMMIT_FAILED");
@@ -255,6 +333,38 @@ class SupabaseMultiplayerStorage implements MultiplayerStorage {
       ? { status: "invalid" }
       : { status: "conflict" };
   }
+
+  async updateClock(input: MultiplayerClockUpdateInput) {
+    const { data, error } = await getSupabaseAdmin().rpc(
+      "baseball_update_clock",
+      {
+        p_game_id: input.roomId,
+        p_revision: input.revision,
+        p_expected_clock: input.expectedClock as unknown as Json,
+        p_clock: input.clock as unknown as Json,
+        p_finish: input.finish,
+      },
+    );
+    if (error) throw new Error("ROOM_CLOCK_UPDATE_FAILED");
+    return readRpcStatus(data) === "applied" ? "applied" : "conflict";
+  }
+}
+
+const ROOM_COLUMNS =
+  "id, room_code, status, state, revision, revision_started_at, clock, expires_at";
+
+function freshPresence(visibility: SeatVisibility): StoredSeatPresence {
+  return { lastSeenAt: new Date().toISOString(), visibility };
+}
+
+function rowToPresence(row: {
+  last_seen_at: string;
+  visibility: string;
+}): StoredSeatPresence {
+  return {
+    lastSeenAt: row.last_seen_at,
+    visibility: row.visibility === "hidden" ? "hidden" : "visible",
+  };
 }
 
 export function getMultiplayerStorage(): MultiplayerStorage {
@@ -280,6 +390,8 @@ function cloneRoom(room: MemoryRoom): MultiplayerRoomRecord {
     status: room.status,
     state: structuredClone(room.state),
     revision: room.revision,
+    revisionStartedAt: room.revisionStartedAt,
+    clock: room.clock ? structuredClone(room.clock) : null,
     expiresAt: room.expiresAt,
   };
 }
@@ -290,6 +402,8 @@ function rowToRoom(row: {
   status: string;
   state: Json;
   revision: number;
+  revision_started_at: string;
+  clock: Json | null;
   expires_at: string;
 }): MultiplayerRoomRecord {
   return {
@@ -298,6 +412,8 @@ function rowToRoom(row: {
     status: row.status as MultiplayerRoomStatus,
     state: row.state as unknown as GameState,
     revision: Number(row.revision),
+    revisionStartedAt: row.revision_started_at,
+    clock: (row.clock ?? null) as unknown as MultiplayerClockState | null,
     expiresAt: row.expires_at,
   };
 }

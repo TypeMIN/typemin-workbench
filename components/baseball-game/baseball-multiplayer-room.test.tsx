@@ -6,6 +6,11 @@ import {
   getGameView,
   transition,
 } from "@/lib/baseball-game/engine";
+import {
+  FORFEIT_AFTER_CONSECUTIVE_TIMEOUTS,
+  buildShotClockView,
+  createClockState,
+} from "@/lib/baseball-game/multiplayer/shot-clock";
 import type { MultiplayerRoomSnapshot } from "@/lib/baseball-game/multiplayer/types";
 
 import BaseballMultiplayerRoom from "./baseball-multiplayer-room";
@@ -27,11 +32,21 @@ function snapshot(seat: "away" | "home", status: "lobby" | "playing") {
     roomCode: "ABC234",
     status,
     seat,
-    opponentConnected: status === "playing",
+    opponent:
+      status === "playing"
+        ? { presence: "online", lastSeenAgoMs: 0 }
+        : { presence: "absent", lastSeenAgoMs: null },
     actionOwner: "home",
     isYourTurn: seat === "home",
     legalCards: [],
     view: getGameView(state, seat),
+    clock: buildShotClockView({
+      state,
+      revisionStartedAt: new Date().toISOString(),
+      clock: createClockState(0),
+      playing: status === "playing",
+      now: Date.now(),
+    }),
   } satisfies MultiplayerRoomSnapshot;
 }
 
@@ -71,7 +86,7 @@ describe("BaseballMultiplayerRoom", () => {
       }),
     ).toHaveLength(4);
     expect(
-      container.querySelector(".bbg-mp-field .bbg-stadium svg"),
+      container.querySelector(".bbg-room-stage .bbg-stadium svg"),
     ).toHaveAttribute("viewBox", "0 0 900 700");
     for (const instanceId of hiddenIds) {
       expect(container).not.toHaveTextContent(instanceId);
@@ -138,13 +153,88 @@ describe("BaseballMultiplayerRoom", () => {
     expect(
       screen.getByRole("button", { name: "스트라이크 선택" }),
     ).toBeDisabled();
-    expect(container.querySelector(".bbg-mp-board")).toHaveAttribute(
+    expect(container.querySelector(".bbg-room-board")).toHaveAttribute(
       "aria-busy",
       "true",
     );
 
     resolveAction?.(response({ snapshot: updated }));
     expect(await screen.findByText("스트라이크 선택 반영 완료")).toBeVisible();
-    expect(screen.getByText("상대 팀의 결정을 기다리는 중")).toBeVisible();
+    expect(screen.getByText("상대 타자가 노림수를 정하는 중")).toBeVisible();
+  });
+
+  it("shows the opponent's live activity, presence and clock", async () => {
+    const awaySnapshot = {
+      ...snapshot("away", "playing"),
+      opponent: { presence: "away" as const, lastSeenAgoMs: 1_000 },
+    } satisfies MultiplayerRoomSnapshot;
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue(response({ snapshot: awaySnapshot })),
+    );
+
+    render(<BaseballMultiplayerRoom roomCode="ABC234" />);
+
+    expect(
+      await screen.findByText("상대 투수가 사인을 고르는 중"),
+    ).toBeVisible();
+    expect(
+      screen.getByText("상대가 경기 화면을 벗어나 있습니다."),
+    ).toBeVisible();
+    expect(screen.getByText(/자리 비움/)).toBeVisible();
+    expect(
+      screen.getByRole("timer", { name: /상대 결정 남은 시간/ }),
+    ).toBeVisible();
+    expect(screen.queryByRole("button", { name: /작전 타임/ })).toBeNull();
+  });
+
+  it("calls a timeout on the deciding team's turn", async () => {
+    const homeSnapshot = snapshot("home", "playing");
+    const fetchMock = vi.fn(() =>
+      Promise.resolve(response({ snapshot: homeSnapshot })),
+    );
+    vi.stubGlobal("fetch", fetchMock);
+
+    render(<BaseballMultiplayerRoom roomCode="ABC234" />);
+    expect(
+      await screen.findByRole("timer", { name: /내 결정 남은 시간/ }),
+    ).toBeVisible();
+    fireEvent.click(
+      screen.getByRole("button", { name: "작전 타임 · 2회 남음" }),
+    );
+
+    await waitFor(() =>
+      expect(fetchMock).toHaveBeenCalledWith(
+        "/api/baseball-game/rooms/ABC234/clock",
+        expect.objectContaining({
+          method: "POST",
+          body: JSON.stringify({ type: "CALL_TIMEOUT", expectedRevision: 0 }),
+        }),
+      ),
+    );
+  });
+
+  it("offers a forfeit claim only after repeated opponent timeouts", async () => {
+    const base = snapshot("away", "playing");
+    const stalled = {
+      ...base,
+      clock: {
+        ...base.clock,
+        consecutiveTimeouts: {
+          away: 0,
+          home: FORFEIT_AFTER_CONSECUTIVE_TIMEOUTS,
+        },
+      },
+    } satisfies MultiplayerRoomSnapshot;
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue(response({ snapshot: stalled })),
+    );
+
+    render(<BaseballMultiplayerRoom roomCode="ABC234" />);
+
+    expect(
+      await screen.findByRole("button", { name: "몰수승 선언" }),
+    ).toBeVisible();
   });
 });

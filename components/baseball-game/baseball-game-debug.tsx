@@ -10,8 +10,9 @@ import {
   BaseballActionFeedback,
   useBaseballActionFeedback,
 } from "@/components/baseball-game/baseball-action-feedback";
+import { BaseballSoundControls } from "@/components/baseball-game/audio/baseball-sound-controls";
+import { useBaseballSoundscape } from "@/components/baseball-game/audio/use-baseball-soundscape";
 import {
-  BaseballAudio,
   BaseballPlayReceipt,
   BroadcastLineScore,
   usePresentation,
@@ -46,7 +47,9 @@ import type {
   GameView,
   PitchFace,
   PitchLocation,
+  PresentationBeat,
   PresentationCue,
+  PresentationScene,
   ScheduledInnings,
   TeamSide,
 } from "@/lib/baseball-game/types";
@@ -112,6 +115,11 @@ export default function BaseballGameDebug({
   const playerView = getGameView(game, session.humanTeam);
   const aiTeam =
     session.mode === "solo_ai" ? oppositeTeam(session.humanTeam) : null;
+  const soundscape = useBaseballSoundscape({
+    game: playerView,
+    perspective: session.mode === "solo_ai" ? session.humanTeam : "neutral",
+    presenting: presentationActive,
+  });
   const interludeKind = getInterludeKind(
     currentRevisionEvents,
     acknowledgedInterlude === game.revision,
@@ -299,13 +307,14 @@ export default function BaseballGameDebug({
               <div className="bbg-broadcast-heading">
                 <h1 id="field-heading">야구 게임 라이브</h1>
                 <BroadcastScoreboard game={game} />
-                <BaseballAudio events={game.eventLog} />
+                <BaseballSoundControls soundscape={soundscape} />
               </div>
 
               <div className="bbg-field-content">
                 <BaseballStadium
                   face={lastResult?.face}
                   game={playerView}
+                  onBeat={soundscape.onBeat}
                   onPresentationChange={setPresentationActive}
                 />
                 {!presentationActive &&
@@ -976,6 +985,7 @@ function presentationLabel(cue: PresentationCue) {
 export function BaseballStadium({
   face,
   game,
+  onBeat,
   onPresentationChange,
 }: {
   face?: DieFace;
@@ -983,6 +993,7 @@ export function BaseballStadium({
     phase?: GamePhase;
     pitchDuel?: GameState["pitchDuel"] | GameView["pitchDuel"];
   };
+  onBeat?: (beat: PresentationBeat, scene: PresentationScene) => void;
   onPresentationChange?: (active: boolean) => void;
 }) {
   const pitchHistory = getPlateAppearancePitchHistory(game.eventLog);
@@ -992,6 +1003,20 @@ export function BaseballStadium({
   useEffect(() => {
     onPresentationChange?.(isPresenting);
   }, [isPresenting, onPresentationChange]);
+  const onBeatRef = useRef(onBeat);
+  useEffect(() => {
+    onBeatRef.current = onBeat;
+  }, [onBeat]);
+  const activeBeat = scene?.beats[index];
+  const playedBeatRef = useRef<string | null>(null);
+  useEffect(() => {
+    // Polling rebuilds scene objects for the same beat, so play by beat id.
+    if (!activeBeat || !scene || playedBeatRef.current === activeBeat.id) {
+      return;
+    }
+    playedBeatRef.current = activeBeat.id;
+    onBeatRef.current?.(activeBeat, scene);
+  }, [activeBeat, scene]);
   const latestPitchLocation = pitchHistory.at(-1)?.location;
   const activeBattedBallCue = cue?.type === "batted_ball" ? cue : undefined;
   const flight = activeBattedBallCue
@@ -1329,43 +1354,124 @@ function CatcherPitchStage({
         viewBox="0 0 900 700"
       >
         <defs>
-          <radialGradient id="catcher-sky" cx="50%" cy="30%" r="76%">
-            <stop offset="0" stopColor="#23435c" />
-            <stop offset="0.54" stopColor="#10283a" />
-            <stop offset="1" stopColor="#06111b" />
+          <linearGradient id="catcher-sky" x1="0" x2="0" y1="0" y2="1">
+            <stop offset="0" stopColor="#060a10" />
+            <stop offset="0.6" stopColor="#0d1824" />
+            <stop offset="1" stopColor="#13202c" />
+          </linearGradient>
+          <radialGradient id="catcher-light" cx="50%" cy="50%" r="50%">
+            <stop offset="0" stopColor="#fff6dd" stopOpacity="0.55" />
+            <stop offset="0.35" stopColor="#ffe7b0" stopOpacity="0.12" />
+            <stop offset="1" stopColor="#ffe7b0" stopOpacity="0" />
           </radialGradient>
+          <pattern
+            height="9"
+            id="catcher-crowd"
+            patternUnits="userSpaceOnUse"
+            width="11"
+          >
+            <rect fill="#0e1620" height="9" width="11" />
+            <circle cx="2.5" cy="3" fill="#2a3644" r="1.6" />
+            <circle cx="7.5" cy="6.5" fill="#1f2a36" r="1.5" />
+            <circle cx="9.5" cy="2" fill="#3a4654" r="1.1" />
+          </pattern>
+          <linearGradient id="catcher-stand-shade" x1="0" x2="0" y1="0" y2="1">
+            <stop offset="0" stopColor="#05080c" stopOpacity="0.2" />
+            <stop offset="1" stopColor="#05080c" stopOpacity="0.75" />
+          </linearGradient>
+          <pattern
+            height="700"
+            id="catcher-mow"
+            patternTransform="skewX(-18)"
+            patternUnits="userSpaceOnUse"
+            width="120"
+          >
+            <rect fill="#1c5537" height="700" width="60" />
+            <rect fill="#184c31" height="700" width="60" x="60" />
+          </pattern>
           <linearGradient id="catcher-dirt" x1="0" x2="0" y1="0" y2="1">
-            <stop offset="0" stopColor="#92623f" />
-            <stop offset="1" stopColor="#4c3024" />
+            <stop offset="0" stopColor="#8a5f40" />
+            <stop offset="1" stopColor="#4a3122" />
+          </linearGradient>
+          <linearGradient id="catcher-rim" x1="0" x2="1" y1="0" y2="0">
+            <stop offset="0" stopColor="#c9d6e2" stopOpacity="0.38" />
+            <stop offset="0.5" stopColor="#c9d6e2" stopOpacity="0" />
           </linearGradient>
         </defs>
         <rect fill="url(#catcher-sky)" height="700" width="900" />
+        <circle cx="120" cy="40" fill="url(#catcher-light)" r="150" />
+        <circle cx="780" cy="40" fill="url(#catcher-light)" r="150" />
         <path
           className="bbg-catcher-stands"
-          d="M0 245 Q450 105 900 245 V355 Q450 225 0 355 Z"
+          d="M0 120 Q450 40 900 120 V300 Q450 214 0 300 Z"
+          fill="url(#catcher-crowd)"
         />
         <path
-          className="bbg-catcher-grass"
-          d="M0 330 Q450 230 900 330 V700 H0 Z"
+          d="M0 120 Q450 40 900 120 V300 Q450 214 0 300 Z"
+          fill="url(#catcher-stand-shade)"
         />
-        <path fill="url(#catcher-dirt)" d="M0 540 Q450 270 900 540 V700 H0 Z" />
+        <path
+          className="bbg-catcher-wall"
+          d="M0 296 Q450 210 900 296 V322 Q450 238 0 322 Z"
+        />
+        <path className="bbg-catcher-wall-line" d="M0 296 Q450 210 900 296" />
+        <path
+          className="bbg-catcher-grass"
+          d="M0 320 Q450 236 900 320 V700 H0 Z"
+          fill="url(#catcher-mow)"
+        />
+        <path fill="url(#catcher-dirt)" d="M0 548 Q450 282 900 548 V700 H0 Z" />
         <ellipse
           className="bbg-catcher-mound"
           cx="450"
-          cy="310"
-          rx="75"
-          ry="18"
+          cy="312"
+          rx="78"
+          ry="17"
         />
-        <g className="bbg-catcher-pitcher" transform="translate(450 274)">
-          <circle cy="-28" r="13" />
-          <path d="M-13 -13 Q0 -24 13 -13 L18 26 L7 52 H-7 L-18 26 Z" />
-          <path d="M-9 48 L-28 92 M9 48 L28 92" />
+        <g className="bbg-catcher-pitcher" transform="translate(450 306)">
+          <path
+            className="bbg-catcher-limb is-leg"
+            d="M-5 -38 L-9 -18 L-13 0"
+          />
+          <path className="bbg-catcher-limb is-leg" d="M5 -38 L8 -18 L12 0" />
+          <path d="M-11 -71 Q0 -76 11 -71 L9 -38 Q0 -34 -9 -38 Z" />
+          <path
+            className="bbg-catcher-limb is-arm"
+            d="M-10 -68 L-13 -56 L-3 -55"
+          />
+          <path
+            className="bbg-catcher-limb is-arm"
+            d="M10 -68 L13 -56 L3 -55"
+          />
+          <circle className="bbg-catcher-glove" cx="0" cy="-56" r="5" />
+          <circle cx="0" cy="-82" r="7.5" />
+          <path d="M-8 -84 Q-7 -92 1 -92 Q8 -91 8 -85 L13 -84 L13 -82 H-8 Z" />
         </g>
-        <g className="bbg-catcher-batter" transform="translate(675 425)">
-          <circle cy="-92" r="24" />
-          <path d="M-26 -65 Q4 -82 28 -54 L40 60 H-22 Z" />
-          <path d="M-9 55 L-35 164 M25 54 L54 164" />
-          <path className="bbg-catcher-bat" d="M-8 -48 L80 -145" />
+        <g className="bbg-catcher-batter" transform="translate(660 690)">
+          <path className="bbg-catcher-bat" d="M24 -170 L70 -262" />
+          <path
+            className="bbg-catcher-limb is-leg"
+            d="M-16 -104 L-34 -54 L-46 -4"
+          />
+          <path
+            className="bbg-catcher-limb is-leg"
+            d="M14 -104 L26 -54 L40 -4"
+          />
+          <path d="M-26 -178 Q2 -190 28 -176 L22 -102 Q2 -94 -20 -102 Z" />
+          <path
+            className="bbg-catcher-limb is-arm"
+            d="M-20 -172 L-2 -148 L22 -166"
+          />
+          <path
+            className="bbg-catcher-limb is-arm"
+            d="M24 -174 L38 -150 L24 -166"
+          />
+          <circle cx="0" cy="-202" r="16" />
+          <path d="M-18 -204 Q-16 -226 3 -226 Q21 -224 21 -206 L28 -201 L-18 -199 Z" />
+          <path
+            className="bbg-catcher-rim"
+            d="M-26 -178 Q2 -190 28 -176 L22 -102"
+          />
         </g>
         <path className="bbg-catcher-box" d="M310 690 L355 520 H545 L590 690" />
         <path

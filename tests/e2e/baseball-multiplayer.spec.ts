@@ -46,7 +46,9 @@ test("두 기기가 방을 만들고 비공개 손패로 같은 경기를 진행
 
   await host.setViewportSize({ width: 944, height: 1013 });
   const portraitField = await host.evaluate(() => {
-    const stadium = document.querySelector(".bbg-mp-field .bbg-field-overview");
+    const stadium = document.querySelector(
+      ".bbg-room-stage .bbg-field-overview",
+    );
     return {
       pageWidthFits: document.documentElement.scrollWidth <= window.innerWidth,
       pageHeightFits:
@@ -80,7 +82,7 @@ test("두 기기가 방을 만들고 비공개 손패로 같은 경기를 진행
   await expect(home.locator(".bbg-card-timing")).toHaveCount(4);
   await expect(home.locator(".bbg-card-effect").first()).toBeVisible();
   await expect(home.getByRole("region", { name: "투구 선택" })).toBeVisible();
-  await expect(host.getByText("상대 팀의 결정을 기다리는 중")).toBeVisible({
+  await expect(host.getByText("상대 투수가 사인을 고르는 중")).toBeVisible({
     timeout: 4_000,
   });
 
@@ -209,7 +211,7 @@ test("두 기기가 방을 만들고 비공개 손패로 같은 경기를 진행
     widthFits: document.documentElement.scrollWidth <= window.innerWidth,
     heightFits: document.documentElement.scrollHeight <= window.innerHeight,
     board: document
-      .querySelector(".bbg-mp-board")
+      .querySelector(".bbg-room-board")
       ?.getBoundingClientRect()
       .toJSON(),
   }));
