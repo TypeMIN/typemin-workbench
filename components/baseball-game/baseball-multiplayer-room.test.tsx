@@ -6,6 +6,7 @@ import {
   getGameView,
   transition,
 } from "@/lib/baseball-game/engine";
+import { buildSeriesView } from "@/lib/baseball-game/multiplayer/series";
 import {
   FORFEIT_AFTER_CONSECUTIVE_TIMEOUTS,
   buildShotClockView,
@@ -14,6 +15,12 @@ import {
 import type { MultiplayerRoomSnapshot } from "@/lib/baseball-game/multiplayer/types";
 
 import BaseballMultiplayerRoom from "./baseball-multiplayer-room";
+
+vi.mock("qrcode", () => ({
+  default: {
+    toDataURL: vi.fn().mockResolvedValue("data:image/png;base64,AA=="),
+  },
+}));
 
 function response(body: unknown, status = 200) {
   return new Response(JSON.stringify(body), {
@@ -47,6 +54,8 @@ function snapshot(seat: "away" | "home", status: "lobby" | "playing") {
       playing: status === "playing",
       now: Date.now(),
     }),
+    reactions: [],
+    series: buildSeriesView(null, state, createClockState(0)),
   } satisfies MultiplayerRoomSnapshot;
 }
 
@@ -236,5 +245,104 @@ describe("BaseballMultiplayerRoom", () => {
     expect(
       await screen.findByRole("button", { name: "몰수승 선언" }),
     ).toBeVisible();
+  });
+
+  it("shows a join QR code in the lobby", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi
+        .fn()
+        .mockResolvedValue(response({ snapshot: snapshot("away", "lobby") })),
+    );
+    render(<BaseballMultiplayerRoom roomCode="ABC234" />);
+    expect(await screen.findByAltText("홈팀 참가 QR 코드")).toBeVisible();
+  });
+
+  it("sends a reaction and floats the opponent's reactions on the stage", async () => {
+    const base = snapshot("away", "playing");
+    let current: MultiplayerRoomSnapshot = base;
+    const fetchMock = vi.fn((input: RequestInfo | URL) =>
+      Promise.resolve(
+        response({
+          snapshot: String(input).endsWith("/reactions")
+            ? {
+                ...base,
+                reactions: [
+                  {
+                    id: "mine-1",
+                    team: "away",
+                    kind: "clap",
+                    at: new Date().toISOString(),
+                  },
+                ],
+              }
+            : current,
+        }),
+      ),
+    );
+    vi.stubGlobal("fetch", fetchMock);
+
+    render(<BaseballMultiplayerRoom roomCode="ABC234" />);
+    fireEvent.click(await screen.findByRole("button", { name: "박수" }));
+    await waitFor(() =>
+      expect(fetchMock).toHaveBeenCalledWith(
+        "/api/baseball-game/rooms/ABC234/reactions",
+        expect.objectContaining({ body: JSON.stringify({ kind: "clap" }) }),
+      ),
+    );
+    expect(await screen.findByText("나")).toBeVisible();
+
+    current = {
+      ...base,
+      reactions: [
+        {
+          id: "theirs-1",
+          team: "home",
+          kind: "taunt",
+          at: new Date().toISOString(),
+        },
+      ],
+    };
+    expect(
+      await screen.findByText("한 번 더 와봐", { selector: "span" }),
+    ).toBeVisible();
+  });
+
+  it("offers a rematch, series record and highlights after the final out", async () => {
+    const base = snapshot("home", "playing");
+    const finishedState = {
+      ...createGame(base.view.config),
+      phase: "finished" as const,
+      winner: "home" as const,
+      score: { away: 1, home: 2 },
+    };
+    const finished = {
+      ...base,
+      status: "finished",
+      isYourTurn: false,
+      actionOwner: null,
+      view: getGameView(finishedState, "home"),
+      series: {
+        ...buildSeriesView(null, finishedState, createClockState(0)),
+        rematchVotes: { away: true, home: false },
+      },
+    } as MultiplayerRoomSnapshot;
+    const fetchMock = vi.fn(() =>
+      Promise.resolve(response({ snapshot: finished })),
+    );
+    vi.stubGlobal("fetch", fetchMock);
+
+    render(<BaseballMultiplayerRoom roomCode="ABC234" />);
+
+    expect(await screen.findByText("레드 승리")).toBeVisible();
+    expect(screen.getByLabelText("시리즈 전적")).toHaveTextContent("1차전");
+    expect(screen.getByText("상대가 재대결을 신청했습니다.")).toBeVisible();
+    fireEvent.click(screen.getByRole("button", { name: /재대결 수락/ }));
+    await waitFor(() =>
+      expect(fetchMock).toHaveBeenCalledWith(
+        "/api/baseball-game/rooms/ABC234/rematch",
+        expect.objectContaining({ method: "POST" }),
+      ),
+    );
   });
 });

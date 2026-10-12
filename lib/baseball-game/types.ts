@@ -91,6 +91,8 @@ export type CardZone = {
   drawPile: CardInstance[];
   hand: CardInstance[];
   discardPile: CardInstance[];
+  /** Times the discard pile was shuffled back in. Absent on older saves. */
+  reshuffleCount?: number;
 };
 
 export type PlayedCard = CardInstance & {
@@ -323,6 +325,9 @@ export type GameEvent = {
   swingDecision?: SwingDecision;
   pitchLocation?: PitchLocation;
   duelWinner?: DuelWinner;
+  cardTiming?: CardTiming;
+  /** Deck reshuffle count when a card was played, for public card counting. */
+  deckCycle?: number;
 };
 
 export type GameState = {
@@ -367,6 +372,7 @@ export type CardZoneView = {
   handCount: number;
   drawCount: number;
   discardCount: number;
+  reshuffleCount: number;
   hand: CardInstance[] | null;
 };
 

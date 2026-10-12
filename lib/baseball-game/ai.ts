@@ -1,5 +1,6 @@
 import { CARD_DEFINITIONS } from "./cards";
 import { getActionOwner, getLegalCards } from "./engine";
+import { getTeamTendencies, type RateSample } from "./scouting";
 import type {
   CardId,
   GameAction,
@@ -7,6 +8,23 @@ import type {
   PitchTarget,
   TeamSide,
 } from "./types";
+
+/**
+ * The AI reads only revealed pitches, so it plays the same information game
+ * as a person. Each read is smoothed toward a prior so a few early choices do
+ * not swing it, and the response is softened so the AI never becomes a fixed
+ * pattern that can be exploited in turn.
+ */
+const READ_PRIOR_SAMPLES = 6;
+const PRIOR_SWING_RATE = 0.55;
+const PRIOR_STRIKE_RATE = 0.62;
+const READ_RESPONSE = 1.1;
+const PITCH_BALL_RANGE = { min: 0.12, max: 0.68 } as const;
+const SWING_RANGE = { min: 0.22, max: 0.85 } as const;
+const FULL_BALLS_BALL_FACTOR = 0.35;
+const TWO_STRIKE_BALL_BONUS = 0.1;
+const TWO_STRIKE_SWING_BONUS = 0.12;
+const THREE_BALL_SWING_PENALTY = 0.12;
 
 const CARD_PRIORITY: Partial<Record<CardId, number>> = {
   GTP: 120,
@@ -81,26 +99,77 @@ export function chooseAiAction(
   }
 
   if (state.phase === "awaiting_pitch") {
-    return { type: "SELECT_PITCH", target: choosePitchTarget(state, random) };
+    return {
+      type: "SELECT_PITCH",
+      target: choosePitchTarget(state, aiTeam, random),
+    };
   }
   if (state.phase === "awaiting_swing") {
-    let swingChance = 0.5;
-    if (state.strikes === 2) swingChance = 0.68;
-    if (state.balls === 3) swingChance = 0.34;
     return {
       type: "SELECT_SWING",
-      decision: random() < swingChance ? "swing" : "take",
+      decision: random() < swingChance(state, aiTeam) ? "swing" : "take",
     };
   }
   return null;
 }
 
+function opponentOf(team: TeamSide): TeamSide {
+  return team === "away" ? "home" : "away";
+}
+
+function smoothedRate(
+  samples: { all: RateSample; twoStrikes: RateSample },
+  twoStrikes: boolean,
+  prior: number,
+) {
+  const sample =
+    twoStrikes && samples.twoStrikes.count > 0
+      ? samples.twoStrikes
+      : samples.all;
+  return (
+    (sample.hits + prior * READ_PRIOR_SAMPLES) /
+    (sample.count + READ_PRIOR_SAMPLES)
+  );
+}
+
+function respond(rate: number, range: { min: number; max: number }) {
+  const value = 0.5 + (rate - 0.5) * READ_RESPONSE;
+  return Math.min(range.max, Math.max(range.min, value));
+}
+
+/** Throw balls to a batter who chases, strikes to one who waits. */
+export function pitchBallChance(state: GameState, aiTeam: TeamSide) {
+  const batter = getTeamTendencies(state.eventLog, opponentOf(aiTeam)).batting;
+  const swingRate = smoothedRate(batter, state.strikes === 2, PRIOR_SWING_RATE);
+  let chance = respond(swingRate, PITCH_BALL_RANGE);
+  if (state.strikes === 2 && state.balls < 3) chance += TWO_STRIKE_BALL_BONUS;
+  if (state.balls === 3) chance *= FULL_BALLS_BALL_FACTOR;
+  return Math.min(PITCH_BALL_RANGE.max, chance);
+}
+
+/** Swing at a pitcher who lives in the zone, take against one who nibbles. */
+export function swingChance(state: GameState, aiTeam: TeamSide) {
+  const pitcher = getTeamTendencies(
+    state.eventLog,
+    opponentOf(aiTeam),
+  ).pitching;
+  const strikeRate = smoothedRate(
+    pitcher,
+    state.strikes === 2,
+    PRIOR_STRIKE_RATE,
+  );
+  let chance = respond(strikeRate, SWING_RANGE);
+  if (state.strikes === 2) chance += TWO_STRIKE_SWING_BONUS;
+  if (state.balls === 3) chance -= THREE_BALL_SWING_PENALTY;
+  return Math.min(SWING_RANGE.max, Math.max(SWING_RANGE.min, chance));
+}
+
 function choosePitchTarget(
   state: GameState,
+  aiTeam: TeamSide,
   random: () => number,
 ): PitchTarget {
-  const ballChance = state.balls === 3 ? 0.08 : state.strikes === 2 ? 0.3 : 0.2;
-  return random() < ballChance ? "ball" : "strike";
+  return random() < pitchBallChance(state, aiTeam) ? "ball" : "strike";
 }
 
 function scoreCard(state: GameState, cardId: CardId) {

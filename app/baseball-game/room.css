@@ -1438,3 +1438,470 @@
     -webkit-line-clamp: 2;
   }
 }
+
+/* Scouting */
+
+.bbg-room-scout summary {
+  display: grid;
+  gap: 2px;
+  cursor: pointer;
+  list-style: none;
+}
+
+.bbg-room-scout summary::-webkit-details-marker {
+  display: none;
+}
+
+.bbg-room-scout summary::after {
+  position: absolute;
+  top: 16px;
+  right: 14px;
+  color: var(--room-dim);
+  font-size: 12px;
+  content: "+";
+}
+
+.bbg-room-scout {
+  position: relative;
+}
+
+.bbg-room-scout[open] summary::after {
+  content: "−";
+}
+
+.bbg-room-scout summary strong {
+  font-size: 14px;
+}
+
+.bbg-room-scout summary span {
+  color: var(--room-muted);
+  font-size: 12px;
+}
+
+.bbg-room-scout-body {
+  display: grid;
+  gap: 14px;
+  margin-top: 12px;
+  padding-top: 12px;
+  border-top: 1px solid var(--room-line);
+}
+
+.bbg-room-scout-body h3 {
+  margin: 0 0 6px;
+  color: var(--room-muted);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+}
+
+.bbg-room-scout-body p {
+  margin: 0;
+  color: var(--room-dim);
+  font-size: 12px;
+}
+
+.bbg-room-tendency {
+  display: grid;
+  grid-template-columns: 92px repeat(3, minmax(0, 1fr));
+  align-items: center;
+  gap: 6px;
+  padding: 6px 0;
+  border-bottom: 1px solid var(--room-line);
+}
+
+.bbg-room-tendency > span {
+  color: var(--room-muted);
+  font-size: 12px;
+}
+
+.bbg-room-tendency div {
+  display: grid;
+  justify-items: start;
+}
+
+.bbg-room-tendency small {
+  color: var(--room-dim);
+  font-size: 10px;
+}
+
+.bbg-room-tendency strong {
+  font-size: 14px;
+}
+
+.bbg-room-tendency em {
+  color: var(--room-dim);
+  font-size: 10px;
+  font-style: normal;
+}
+
+.bbg-room-notes,
+.bbg-room-tracker {
+  display: grid;
+  gap: 4px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.bbg-room-notes li,
+.bbg-room-tracker li {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 6px 8px;
+  border-radius: var(--room-radius-sm);
+  background: var(--room-raised);
+  font-size: 12px;
+}
+
+.bbg-room-notes li span {
+  color: var(--room-dim);
+  white-space: nowrap;
+}
+
+.bbg-room-notes li strong {
+  font-weight: 600;
+  text-align: right;
+}
+
+.bbg-room-notes li[data-kind="passed"] strong {
+  color: var(--room-accent);
+}
+
+.bbg-room-tracker li strong {
+  color: var(--room-muted);
+  font-weight: 600;
+}
+
+/* Reactions */
+
+.bbg-room-reactions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.bbg-room-reactions button {
+  min-height: 30px;
+  padding: 0 10px;
+  border: 1px solid var(--room-line);
+  border-radius: var(--room-radius-sm);
+  color: var(--room-muted);
+  background: var(--room-panel);
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.bbg-room-reactions button:hover:not(:disabled) {
+  border-color: var(--room-line-strong);
+  color: var(--room-text);
+}
+
+.bbg-room-reactions button:disabled {
+  cursor: default;
+  opacity: 0.4;
+}
+
+.bbg-room-bubbles {
+  position: absolute;
+  z-index: 14;
+  inset: 0;
+  pointer-events: none;
+}
+
+.bbg-room-bubbles span {
+  position: absolute;
+  bottom: calc(76px + var(--bubble-offset, 0) * 40px);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px;
+  border: 1px solid var(--room-line-strong);
+  border-radius: var(--room-radius);
+  color: var(--room-text);
+  background: rgb(8 11 16 / 92%);
+  box-shadow: 0 10px 26px rgb(0 0 0 / 40%);
+  font-size: 14px;
+  font-weight: 700;
+  animation: bbg-room-bubble 2.8s ease-out forwards;
+}
+
+.bbg-room-bubbles span[data-side="mine"] {
+  left: 16px;
+  border-left: 3px solid var(--room-accent);
+}
+
+.bbg-room-bubbles span[data-side="opponent"] {
+  right: 16px;
+  border-right: 3px solid var(--room-home);
+}
+
+.bbg-room-bubbles small {
+  color: var(--room-dim);
+  font-size: 10px;
+  font-weight: 700;
+}
+
+@keyframes bbg-room-bubble {
+  0% {
+    opacity: 0;
+    translate: 0 12px;
+  }
+  12%,
+  75% {
+    opacity: 1;
+    translate: 0 0;
+  }
+  100% {
+    opacity: 0;
+    translate: 0 -24px;
+  }
+}
+
+/* Connection warning */
+
+.bbg-room-connection-lost {
+  position: absolute;
+  z-index: 16;
+  top: 14px;
+  left: 50%;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 7px 12px;
+  border: 1px solid color-mix(in srgb, var(--room-out) 60%, transparent);
+  border-radius: var(--room-radius-sm);
+  color: #ffd0cb;
+  background: rgb(40 10 10 / 92%);
+  font-size: 12.5px;
+  font-weight: 700;
+  translate: -50% 0;
+}
+
+/* Replay */
+
+.bbg-room-replay {
+  position: absolute;
+  z-index: 20;
+  inset: 0;
+  background: #05080c;
+}
+
+.bbg-room-replay > .bbg-stadium {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  margin: 0;
+  border: 0;
+  border-radius: 0;
+}
+
+.bbg-room-replay-bar {
+  position: absolute;
+  z-index: 22;
+  right: 14px;
+  bottom: 14px;
+  left: 14px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 8px 8px 8px 0;
+  overflow: hidden;
+  border: 1px solid var(--room-line-strong);
+  border-radius: var(--room-radius-sm);
+  background: rgb(8 11 16 / 94%);
+}
+
+.bbg-room-replay-tag {
+  display: flex;
+  align-self: stretch;
+  align-items: center;
+  gap: 6px;
+  margin: -8px 0;
+  padding: 0 12px;
+  color: var(--room-accent-ink);
+  background: var(--room-accent);
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+}
+
+.bbg-room-replay-bar strong {
+  min-width: 0;
+  flex: 1;
+  overflow: hidden;
+  font-size: 14px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.bbg-room-replay-count {
+  color: var(--room-dim);
+  font-size: 12px;
+}
+
+.bbg-room-replay-bar > div {
+  display: flex;
+  gap: 4px;
+}
+
+.bbg-room-replay-bar button,
+.bbg-room-lower-replay {
+  display: grid;
+  width: 32px;
+  height: 32px;
+  place-items: center;
+  padding: 0;
+  border: 1px solid var(--room-line);
+  border-radius: var(--room-radius-sm);
+  color: var(--room-muted);
+  background: transparent;
+  cursor: pointer;
+}
+
+.bbg-room-replay-bar button:hover:not(:disabled),
+.bbg-room-lower-replay:hover {
+  border-color: var(--room-line-strong);
+  color: var(--room-text);
+}
+
+.bbg-room-replay-bar button:disabled {
+  opacity: 0.35;
+}
+
+.bbg-room-lower-replay {
+  align-self: center;
+  margin-right: 8px;
+  flex: none;
+}
+
+/* Final panel: series and rematch */
+
+.bbg-room-series {
+  display: grid;
+  gap: 8px;
+  padding: 10px;
+  border-radius: var(--room-radius-sm);
+  background: var(--room-raised);
+}
+
+.bbg-room-series > div {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.bbg-room-series > div span {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  color: var(--room-muted);
+  font-size: 13px;
+}
+
+.bbg-room-series > div span[data-mine="true"] {
+  color: var(--room-text);
+}
+
+.bbg-room-series > div strong {
+  color: var(--room-text);
+  font-size: 22px;
+}
+
+.bbg-room-series ol {
+  display: grid;
+  gap: 2px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.bbg-room-series li {
+  display: grid;
+  grid-template-columns: 44px minmax(0, 1fr) auto;
+  gap: 8px;
+  color: var(--room-dim);
+  font-size: 11.5px;
+}
+
+.bbg-room-series li em {
+  color: var(--room-out);
+  font-style: normal;
+}
+
+.bbg-room-rematch {
+  display: grid;
+  gap: 6px;
+}
+
+.bbg-room-rematch p {
+  margin: 0;
+  color: var(--room-accent);
+  font-size: 12.5px;
+  font-weight: 600;
+}
+
+.bbg-room-qr {
+  width: 136px;
+  height: 136px;
+  justify-self: start;
+  border-radius: var(--room-radius-sm);
+}
+
+.bbg-room-kbd {
+  display: inline-block;
+  margin-left: 8px;
+  padding: 1px 6px;
+  border: 1px solid var(--room-line-strong);
+  border-radius: 3px;
+  color: var(--room-dim);
+  font-family: ui-monospace, "SF Mono", Menlo, monospace;
+  font-size: 10.5px;
+}
+
+@media (hover: none) {
+  .bbg-room-kbd {
+    display: none;
+  }
+}
+
+@media (max-width: 880px) {
+  .bbg-room-reactions {
+    flex-wrap: nowrap;
+    overflow-x: auto;
+  }
+
+  .bbg-room-reactions button {
+    flex: none;
+  }
+
+  .bbg-room-bubbles span {
+    bottom: calc(60px + var(--bubble-offset, 0) * 36px);
+    font-size: 13px;
+  }
+
+  .bbg-room-replay-bar {
+    right: 8px;
+    bottom: 8px;
+    left: 8px;
+  }
+
+  .bbg-room-replay-count {
+    display: none;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .bbg-room-bubbles span {
+    animation-duration: 0.01ms;
+    animation-delay: 2.7s;
+  }
+}
+
+/* Rail panels scroll as a column; none of them may be squeezed to zero. */
+.bbg-room-rail > * {
+  flex-shrink: 0;
+}

@@ -115,10 +115,12 @@ export type Database = {
           id: string;
           mode: string;
           party_state: Json | null;
+          reactions: Json;
           revision: number;
           revision_started_at: string;
           room_code: string;
           room_revision: number;
+          series: Json | null;
           state: Json;
           status: string;
           updated_at: string;
@@ -131,10 +133,12 @@ export type Database = {
           id?: string;
           mode?: string;
           party_state?: Json | null;
+          reactions?: Json;
           revision?: number;
           revision_started_at?: string;
           room_code: string;
           room_revision?: number;
+          series?: Json | null;
           state: Json;
           status?: string;
           updated_at?: string;
@@ -147,10 +151,12 @@ export type Database = {
           id?: string;
           mode?: string;
           party_state?: Json | null;
+          reactions?: Json;
           revision?: number;
           revision_started_at?: string;
           room_code?: string;
           room_revision?: number;
+          series?: Json | null;
           state?: Json;
           status?: string;
           updated_at?: string;
@@ -811,6 +817,16 @@ export type Database = {
         };
         Returns: Json;
       };
+      baseball_push_reaction: {
+        Args: {
+          p_cooldown_ms: number;
+          p_game_id: string;
+          p_kind: string;
+          p_limit: number;
+          p_team: string;
+        };
+        Returns: Json;
+      };
       baseball_update_clock: {
         Args: {
           p_clock: Json;
@@ -818,6 +834,17 @@ export type Database = {
           p_finish: boolean;
           p_game_id: string;
           p_revision: number;
+        };
+        Returns: Json;
+      };
+      baseball_vote_rematch: {
+        Args: {
+          p_clock: Json;
+          p_expected_series: Json;
+          p_game_id: string;
+          p_new_state: Json;
+          p_revision: number;
+          p_series: Json;
         };
         Returns: Json;
       };

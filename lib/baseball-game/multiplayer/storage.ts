@@ -11,10 +11,14 @@ import type {
   SeatVisibility,
   StoredSeatPresence,
 } from "./presence";
+import type { MultiplayerReaction } from "./reactions";
+import type { MultiplayerSeries } from "./series";
 import type { MultiplayerClockState } from "./shot-clock";
 import type {
   MultiplayerClockUpdateInput,
   MultiplayerCommitInput,
+  MultiplayerReactionInput,
+  MultiplayerRematchInput,
   MultiplayerCommitResult,
   MultiplayerRoomRecord,
   MultiplayerRoomStatus,
@@ -47,6 +51,10 @@ export interface MultiplayerStorage {
   updateClock(
     input: MultiplayerClockUpdateInput,
   ): Promise<"applied" | "conflict">;
+  pushReaction(
+    input: MultiplayerReactionInput,
+  ): Promise<"applied" | "cooldown" | "conflict">;
+  voteRematch(input: MultiplayerRematchInput): Promise<"applied" | "conflict">;
 }
 
 export type MultiplayerSeatContext = {
@@ -83,7 +91,9 @@ class MemoryMultiplayerStorage implements MultiplayerStorage {
       revision: input.state.revision,
       revisionStartedAt: new Date(now).toISOString(),
       clock: null,
-      expiresAt: new Date(now + 24 * 60 * 60 * 1000).toISOString(),
+      reactions: [],
+      series: null,
+      expiresAt: new Date(now + ROOM_LIFETIME_MS).toISOString(),
       seats: { away: input.awayTokenHash },
       presence: { away: freshPresence("visible") },
       idempotency: new Map(),
@@ -196,6 +206,53 @@ class MemoryMultiplayerStorage implements MultiplayerStorage {
     }
     room.clock = structuredClone(input.clock);
     if (input.finish) room.status = "finished";
+    return "applied" as const;
+  }
+
+  async pushReaction(input: MultiplayerReactionInput) {
+    const room = findMemoryRoom(input.roomId);
+    if (!room || (room.status !== "playing" && room.status !== "finished")) {
+      return "conflict" as const;
+    }
+    const now = Date.now();
+    const recent = room.reactions.some(
+      (reaction) =>
+        reaction.team === input.team &&
+        now - Date.parse(reaction.at) < input.cooldownMs,
+    );
+    if (recent) return "cooldown" as const;
+    room.reactions = [
+      ...room.reactions,
+      {
+        id: randomUUID(),
+        team: input.team,
+        kind: input.kind,
+        at: new Date(now).toISOString(),
+      },
+    ].slice(-input.limit);
+    return "applied" as const;
+  }
+
+  async voteRematch(input: MultiplayerRematchInput) {
+    const room = findMemoryRoom(input.roomId);
+    if (
+      !room ||
+      room.status !== "finished" ||
+      room.revision !== input.revision ||
+      JSON.stringify(room.series) !== JSON.stringify(input.expectedSeries)
+    ) {
+      return "conflict" as const;
+    }
+    room.series = structuredClone(input.series);
+    if (!input.start) return "applied" as const;
+    room.state = structuredClone(input.start.newState);
+    room.revision = input.start.newState.revision;
+    room.clock = structuredClone(input.start.clock);
+    room.status = "playing";
+    room.revisionStartedAt = new Date().toISOString();
+    room.expiresAt = new Date(Date.now() + ROOM_LIFETIME_MS).toISOString();
+    room.seats = { away: room.seats.home, home: room.seats.away };
+    room.presence = { away: room.presence.home, home: room.presence.away };
     return "applied" as const;
   }
 }
@@ -348,10 +405,44 @@ class SupabaseMultiplayerStorage implements MultiplayerStorage {
     if (error) throw new Error("ROOM_CLOCK_UPDATE_FAILED");
     return readRpcStatus(data) === "applied" ? "applied" : "conflict";
   }
+
+  async pushReaction(input: MultiplayerReactionInput) {
+    const { data, error } = await getSupabaseAdmin().rpc(
+      "baseball_push_reaction",
+      {
+        p_game_id: input.roomId,
+        p_team: input.team,
+        p_kind: input.kind,
+        p_cooldown_ms: input.cooldownMs,
+        p_limit: input.limit,
+      },
+    );
+    if (error) throw new Error("ROOM_REACTION_FAILED");
+    const status = readRpcStatus(data);
+    return status === "applied" || status === "cooldown" ? status : "conflict";
+  }
+
+  async voteRematch(input: MultiplayerRematchInput) {
+    const { data, error } = await getSupabaseAdmin().rpc(
+      "baseball_vote_rematch",
+      {
+        p_game_id: input.roomId,
+        p_revision: input.revision,
+        p_expected_series: input.expectedSeries as unknown as Json,
+        p_series: input.series as unknown as Json,
+        p_new_state: (input.start?.newState ?? null) as unknown as Json,
+        p_clock: (input.start?.clock ?? null) as unknown as Json,
+      },
+    );
+    if (error) throw new Error("ROOM_REMATCH_FAILED");
+    return readRpcStatus(data) === "applied" ? "applied" : "conflict";
+  }
 }
 
+const ROOM_LIFETIME_MS = 24 * 60 * 60 * 1000;
+
 const ROOM_COLUMNS =
-  "id, room_code, status, state, revision, revision_started_at, clock, expires_at";
+  "id, room_code, status, state, revision, revision_started_at, clock, reactions, series, expires_at";
 
 function freshPresence(visibility: SeatVisibility): StoredSeatPresence {
   return { lastSeenAt: new Date().toISOString(), visibility };
@@ -392,6 +483,8 @@ function cloneRoom(room: MemoryRoom): MultiplayerRoomRecord {
     revision: room.revision,
     revisionStartedAt: room.revisionStartedAt,
     clock: room.clock ? structuredClone(room.clock) : null,
+    reactions: structuredClone(room.reactions),
+    series: room.series ? structuredClone(room.series) : null,
     expiresAt: room.expiresAt,
   };
 }
@@ -404,6 +497,8 @@ function rowToRoom(row: {
   revision: number;
   revision_started_at: string;
   clock: Json | null;
+  reactions: Json;
+  series: Json | null;
   expires_at: string;
 }): MultiplayerRoomRecord {
   return {
@@ -414,6 +509,10 @@ function rowToRoom(row: {
     revision: Number(row.revision),
     revisionStartedAt: row.revision_started_at,
     clock: (row.clock ?? null) as unknown as MultiplayerClockState | null,
+    reactions: Array.isArray(row.reactions)
+      ? (row.reactions as unknown as MultiplayerReaction[])
+      : [],
+    series: (row.series ?? null) as unknown as MultiplayerSeries | null,
     expiresAt: row.expires_at,
   };
 }

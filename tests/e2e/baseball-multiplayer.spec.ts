@@ -223,3 +223,55 @@ test("두 기기가 방을 만들고 비공개 손패로 같은 경기를 진행
   await homeContext.close();
   await outsiderContext.close();
 });
+
+test("상대 기기의 응원과 접속 상태가 실시간으로 보인다", async ({
+  browser,
+}) => {
+  const baseURL = process.env.PLAYWRIGHT_BASE_URL ?? "http://localhost:3000";
+  const hostContext = await browser.newContext({
+    viewport: { width: 1280, height: 720 },
+  });
+  const homeContext = await browser.newContext({
+    viewport: { width: 390, height: 844 },
+  });
+  const host = await hostContext.newPage();
+  const home = await homeContext.newPage();
+
+  await host.goto(`${baseURL}/baseball-game`);
+  const created = await host.evaluate(async () => {
+    const response = await fetch("/api/baseball-game/rooms", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        mode: "multiplayer",
+        config: { innings: 3, awayTeamName: "블루", homeTeamName: "레드" },
+      }),
+    });
+    return response.json();
+  });
+  await host.goto(`${baseURL}${created.roomUrl}`);
+  await expect(host.getByAltText("홈팀 참가 QR 코드")).toBeVisible();
+
+  await home.goto(`${baseURL}${created.roomUrl}`);
+  await home.getByRole("button", { name: "홈팀으로 참가" }).click();
+  await expect(home.getByRole("region", { name: "투구 선택" })).toBeVisible();
+
+  await expect(host.getByText("상대 투수가 사인을 고르는 중")).toBeVisible();
+  await expect(host.getByText(/접속 중/)).toBeVisible();
+  await expect(
+    host.getByRole("timer", { name: /상대 결정 남은 시간/ }),
+  ).toBeVisible();
+
+  await home.getByRole("button", { name: "한 번 더 와봐" }).click();
+  await expect(
+    host.locator(".bbg-room-bubbles [data-side='opponent']"),
+  ).toContainText("한 번 더 와봐", { timeout: 4_000 });
+
+  await home.close();
+  await expect(host.getByText("상대 연결 끊김")).toBeVisible({
+    timeout: 25_000,
+  });
+
+  await hostContext.close();
+  await homeContext.close();
+});

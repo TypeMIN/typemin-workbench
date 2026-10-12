@@ -50,6 +50,7 @@ export function multiplayerErrorResponse(error: unknown) {
     NOT_YOUR_TURN: 403,
     INVALID_ACTION: 400,
     REVISION_CONFLICT: 409,
+    RATE_LIMITED: 429,
     STORAGE_ERROR: 500,
   }[error.code];
   return Response.json({ error: error.message, code: error.code }, { status });
