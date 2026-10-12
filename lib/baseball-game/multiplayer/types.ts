@@ -10,6 +10,8 @@ import type {
   TeamSide,
 } from "../types";
 import type { OpponentStatus } from "./presence";
+import type { MultiplayerReaction, ReactionKind } from "./reactions";
+import type { MultiplayerSeries, SeriesView } from "./series";
 import type { MultiplayerClockState, ShotClockView } from "./shot-clock";
 
 export type MultiplayerRoomStatus =
@@ -31,6 +33,8 @@ export type MultiplayerRoomSnapshot = {
   legalCards: CardAvailability[];
   view: GameView;
   clock: ShotClockView;
+  reactions: MultiplayerReaction[];
+  series: SeriesView;
 };
 
 export type MultiplayerRoomRecord = {
@@ -41,6 +45,8 @@ export type MultiplayerRoomRecord = {
   revision: number;
   revisionStartedAt: string;
   clock: MultiplayerClockState | null;
+  reactions: MultiplayerReaction[];
+  series: MultiplayerSeries | null;
   expiresAt: string;
 };
 
@@ -66,6 +72,22 @@ export type MultiplayerClockUpdateInput = {
   expectedClock: MultiplayerClockState | null;
   clock: MultiplayerClockState;
   finish: boolean;
+};
+
+export type MultiplayerReactionInput = {
+  roomId: string;
+  team: TeamSide;
+  kind: ReactionKind;
+  cooldownMs: number;
+  limit: number;
+};
+
+export type MultiplayerRematchInput = {
+  roomId: string;
+  revision: number;
+  expectedSeries: MultiplayerSeries | null;
+  series: MultiplayerSeries;
+  start: { newState: GameState; clock: MultiplayerClockState } | null;
 };
 
 export type MultiplayerCommitResult =

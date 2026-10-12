@@ -23,12 +23,27 @@ import {
   seatTokenHash,
 } from "./security";
 import {
+  REACTION_COOLDOWN_MS,
+  REACTION_HISTORY_LIMIT,
+  visibleReactions,
+  type ReactionKind,
+} from "./reactions";
+import {
+  buildRematchState,
+  buildSeriesView,
+  createSeries,
+  isGameOver,
+  summarizeGame,
+  type MultiplayerSeries,
+} from "./series";
+import {
   RECONNECT_GRACE_MS,
   TIMEOUT_EXTENSION_MS,
   buildShotClockView,
   canClaimForfeit,
   chooseTimeoutAction,
   getClockWindow,
+  createClockState,
   nextClockAfterCommit,
   resolveClockState,
   type MultiplayerClockState,
@@ -55,6 +70,7 @@ export class MultiplayerServiceError extends Error {
       | "NOT_YOUR_TURN"
       | "INVALID_ACTION"
       | "REVISION_CONFLICT"
+      | "RATE_LIMITED"
       | "STORAGE_ERROR",
     message: string,
   ) {
@@ -356,6 +372,118 @@ export async function submitMultiplayerCommand(
   );
 }
 
+export async function sendMultiplayerReaction(
+  roomCode: string,
+  seatToken: string | null,
+  kind: ReactionKind,
+  storage: MultiplayerStorage = getMultiplayerStorage(),
+) {
+  const room = await requireRoom(roomCode, storage);
+  const seatContext = await requireSeatContext(room, seatToken, storage);
+  if (room.status !== "playing" && room.status !== "finished") {
+    throw new MultiplayerServiceError(
+      "ROOM_UNAVAILABLE",
+      "경기 중에만 응원을 보낼 수 있습니다.",
+    );
+  }
+  let status;
+  try {
+    status = await storage.pushReaction({
+      roomId: room.id,
+      team: seatContext.seat,
+      kind,
+      cooldownMs: REACTION_COOLDOWN_MS,
+      limit: REACTION_HISTORY_LIMIT,
+    });
+  } catch {
+    throw new MultiplayerServiceError(
+      "STORAGE_ERROR",
+      "응원을 보내지 못했습니다.",
+    );
+  }
+  if (status === "cooldown") {
+    throw new MultiplayerServiceError(
+      "RATE_LIMITED",
+      "잠시 후 다시 보내 주세요.",
+    );
+  }
+  if (status === "conflict") {
+    throw new MultiplayerServiceError(
+      "ROOM_UNAVAILABLE",
+      "응원을 보낼 수 없는 경기 상태입니다.",
+    );
+  }
+  return getMultiplayerSnapshot(roomCode, seatToken, storage);
+}
+
+/**
+ * The first vote is stored; the second vote starts the next game with home
+ * and away swapped and records the finished one in the series.
+ */
+export async function voteMultiplayerRematch(
+  roomCode: string,
+  seatToken: string | null,
+  storage: MultiplayerStorage = getMultiplayerStorage(),
+) {
+  const storedRoom = await requireRoom(roomCode, storage);
+  const seatContext = await requireSeatContext(storedRoom, seatToken, storage);
+  const room = await settleExpiredDecision(storedRoom, seatContext, storage);
+  const clock = resolveClockState(room.clock, room.revision);
+  if (room.status !== "finished" || !isGameOver(room.state, clock)) {
+    throw new MultiplayerServiceError(
+      "ROOM_UNAVAILABLE",
+      "경기가 끝난 뒤에 재대결할 수 있습니다.",
+    );
+  }
+  const seat = seatContext.seat;
+  const series: MultiplayerSeries = room.series ?? createSeries();
+  if (series.rematchVotes[seat]) return buildSnapshot(room, seatContext);
+
+  const opponentVoted = series.rematchVotes[oppositeSeat(seat)];
+  let nextSeries: MultiplayerSeries;
+  let start = null;
+  if (opponentVoted) {
+    const newState = buildRematchState(room.state, randomInt(0, 0x1_0000_0000));
+    nextSeries = {
+      ...series,
+      games: [
+        ...series.games,
+        summarizeGame(room.state, clock, series.games.length + 1),
+      ],
+      rematchVotes: { away: false, home: false },
+    };
+    start = { newState, clock: createClockState(newState.revision) };
+  } else {
+    nextSeries = {
+      ...series,
+      rematchVotes: { ...series.rematchVotes, [seat]: true },
+    };
+  }
+
+  let status;
+  try {
+    status = await storage.voteRematch({
+      roomId: room.id,
+      revision: room.revision,
+      expectedSeries: room.series,
+      series: nextSeries,
+      start,
+    });
+  } catch {
+    throw new MultiplayerServiceError(
+      "STORAGE_ERROR",
+      "재대결 요청을 저장하지 못했습니다.",
+    );
+  }
+  if (status === "conflict") {
+    throw new MultiplayerServiceError(
+      "REVISION_CONFLICT",
+      "상대 기기에서 먼저 처리되었습니다. 다시 시도해 주세요.",
+    );
+  }
+  return getMultiplayerSnapshot(roomCode, seatToken, storage);
+}
+
 async function loadPlayingRoom(
   roomCode: string,
   seatToken: string | null,
@@ -569,5 +697,7 @@ function buildSnapshot(
       playing,
       now,
     }),
+    reactions: visibleReactions(room.reactions, now),
+    series: buildSeriesView(room.series, room.state, clock),
   };
 }

@@ -1,8 +1,8 @@
 import { describe, expect, it } from "vitest";
 
-import { chooseAiAction } from "./ai";
+import { chooseAiAction, pitchBallChance, swingChance } from "./ai";
 import { createGame, transition } from "./engine";
-import type { GameState } from "./types";
+import type { GameEvent, GameState } from "./types";
 
 const CONFIG = {
   innings: 3 as const,
@@ -109,4 +109,55 @@ describe("baseball game AI", () => {
       type: "PASS_CARD_WINDOW",
     });
   });
+
+  it("throws more balls to a batter who keeps chasing", () => {
+    const state = createGame(CONFIG);
+    const chaser = withPitches(state, 12, { swing: true });
+    const waiter = withPitches(state, 12, { swing: false });
+    expect(pitchBallChance(chaser, "home")).toBeGreaterThan(
+      pitchBallChance(state, "home"),
+    );
+    expect(pitchBallChance(waiter, "home")).toBeLessThan(
+      pitchBallChance(state, "home"),
+    );
+  });
+
+  it("avoids walks with three balls even against a chaser", () => {
+    const chaser = withPitches(createGame(CONFIG), 12, { swing: true });
+    expect(pitchBallChance({ ...chaser, balls: 3 }, "home")).toBeLessThan(
+      pitchBallChance(chaser, "home") / 2,
+    );
+  });
+
+  it("swings more against a pitcher who lives in the zone", () => {
+    const state = createGame(CONFIG);
+    const strikeThrower = withPitches(state, 12, { strike: true }, "bottom");
+    const nibbler = withPitches(state, 12, { strike: false }, "bottom");
+    expect(swingChance(strikeThrower, "home")).toBeGreaterThan(
+      swingChance(nibbler, "home"),
+    );
+  });
 });
+
+function withPitches(
+  state: GameState,
+  count: number,
+  pattern: { swing?: boolean; strike?: boolean },
+  half: "top" | "bottom" = "top",
+): GameState {
+  const events: GameEvent[] = Array.from({ length: count }, (_, index) => ({
+    sequence: index + 1,
+    revision: index + 1,
+    inning: 1,
+    half,
+    kind: "pitch_result",
+    summary: "",
+    face: "B",
+    pitchTarget: (pattern.strike ?? true) ? "strike" : "ball",
+    swingDecision: (pattern.swing ?? false) ? "swing" : "take",
+    runs: 0,
+    outsRecorded: 0,
+    moves: [],
+  }));
+  return { ...state, eventLog: events };
+}

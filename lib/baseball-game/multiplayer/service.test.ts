@@ -6,13 +6,16 @@ import { createGame } from "../engine";
 import type { TeamSide } from "../types";
 import type { SeatVisibility, StoredSeatPresence } from "./presence";
 import { seatTokenHash } from "./security";
+import { REACTION_COOLDOWN_MS, REACTION_VISIBLE_MS } from "./reactions";
 import {
   callMultiplayerTimeout,
   claimMultiplayerForfeit,
   getMultiplayerSnapshot,
   heartbeatMultiplayerSeat,
+  sendMultiplayerReaction,
   submitMultiplayerCommand,
   timeoutIdempotencyKey,
+  voteMultiplayerRematch,
 } from "./service";
 import {
   DECISION_LIMIT_MS,
@@ -26,6 +29,8 @@ import type { MultiplayerStorage } from "./storage";
 import type {
   MultiplayerClockUpdateInput,
   MultiplayerCommitInput,
+  MultiplayerReactionInput,
+  MultiplayerRematchInput,
   MultiplayerCommitResult,
   MultiplayerRoomRecord,
 } from "./types";
@@ -49,6 +54,8 @@ class TestStorage implements MultiplayerStorage {
     revision: 0,
     revisionStartedAt: new Date(START).toISOString(),
     clock: null,
+    reactions: [],
+    series: null,
     expiresAt: new Date(START + 24 * 60 * 60_000).toISOString(),
   };
   seats = new Map<TeamSide, string>([
@@ -122,6 +129,49 @@ class TestStorage implements MultiplayerStorage {
     }
     this.room.clock = structuredClone(input.clock);
     if (input.finish) this.room.status = "finished";
+    return "applied" as const;
+  }
+
+  async pushReaction(input: MultiplayerReactionInput) {
+    const now = Date.now();
+    if (
+      this.room.reactions.some(
+        (item) =>
+          item.team === input.team &&
+          now - Date.parse(item.at) < input.cooldownMs,
+      )
+    ) {
+      return "cooldown" as const;
+    }
+    this.room.reactions = [
+      ...this.room.reactions,
+      {
+        id: randomUUID(),
+        team: input.team,
+        kind: input.kind,
+        at: new Date(now).toISOString(),
+      },
+    ].slice(-input.limit);
+    return "applied" as const;
+  }
+
+  async voteRematch(input: MultiplayerRematchInput) {
+    if (
+      this.room.status !== "finished" ||
+      input.revision !== this.room.revision ||
+      JSON.stringify(input.expectedSeries) !== JSON.stringify(this.room.series)
+    ) {
+      return "conflict" as const;
+    }
+    this.room.series = structuredClone(input.series);
+    if (!input.start) return "applied" as const;
+    this.room.state = structuredClone(input.start.newState);
+    this.room.revision = input.start.newState.revision;
+    this.room.clock = structuredClone(input.start.clock);
+    this.room.status = "playing";
+    const away = this.seats.get("away")!;
+    this.seats.set("away", this.seats.get("home")!);
+    this.seats.set("home", away);
     return "applied" as const;
   }
 
@@ -437,5 +487,83 @@ describe("baseball multiplayer service", () => {
         storage,
       ),
     ).rejects.toMatchObject({ code: "ROOM_UNAVAILABLE" });
+  });
+
+  it("throttles reactions per team and expires them from snapshots", async () => {
+    at(START + 1_000);
+    const storage = new TestStorage();
+    const sent = await sendMultiplayerReaction(
+      "ABC234",
+      AWAY_TOKEN,
+      "clap",
+      storage,
+    );
+    expect(sent.reactions).toMatchObject([{ team: "away", kind: "clap" }]);
+    await expect(
+      sendMultiplayerReaction("ABC234", AWAY_TOKEN, "gg", storage),
+    ).rejects.toMatchObject({ code: "RATE_LIMITED" });
+    await sendMultiplayerReaction("ABC234", HOME_TOKEN, "nice", storage);
+
+    at(START + 1_000 + REACTION_COOLDOWN_MS);
+    await sendMultiplayerReaction("ABC234", AWAY_TOKEN, "gg", storage);
+
+    at(START + 1_000 + REACTION_COOLDOWN_MS + REACTION_VISIBLE_MS);
+    markOnline(storage, "home");
+    const later = await getMultiplayerSnapshot("ABC234", AWAY_TOKEN, storage);
+    expect(later.reactions.map((item) => item.kind)).toEqual(["gg"]);
+  });
+
+  it("refuses a rematch while the game is still running", async () => {
+    at(START + 1_000);
+    const storage = new TestStorage();
+    await expect(
+      voteMultiplayerRematch("ABC234", AWAY_TOKEN, storage),
+    ).rejects.toMatchObject({ code: "ROOM_UNAVAILABLE" });
+  });
+
+  it("starts a swapped rematch once both teams vote and records the series", async () => {
+    at(START + 1_000);
+    const storage = new TestStorage();
+    storage.room.status = "finished";
+    storage.room.state = {
+      ...storage.room.state,
+      phase: "finished",
+      winner: "home",
+      score: { away: 1, home: 3 },
+    };
+    storage.room.revision = 40;
+    storage.room.state.revision = 40;
+
+    const first = await voteMultiplayerRematch("ABC234", AWAY_TOKEN, storage);
+    expect(first.series.rematchVotes).toEqual({ away: true, home: false });
+    expect(first.series.wins).toEqual([
+      { name: "원정", wins: 0 },
+      { name: "홈", wins: 1 },
+    ]);
+    const repeat = await voteMultiplayerRematch("ABC234", AWAY_TOKEN, storage);
+    expect(repeat.status).toBe("finished");
+
+    const started = await voteMultiplayerRematch("ABC234", HOME_TOKEN, storage);
+    expect(started.status).toBe("playing");
+    expect(started.seat).toBe("away");
+    expect(started.view.revision).toBe(41);
+    expect(started.view.config).toMatchObject({
+      awayTeamName: "홈",
+      homeTeamName: "원정",
+    });
+    expect(started.series.games).toHaveLength(1);
+    expect(started.series.rematchVotes).toEqual({ away: false, home: false });
+    expect(started.clock.timeoutsRemaining).toEqual({ away: 2, home: 2 });
+
+    const formerAway = await getMultiplayerSnapshot(
+      "ABC234",
+      AWAY_TOKEN,
+      storage,
+    );
+    expect(formerAway.seat).toBe("home");
+    expect(formerAway.series.wins).toEqual([
+      { name: "홈", wins: 1 },
+      { name: "원정", wins: 0 },
+    ]);
   });
 });

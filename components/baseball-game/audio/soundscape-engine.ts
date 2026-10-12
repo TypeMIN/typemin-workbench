@@ -382,6 +382,44 @@ const SFX_PATCHES: Record<SoundCue, Layer[]> = {
       freq: 1500,
     },
   ],
+  reaction: [
+    {
+      kind: "tone",
+      duration: 0.07,
+      attack: 0.004,
+      gain: 0.1,
+      wave: "triangle",
+      freq: 740,
+    },
+    {
+      kind: "tone",
+      delay: 0.07,
+      duration: 0.1,
+      attack: 0.004,
+      gain: 0.09,
+      wave: "triangle",
+      freq: 990,
+    },
+  ],
+  your_turn: [
+    {
+      kind: "tone",
+      duration: 0.18,
+      attack: 0.01,
+      gain: 0.1,
+      wave: "sine",
+      freq: 660,
+    },
+    {
+      kind: "tone",
+      delay: 0.16,
+      duration: 0.28,
+      attack: 0.01,
+      gain: 0.1,
+      wave: "sine",
+      freq: 880,
+    },
+  ],
   timeout_call: [
     {
       kind: "tone",

@@ -401,6 +401,8 @@ function emit(
     swingDecision?: GameEvent["swingDecision"];
     pitchLocation?: PitchLocation;
     duelWinner?: GameEvent["duelWinner"];
+    cardTiming?: GameEvent["cardTiming"];
+    deckCycle?: GameEvent["deckCycle"];
   },
 ) {
   events.push({
@@ -422,6 +424,8 @@ function emit(
     swingDecision: event.swingDecision,
     pitchLocation: event.pitchLocation,
     duelWinner: event.duelWinner,
+    cardTiming: event.cardTiming,
+    deckCycle: event.deckCycle,
   });
 }
 
@@ -1520,12 +1524,17 @@ function playCard(state: GameState, instanceId: string, events: GameEvent[]) {
   const zone = state.cards[role];
   const card = zone.hand.find((instance) => instance.instanceId === instanceId);
   if (!card) return;
+  // Stamp the cycle before spending: a reshuffle triggered by this draw
+  // returns the played card to the deck, so it belongs to the old cycle.
+  const deckCycle = zone.reshuffleCount ?? 0;
   spendCard(state, role, card);
   emit(state, events, {
     kind: "card_play",
     summary: `${role === "offense" ? "공격" : "수비"} 카드 · ${CARD_DEFINITIONS[card.cardId].name}`,
     cardId: card.cardId,
     cardRole: role,
+    cardTiming: window.timing,
+    deckCycle,
   });
 
   if (window.respondingTo) {
@@ -1552,6 +1561,7 @@ function passCardWindow(state: GameState, events: GameEvent[]) {
     kind: "card_pass",
     summary: `${role === "offense" ? "공격" : "수비"} 카드 패스`,
     cardRole: role,
+    cardTiming: window.timing,
   });
   if (window.respondingTo) {
     const primary = window.respondingTo;
@@ -2348,7 +2358,12 @@ function createCardZone(role: CardRole, rng: GameState["rng"]): CardZone {
       cardId,
     })),
   );
-  return { drawPile: shuffle(cards, rng), hand: [], discardPile: [] };
+  return {
+    drawPile: shuffle(cards, rng),
+    hand: [],
+    discardPile: [],
+    reshuffleCount: 0,
+  };
 }
 
 function spendCard(state: GameState, role: CardRole, card: CardInstance) {
@@ -2366,6 +2381,7 @@ function drawToFour(zone: CardZone, rng: GameState["rng"]) {
       if (zone.discardPile.length === 0) return;
       zone.drawPile = shuffle(zone.discardPile, rng);
       zone.discardPile = [];
+      zone.reshuffleCount = (zone.reshuffleCount ?? 0) + 1;
     }
     const card = zone.drawPile.pop();
     if (card) zone.hand.push(card);
@@ -2413,6 +2429,7 @@ function cloneCardZone(zone: CardZone): CardZone {
     drawPile: zone.drawPile.map((card) => ({ ...card })),
     hand: zone.hand.map((card) => ({ ...card })),
     discardPile: zone.discardPile.map((card) => ({ ...card })),
+    reshuffleCount: zone.reshuffleCount ?? 0,
   };
 }
 
@@ -2421,6 +2438,7 @@ function cardZoneView(zone: CardZone, reveal: boolean) {
     handCount: zone.hand.length,
     drawCount: zone.drawPile.length,
     discardCount: zone.discardPile.length,
+    reshuffleCount: zone.reshuffleCount ?? 0,
     hand: reveal ? zone.hand.map((card) => ({ ...card })) : null,
   };
 }

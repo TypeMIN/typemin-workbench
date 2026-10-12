@@ -1,6 +1,17 @@
 "use client";
 
-import { ArrowLeft, Check, Copy, Flag, Timer, Users } from "lucide-react";
+import {
+  ArrowLeft,
+  Check,
+  Copy,
+  Film,
+  Flag,
+  Repeat,
+  RotateCcw,
+  Timer,
+  Users,
+  WifiOff,
+} from "lucide-react";
 import Link from "next/link";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
@@ -21,6 +32,18 @@ import {
 import { BaseballCardFace } from "@/components/baseball-game/baseball-card-face";
 import { BaseballDuelControl } from "@/components/baseball-game/baseball-duel-control";
 import { BaseballStadium } from "@/components/baseball-game/baseball-game-debug";
+import {
+  ReactionBar,
+  ReactionBubbles,
+  ReplayReel,
+  RoomQr,
+  SeriesSummary,
+  shortcutHint,
+  useDecisionShortcuts,
+  useTurnAlert,
+  type ReplayItem,
+} from "@/components/baseball-game/baseball-room-extras";
+import { getHighlights } from "@/lib/baseball-game/highlights";
 import { isClutch } from "@/lib/baseball-game/audio/leverage";
 import { CARD_DEFINITIONS } from "@/lib/baseball-game/cards";
 import { PITCH_TARGET_LABELS } from "@/lib/baseball-game/duel";
@@ -32,12 +55,20 @@ import {
   SEAT_HEARTBEAT_INTERVAL_MS,
   type OpponentStatus,
 } from "@/lib/baseball-game/multiplayer/presence";
+import type { ReactionKind } from "@/lib/baseball-game/multiplayer/reactions";
 import type { ShotClockView } from "@/lib/baseball-game/multiplayer/shot-clock";
 import type {
   MultiplayerCommand,
   MultiplayerRoomSnapshot,
 } from "@/lib/baseball-game/multiplayer/types";
 import { hasResolutionOutcome } from "@/lib/baseball-game/presentation";
+import {
+  getCardNotes,
+  getDeckTracker,
+  getTeamTendencies,
+  ratePercent,
+  type RateSample,
+} from "@/lib/baseball-game/scouting";
 import type {
   CardRole,
   GameAction,
@@ -48,6 +79,8 @@ import type {
 const CLOCK_REFRESH_MS = 200;
 const COPIED_RESET_MS = 1_600;
 const FINAL_TICK_SECONDS = 3;
+// Three missed polls (~1.5s at the fastest cadence) before warning the player.
+const CONNECTION_WARNING_FAILURES = 3;
 
 type ClockCommand = "CALL_TIMEOUT" | "CLAIM_FORFEIT";
 
@@ -66,6 +99,8 @@ export default function BaseballMultiplayerRoom({
   const [error, setError] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
   const [clockOffsetMs, setClockOffsetMs] = useState(0);
+  const [connectionLost, setConnectionLost] = useState(false);
+  const failuresRef = useRef(0);
   const seatEstablishedRef = useRef(false);
   const actionFeedback = useBaseballActionFeedback();
 
@@ -100,10 +135,16 @@ export default function BaseballMultiplayerRoom({
           return;
         }
         seatEstablishedRef.current = true;
+        failuresRef.current = 0;
+        setConnectionLost(false);
         setNeedsSeat(false);
         acceptSnapshot(payload.snapshot);
         setError(null);
       } catch {
+        failuresRef.current += 1;
+        if (failuresRef.current >= CONNECTION_WARNING_FAILURES) {
+          setConnectionLost(true);
+        }
         if (!quiet) setError("멀티플레이 서버에 연결하지 못했습니다.");
       } finally {
         if (!quiet) setLoading(false);
@@ -252,10 +293,57 @@ export default function BaseballMultiplayerRoom({
     }
   }
 
+  async function postRoom(path: string, body: unknown) {
+    const response = await fetch(
+      `/api/baseball-game/rooms/${encodeURIComponent(roomCode)}/${path}`,
+      {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify(body),
+      },
+    );
+    const payload = (await response.json()) as {
+      snapshot?: MultiplayerRoomSnapshot;
+      error?: string;
+    };
+    if (payload.snapshot) acceptSnapshot(payload.snapshot);
+    return { ok: response.ok, error: payload.error ?? null };
+  }
+
+  async function sendReaction(kind: ReactionKind) {
+    try {
+      const result = await postRoom("reactions", { kind });
+      if (!result.ok && result.error) {
+        actionFeedback.show({
+          status: "error",
+          title: "응원을 보내지 못했습니다",
+          detail: result.error,
+        });
+      }
+    } catch {
+      setError("응원을 서버에 보내지 못했습니다.");
+    }
+  }
+
+  async function voteRematch() {
+    if (submitting) return;
+    setSubmitting(true);
+    try {
+      const result = await postRoom("rematch", {});
+      if (!result.ok) {
+        setError(result.error ?? "재대결을 요청하지 못했습니다.");
+        await loadSnapshot(true);
+      }
+    } catch {
+      setError("재대결 요청을 서버에 보내지 못했습니다.");
+    } finally {
+      setSubmitting(false);
+    }
+  }
+
   async function copyRoomLink() {
     try {
-      const roomUrl = `${window.location.origin}/baseball-game/rooms/${roomCode}`;
-      await navigator.clipboard.writeText(roomUrl);
+      await navigator.clipboard.writeText(roomUrl(roomCode));
       setCopied(true);
       window.setTimeout(() => setCopied(false), COPIED_RESET_MS);
     } catch {
@@ -286,11 +374,14 @@ export default function BaseballMultiplayerRoom({
       ) : snapshot ? (
         <MultiplayerBoard
           clockOffsetMs={clockOffsetMs}
+          connectionLost={connectionLost}
           copied={copied}
           error={error}
           feedback={actionFeedback.feedback}
           onClock={submitClock}
           onCopy={copyRoomLink}
+          onReaction={sendReaction}
+          onRematch={voteRematch}
           onSubmit={submitCommand}
           snapshot={snapshot}
           submitting={submitting}
@@ -468,21 +559,27 @@ function RoomMessage({ title, copy }: { title: string; copy: string }) {
 
 function MultiplayerBoard({
   clockOffsetMs,
+  connectionLost,
   copied,
   error,
   feedback,
   onClock,
   onCopy,
+  onReaction,
+  onRematch,
   onSubmit,
   snapshot,
   submitting,
 }: {
   clockOffsetMs: number;
+  connectionLost: boolean;
   copied: boolean;
   error: string | null;
   feedback: ReturnType<typeof useBaseballActionFeedback>["feedback"];
   onClock: (type: ClockCommand) => void;
   onCopy: () => void;
+  onReaction: (kind: ReactionKind) => void;
+  onRematch: () => void;
   onSubmit: (command: MultiplayerCommand) => void;
   snapshot: MultiplayerRoomSnapshot;
   submitting: boolean;
@@ -520,6 +617,42 @@ function MultiplayerBoard({
   const seatName = teamName(game, seat);
   const playing = snapshot.status === "playing" && !snapshot.clock.forfeitedBy;
   const clutch = playing && !presentationActive && isClutch(game);
+  const [replay, setReplay] = useState<{
+    title: string;
+    items: ReplayItem[];
+  } | null>(null);
+  const highlights = useMemo(
+    () =>
+      getHighlights(game.eventLog).map((item) => ({
+        revision: item.revision,
+        label: `${item.inning}회${item.half === "top" ? "초" : "말"} · ${item.label}`,
+      })),
+    [game.eventLog],
+  );
+  const lastPlay = game.eventLog.findLast((event) =>
+    hasResolutionOutcome([event]),
+  );
+  const closeReplay = useCallback(() => setReplay(null), []);
+
+  useTurnAlert(playing && snapshot.isYourTurn, soundscape.playCue);
+  useDecisionShortcuts({
+    enabled:
+      playing &&
+      snapshot.isYourTurn &&
+      !presentationActive &&
+      !submitting &&
+      !replay,
+    phase: game.phase,
+    onAction: (action) => {
+      if (
+        action.type === "SELECT_PITCH" ||
+        action.type === "SELECT_SWING" ||
+        action.type === "PASS_CARD_WINDOW"
+      ) {
+        onSubmit(action);
+      }
+    },
+  });
 
   return (
     <>
@@ -536,6 +669,26 @@ function MultiplayerBoard({
           />
           <section className="bbg-room-stage" aria-label="야구 경기장">
             <Scorebug game={game} seat={seat} />
+            {connectionLost ? (
+              <div className="bbg-room-connection-lost" role="alert">
+                <WifiOff aria-hidden="true" size={14} />
+                연결이 불안정합니다 · 다시 연결하는 중
+              </div>
+            ) : null}
+            <ReactionBubbles
+              onIncoming={() => soundscape.playCue("reaction")}
+              reactions={snapshot.reactions}
+              seat={seat}
+            />
+            {replay ? (
+              <ReplayReel
+                game={game}
+                items={replay.items}
+                onBeat={soundscape.onBeat}
+                onClose={closeReplay}
+                title={replay.title}
+              />
+            ) : null}
             {clutch ? (
               <div className="bbg-room-clutch" aria-live="polite">
                 승부처
@@ -579,6 +732,26 @@ function MultiplayerBoard({
                 </strong>
                 {concealingOutcome ? null : <BaseballPlayReceipt game={game} />}
               </div>
+              {!presentationActive && lastPlay && !replay ? (
+                <button
+                  aria-label="방금 플레이 다시 보기"
+                  className="bbg-room-lower-replay"
+                  onClick={() =>
+                    setReplay({
+                      title: "다시 보기",
+                      items: [
+                        {
+                          revision: lastPlay.revision,
+                          label: lastPlay.summary,
+                        },
+                      ],
+                    })
+                  }
+                  type="button"
+                >
+                  <RotateCcw aria-hidden="true" size={15} />
+                </button>
+              ) : null}
             </div>
           </section>
 
@@ -595,12 +768,25 @@ function MultiplayerBoard({
               opponentSeat={opponentSeat}
               seat={seat}
             />
+            {snapshot.status === "playing" || snapshot.status === "finished" ? (
+              <ReactionBar
+                disabled={false}
+                onSend={(kind) => {
+                  soundscape.playCue("reaction");
+                  onReaction(kind);
+                }}
+              />
+            ) : null}
 
             {snapshot.status === "lobby" ? (
               <div className="bbg-room-panel bbg-room-waiting">
                 <small>Waiting</small>
                 <strong>홈팀 참가 대기 중</strong>
-                <p>상대 기기에서 참가 링크를 열면 경기가 시작됩니다.</p>
+                <p>
+                  상대 기기에서 참가 링크를 열거나 QR을 찍으면 경기가
+                  시작됩니다.
+                </p>
+                <RoomQr url={roomUrl(snapshot.roomCode)} />
                 <button
                   className="bbg-room-secondary"
                   onClick={onCopy}
@@ -618,7 +804,12 @@ function MultiplayerBoard({
               <DecisionPanel
                 clockOffsetMs={clockOffsetMs}
                 disabled={submitting}
+                highlightCount={highlights.length}
                 onClock={onClock}
+                onRematch={onRematch}
+                onShowHighlights={() =>
+                  setReplay({ title: "하이라이트", items: highlights })
+                }
                 onSubmit={onSubmit}
                 onTick={soundscape.playCue}
                 opponentSeat={opponentSeat}
@@ -669,6 +860,8 @@ function MultiplayerBoard({
                 })}
               </div>
             </section>
+
+            <ScoutingPanel game={game} opponentSeat={opponentSeat} />
 
             <section className="bbg-room-panel bbg-room-box">
               <BroadcastLineScore game={game} />
@@ -770,7 +963,10 @@ const PRESENCE_LABELS: Record<OpponentStatus["presence"], string> = {
 function DecisionPanel({
   clockOffsetMs,
   disabled,
+  highlightCount,
   onClock,
+  onRematch,
+  onShowHighlights,
   onSubmit,
   onTick,
   opponentSeat,
@@ -778,7 +974,10 @@ function DecisionPanel({
 }: {
   clockOffsetMs: number;
   disabled: boolean;
+  highlightCount: number;
   onClock: (type: ClockCommand) => void;
+  onRematch: () => void;
+  onShowHighlights: () => void;
   onSubmit: (command: MultiplayerCommand) => void;
   onTick: BaseballSoundscape["playCue"];
   opponentSeat: TeamSide;
@@ -801,7 +1000,28 @@ function DecisionPanel({
         <strong>
           {winner ? `${teamName(game, winner)} 승리` : "경기 종료"}
         </strong>
-        {forfeitWinner ? <span>상대의 연속 시간 초과로 몰수승</span> : null}
+        {forfeitWinner ? <span>연속 시간 초과로 몰수 처리</span> : null}
+        <SeriesSummary
+          series={snapshot.series}
+          seatName={teamName(game, seat)}
+        />
+        <RematchControl
+          disabled={disabled}
+          onRematch={onRematch}
+          opponentSeat={opponentSeat}
+          seat={seat}
+          votes={snapshot.series.rematchVotes}
+        />
+        {highlightCount ? (
+          <button
+            className="bbg-room-secondary"
+            onClick={onShowHighlights}
+            type="button"
+          >
+            <Film aria-hidden="true" size={15} />
+            하이라이트 보기 · {highlightCount}장면
+          </button>
+        ) : null}
       </div>
     );
   }
@@ -829,7 +1049,12 @@ function DecisionPanel({
           <small>{mine ? "Your decision" : "Opponent"}</small>
           <strong>{mine ? myDecisionTitle(game) : activity.title}</strong>
           {mine ? (
-            <span>{myDecisionDetail(game)}</span>
+            <span>
+              {myDecisionDetail(game)}
+              {shortcutHint(game.phase) ? (
+                <kbd className="bbg-room-kbd">{shortcutHint(game.phase)}</kbd>
+              ) : null}
+            </span>
           ) : activity.detail ? (
             <span>{activity.detail}</span>
           ) : null}
@@ -898,6 +1123,43 @@ function DecisionPanel({
   );
 }
 
+function RematchControl({
+  disabled,
+  onRematch,
+  opponentSeat,
+  seat,
+  votes,
+}: {
+  disabled: boolean;
+  onRematch: () => void;
+  opponentSeat: TeamSide;
+  seat: TeamSide;
+  votes: Record<TeamSide, boolean>;
+}) {
+  if (votes[seat]) {
+    return (
+      <button className="bbg-room-secondary" disabled type="button">
+        <Repeat aria-hidden="true" size={15} />
+        상대 수락 대기 중
+      </button>
+    );
+  }
+  return (
+    <div className="bbg-room-rematch">
+      {votes[opponentSeat] ? <p>상대가 재대결을 신청했습니다.</p> : null}
+      <button
+        className="bbg-room-primary"
+        disabled={disabled}
+        onClick={onRematch}
+        type="button"
+      >
+        <Repeat aria-hidden="true" size={15} />
+        {votes[opponentSeat] ? "재대결 수락" : "재대결 신청"} · 홈/원정 교대
+      </button>
+    </div>
+  );
+}
+
 function ShotClock({
   clock,
   mine,
@@ -955,6 +1217,132 @@ function ShotClock({
   );
 }
 
+function ScoutingPanel({
+  game,
+  opponentSeat,
+}: {
+  game: GameView;
+  opponentSeat: TeamSide;
+}) {
+  const tendencies = useMemo(
+    () => getTeamTendencies(game.eventLog, opponentSeat),
+    [game.eventLog, opponentSeat],
+  );
+  const notes = useMemo(
+    () => getCardNotes(game.eventLog, opponentSeat),
+    [game.eventLog, opponentSeat],
+  );
+  const opponentRole: CardRole =
+    game.battingTeam === opponentSeat ? "offense" : "defense";
+  const deck = game.cards[opponentRole];
+  const tracker = useMemo(
+    () => getDeckTracker(game.eventLog, opponentRole, deck.reshuffleCount),
+    [deck.reshuffleCount, game.eventLog, opponentRole],
+  );
+  const savedCards = notes.filter((note) => note.kind === "passed").length;
+  const strikeRate = ratePercent(tendencies.pitching.all);
+  const swingRate = ratePercent(tendencies.batting.all);
+
+  return (
+    <details className="bbg-room-panel bbg-room-scout">
+      <summary>
+        <small>Scouting</small>
+        <strong>상대 분석</strong>
+        <span>
+          {[
+            strikeRate !== null ? `스트라이크 ${strikeRate}%` : null,
+            swingRate !== null ? `스윙 ${swingRate}%` : null,
+            savedCards ? `카드 아낌 ${savedCards}회` : null,
+          ]
+            .filter(Boolean)
+            .join(" · ") || "공개된 기록이 쌓이면 표시됩니다"}
+        </span>
+      </summary>
+      <div className="bbg-room-scout-body">
+        <section aria-label="상대 투타 성향">
+          <h3>투타 성향</h3>
+          <TendencyRow
+            label="투수 · 스트라이크"
+            samples={tendencies.pitching}
+          />
+          <TendencyRow label="타자 · 스윙" samples={tendencies.batting} />
+        </section>
+        <section aria-label="상대 카드 노트">
+          <h3>카드 노트</h3>
+          {notes.length ? (
+            <ol className="bbg-room-notes">
+              {notes.map((note) => (
+                <li data-kind={note.kind} key={note.sequence}>
+                  <span>
+                    {note.inning}회{note.half === "top" ? "초" : "말"}
+                    {note.timing ? ` · ${CARD_TIMING_LABELS[note.timing]}` : ""}
+                  </span>
+                  <strong>
+                    {note.kind === "played" && note.cardId
+                      ? `${CARD_DEFINITIONS[note.cardId].name} 사용`
+                      : "낼 카드가 있었지만 넘김"}
+                  </strong>
+                </li>
+              ))}
+            </ol>
+          ) : (
+            <p>상대에게 카드 창이 열리면 기록됩니다.</p>
+          )}
+        </section>
+        <section aria-label="상대 덱 트래커">
+          <h3>
+            {opponentRole === "offense" ? "공격" : "수비"} 덱 · 남은{" "}
+            {deck.drawCount}장
+          </h3>
+          {tracker.length ? (
+            <ul className="bbg-room-tracker">
+              {tracker.map((row) => (
+                <li key={row.cardId}>
+                  <span>{CARD_DEFINITIONS[row.cardId].name}</span>
+                  <strong>
+                    최대 {row.maxRemaining}/{row.copies}
+                  </strong>
+                </li>
+              ))}
+            </ul>
+          ) : (
+            <p>이번 덱 순환에서 공개된 카드가 없습니다.</p>
+          )}
+        </section>
+      </div>
+    </details>
+  );
+}
+
+function TendencyRow({
+  label,
+  samples,
+}: {
+  label: string;
+  samples: Record<"all" | "recent" | "twoStrikes", RateSample>;
+}) {
+  const cells: Array<[string, RateSample]> = [
+    ["전체", samples.all],
+    ["최근 5구", samples.recent],
+    ["2S 이후", samples.twoStrikes],
+  ];
+  return (
+    <div className="bbg-room-tendency">
+      <span>{label}</span>
+      {cells.map(([name, sample]) => {
+        const percent = ratePercent(sample);
+        return (
+          <div key={name}>
+            <small>{name}</small>
+            <strong>{percent === null ? "–" : `${percent}%`}</strong>
+            <em>{sample.count}구</em>
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
 function myDecisionTitle(game: GameView) {
   if (game.phase === "awaiting_pitch") return "투구를 선택하세요";
   if (game.phase === "awaiting_swing") return "스윙할지 정하세요";
@@ -1005,6 +1393,10 @@ function CountLights({
       ))}
     </div>
   );
+}
+
+function roomUrl(roomCode: string) {
+  return `${window.location.origin}/baseball-game/rooms/${roomCode}`;
 }
 
 function inningLabel(game: GameView) {

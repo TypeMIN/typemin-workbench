@@ -29,7 +29,9 @@ export type SoundCue =
   | "game_end"
   | "tick"
   | "tick_final"
-  | "timeout_call";
+  | "timeout_call"
+  | "reaction"
+  | "your_turn";
 
 export type CrowdReaction = "rise" | "cheer" | "roar" | "groan" | "gasp";
 
