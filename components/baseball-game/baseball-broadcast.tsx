@@ -1,7 +1,6 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
-import { Volume2, VolumeX } from "lucide-react";
 import {
   buildPresentationScenes,
   CARD_DEFINITIONS,
@@ -130,122 +129,33 @@ function inningValue(game: BroadcastGame, side: TeamSide, inning: number) {
   return skippedHome ? "X" : "-";
 }
 
-const SOUND_STORAGE_KEY = "bbg-broadcast-sound-v1";
-const VOLUME_STORAGE_KEY = "bbg-broadcast-volume-v1";
+// Short buzz for routine plays, a double pulse for runs, a firm one for outs.
+const HAPTIC_PATTERNS = {
+  routine: [18],
+  out: [45],
+  score: [30, 40, 30],
+} as const;
 
-export function BaseballAudio({
-  events,
-  mode = "full",
-}: {
-  events: GameEvent[];
-  mode?: "full" | "personal";
-}) {
-  const [muted, setMuted] = useState(false);
-  const [unlocked, setUnlocked] = useState(false);
-  const [volume, setVolume] = useState(0.65);
-  const contextRef = useRef<AudioContext | null>(null);
-  const playedRevisionRef = useRef(0);
-
-  useEffect(() => {
-    if (mode !== "full") return;
-    const timer = window.setTimeout(() => {
-      setMuted(window.localStorage.getItem(SOUND_STORAGE_KEY) === "muted");
-      const storedValue = window.localStorage.getItem(VOLUME_STORAGE_KEY);
-      const stored = Number(storedValue);
-      if (storedValue !== null && stored >= 0 && stored <= 1) setVolume(stored);
-    }, 0);
-    return () => window.clearTimeout(timer);
-  }, [mode]);
-
-  useEffect(
-    () => () => {
-      if (contextRef.current) void contextRef.current.close();
-    },
-    [],
-  );
-
-  useEffect(() => {
-    const unlock = () => {
-      setUnlocked(true);
-      if (mode === "full" && !contextRef.current) {
-        const AudioContextClass = window.AudioContext;
-        if (AudioContextClass) contextRef.current = new AudioContextClass();
-      }
-    };
-    window.addEventListener("pointerdown", unlock, { once: true });
-    window.addEventListener("keydown", unlock, { once: true });
-    return () => {
-      window.removeEventListener("pointerdown", unlock);
-      window.removeEventListener("keydown", unlock);
-    };
-  }, [mode]);
-
+export function BaseballHaptics({ events }: { events: GameEvent[] }) {
+  const playedRevisionRef = useRef(events.at(-1)?.revision ?? 0);
   const latestRevision = events.at(-1)?.revision ?? 0;
+
   useEffect(() => {
-    if (!unlocked || latestRevision <= playedRevisionRef.current) return;
+    if (latestRevision <= playedRevisionRef.current) return;
     playedRevisionRef.current = latestRevision;
-    const revisionEvents = events.filter(
-      (event) => event.revision === latestRevision,
+    const cues = getAudioCues(
+      events.filter((event) => event.revision === latestRevision),
     );
-    if (mode === "personal") {
-      navigator.vibrate?.(18);
-      return;
-    }
-    if (muted || !contextRef.current) return;
-    const context = contextRef.current;
-    if (context.state === "suspended") void context.resume();
-    getAudioCues(revisionEvents)
-      .slice(0, 6)
-      .forEach((cue, index) => {
-        synthesizeCue(context, cue, index * 0.11, volume);
-      });
-  }, [events, latestRevision, mode, muted, unlocked, volume]);
+    const pattern =
+      cues.includes("score") || cues.includes("home_run")
+        ? HAPTIC_PATTERNS.score
+        : cues.includes("out")
+          ? HAPTIC_PATTERNS.out
+          : HAPTIC_PATTERNS.routine;
+    navigator.vibrate?.([...pattern]);
+  }, [events, latestRevision]);
 
-  if (mode === "personal") return null;
-
-  return (
-    <div className="bbg-audio-control">
-      <button
-        aria-label={muted ? "경기 음향 켜기" : "경기 음향 끄기"}
-        aria-pressed={!muted}
-        className="bbg-sound-toggle"
-        onClick={() => {
-          setUnlocked(true);
-          setMuted((current) => {
-            const next = !current;
-            window.localStorage.setItem(
-              SOUND_STORAGE_KEY,
-              next ? "muted" : "on",
-            );
-            return next;
-          });
-        }}
-        type="button"
-      >
-        {muted ? (
-          <VolumeX aria-hidden="true" size={16} />
-        ) : (
-          <Volume2 aria-hidden="true" size={16} />
-        )}
-      </button>
-      <label className="bbg-volume-control">
-        <span>볼륨</span>
-        <input
-          aria-label="경기 음향 볼륨"
-          max="1"
-          min="0"
-          onChange={(event) => {
-            const next = Number(event.target.value);
-            setVolume(next);
-            window.localStorage.setItem(VOLUME_STORAGE_KEY, String(next));
-          }}
-          step="0.05"
-          type="range"
-          value={volume}
-        />
-      </label>
-    </div>
-  );
+  return null;
 }
 
 export function usePresentation(events: GameEvent[]) {
@@ -461,45 +371,4 @@ export function BaseballPlayReceipt({
       ))}
     </dl>
   );
-}
-
-function synthesizeCue(
-  context: AudioContext,
-  cue: ReturnType<typeof getAudioCues>[number],
-  delay: number,
-  volume: number,
-) {
-  const now = context.currentTime + delay;
-  const oscillator = context.createOscillator();
-  const gain = context.createGain();
-  const frequencies: Record<typeof cue, number> = {
-    pitch: 230,
-    mitt: 110,
-    contact: 520,
-    ground: 86,
-    throw: 300,
-    safe: 440,
-    out: 150,
-    score: 660,
-    home_run: 780,
-    ball: 260,
-    strike: 180,
-  };
-  oscillator.type =
-    cue === "contact" || cue === "home_run" ? "sawtooth" : "sine";
-  oscillator.frequency.setValueAtTime(frequencies[cue], now);
-  if (cue === "pitch" || cue === "throw")
-    oscillator.frequency.exponentialRampToValueAtTime(90, now + 0.14);
-  gain.gain.setValueAtTime(0.0001, now);
-  gain.gain.exponentialRampToValueAtTime(
-    Math.max(0.0001, 0.075 * volume),
-    now + 0.012,
-  );
-  gain.gain.exponentialRampToValueAtTime(
-    0.0001,
-    now + (cue === "home_run" ? 0.5 : 0.2),
-  );
-  oscillator.connect(gain).connect(context.destination);
-  oscillator.start(now);
-  oscillator.stop(now + (cue === "home_run" ? 0.52 : 0.22));
 }

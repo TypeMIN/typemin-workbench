@@ -10,8 +10,10 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { createGame } from "@/lib/baseball-game";
 import type { GameEvent } from "@/lib/baseball-game/types";
+import { BaseballSoundControls } from "./audio/baseball-sound-controls";
+import { useBaseballSoundscape } from "./audio/use-baseball-soundscape";
 import {
-  BaseballAudio,
+  BaseballHaptics,
   BaseballPlayReceipt,
   BroadcastLineScore,
   getBaseballPlayReceipt,
@@ -38,10 +40,19 @@ describe("broadcast UI", () => {
   });
 
   it("persists mute and volume preferences", async () => {
-    render(<BaseballAudio events={[]} />);
+    function Harness() {
+      const soundscape = useBaseballSoundscape({
+        game: createGame(CONFIG),
+        perspective: "neutral",
+        presenting: false,
+      });
+      return <BaseballSoundControls soundscape={soundscape} />;
+    }
+    render(<Harness />);
     const sound = await screen.findByRole("button", { name: "경기 음향 끄기" });
     fireEvent.click(sound);
     expect(window.localStorage.getItem("bbg-broadcast-sound-v1")).toBe("muted");
+    fireEvent.click(screen.getByRole("button", { name: "음향 세부 설정" }));
     fireEvent.change(screen.getByRole("slider", { name: "경기 음향 볼륨" }), {
       target: { value: "0.4" },
     });
@@ -52,9 +63,52 @@ describe("broadcast UI", () => {
     );
   });
 
-  it("does not render full sound controls on a personal party device", () => {
-    render(<BaseballAudio events={[]} mode="personal" />);
+  it("keeps per-bus levels and restores the legacy master volume", async () => {
+    window.localStorage.setItem("bbg-broadcast-volume-v1", "0.3");
+    function Harness() {
+      const soundscape = useBaseballSoundscape({
+        game: createGame(CONFIG),
+        perspective: "neutral",
+        presenting: false,
+      });
+      return <BaseballSoundControls soundscape={soundscape} />;
+    }
+    render(<Harness />);
+    fireEvent.click(screen.getByRole("button", { name: "음향 세부 설정" }));
+    await waitFor(() =>
+      expect(
+        screen.getByRole("slider", { name: "경기 음향 볼륨" }),
+      ).toHaveValue("0.3"),
+    );
+    fireEvent.change(screen.getByRole("slider", { name: "관중 볼륨" }), {
+      target: { value: "0.2" },
+    });
+    expect(
+      JSON.parse(window.localStorage.getItem("bbg-sound-buses-v1") ?? "{}"),
+    ).toMatchObject({ crowd: 0.2 });
+  });
+
+  it("vibrates a personal party device without rendering sound controls", () => {
+    const vibrate = vi.fn();
+    Object.defineProperty(navigator, "vibrate", {
+      configurable: true,
+      value: vibrate,
+    });
+    const scoring: GameEvent = {
+      sequence: 1,
+      revision: 1,
+      inning: 1,
+      half: "top",
+      kind: "plate_appearance",
+      summary: "득점",
+      runs: 1,
+      outsRecorded: 0,
+      moves: [],
+    };
+    const { rerender } = render(<BaseballHaptics events={[]} />);
     expect(screen.queryByRole("button", { name: /경기 음향/ })).toBeNull();
+    rerender(<BaseballHaptics events={[scoring]} />);
+    expect(vibrate).toHaveBeenCalledWith([30, 40, 30]);
   });
 
   it("clears the final presentation cue instead of covering the field", () => {

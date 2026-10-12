@@ -1,6 +1,6 @@
 import "server-only";
 
-import { randomInt } from "node:crypto";
+import { createHash, randomInt } from "node:crypto";
 
 import {
   createGame,
@@ -12,12 +12,32 @@ import {
 import type { GameConfig, TeamSide } from "../types";
 import { commandToGameAction } from "./command";
 import {
+  getOpponentStatus,
+  getSeatPresence,
+  type SeatVisibility,
+} from "./presence";
+import {
   newRoomCode,
   newSeatToken,
   normalizeRoomCode,
   seatTokenHash,
 } from "./security";
-import { getMultiplayerStorage, type MultiplayerStorage } from "./storage";
+import {
+  RECONNECT_GRACE_MS,
+  TIMEOUT_EXTENSION_MS,
+  buildShotClockView,
+  canClaimForfeit,
+  chooseTimeoutAction,
+  getClockWindow,
+  nextClockAfterCommit,
+  resolveClockState,
+  type MultiplayerClockState,
+} from "./shot-clock";
+import {
+  getMultiplayerStorage,
+  type MultiplayerSeatContext,
+  type MultiplayerStorage,
+} from "./storage";
 import type {
   MultiplayerCommand,
   MultiplayerCreateResult,
@@ -121,12 +141,116 @@ export async function getMultiplayerSnapshot(
   seatToken: string | null,
   storage: MultiplayerStorage = getMultiplayerStorage(),
 ): Promise<MultiplayerRoomSnapshot> {
+  const storedRoom = await requireRoom(roomCode, storage);
+  const seatContext = await requireSeatContext(storedRoom, seatToken, storage);
+  const room = await settleExpiredDecision(storedRoom, seatContext, storage);
+  return buildSnapshot(room, seatContext);
+}
+
+export async function heartbeatMultiplayerSeat(
+  roomCode: string,
+  seatToken: string | null,
+  visibility: SeatVisibility,
+  storage: MultiplayerStorage = getMultiplayerStorage(),
+) {
   const room = await requireRoom(roomCode, storage);
+  if (!seatToken) {
+    throw new MultiplayerServiceError(
+      "SEAT_REQUIRED",
+      "이 기기는 아직 경기에 참가하지 않았습니다.",
+    );
+  }
+  let seat;
+  try {
+    seat = await storage.touchSeat(
+      room.id,
+      seatTokenHash(seatToken),
+      visibility,
+    );
+  } catch {
+    throw new MultiplayerServiceError(
+      "STORAGE_ERROR",
+      "접속 상태를 저장하지 못했습니다.",
+    );
+  }
+  if (!seat) {
+    throw new MultiplayerServiceError(
+      "SEAT_REQUIRED",
+      "유효한 참가 좌석이 없습니다.",
+    );
+  }
   const seatContext = await requireSeatContext(room, seatToken, storage);
+  await settleExpiredDecision(room, seatContext, storage);
+  return { seat };
+}
+
+export async function callMultiplayerTimeout(
+  roomCode: string,
+  seatToken: string | null,
+  expectedRevision: number,
+  storage: MultiplayerStorage = getMultiplayerStorage(),
+) {
+  const { room, seatContext, clock } = await loadPlayingRoom(
+    roomCode,
+    seatToken,
+    storage,
+  );
+  const seat = seatContext.seat;
+  if (room.revision !== expectedRevision) {
+    throw new MultiplayerServiceError(
+      "REVISION_CONFLICT",
+      "다른 기기에서 경기가 먼저 진행되었습니다.",
+    );
+  }
+  if (getActionOwner(room.state) !== seat) {
+    throw new MultiplayerServiceError(
+      "NOT_YOUR_TURN",
+      "작전 타임은 내 결정 차례에만 부를 수 있습니다.",
+    );
+  }
+  if (clock.timeoutsRemaining[seat] <= 0) {
+    throw new MultiplayerServiceError(
+      "INVALID_ACTION",
+      "남은 작전 타임이 없습니다.",
+    );
+  }
+  const next: MultiplayerClockState = {
+    ...clock,
+    extensionMs: clock.extensionMs + TIMEOUT_EXTENSION_MS,
+    timeoutsRemaining: {
+      ...clock.timeoutsRemaining,
+      [seat]: clock.timeoutsRemaining[seat] - 1,
+    },
+  };
+  await writeClock(room, next, false, storage);
+  return buildSnapshot({ ...room, clock: next }, seatContext);
+}
+
+export async function claimMultiplayerForfeit(
+  roomCode: string,
+  seatToken: string | null,
+  storage: MultiplayerStorage = getMultiplayerStorage(),
+) {
+  const { room, seatContext, clock } = await loadPlayingRoom(
+    roomCode,
+    seatToken,
+    storage,
+  );
+  const seat = seatContext.seat;
+  if (!canClaimForfeit(clock, seat)) {
+    throw new MultiplayerServiceError(
+      "INVALID_ACTION",
+      "아직 몰수승을 선언할 수 없습니다.",
+    );
+  }
+  const next: MultiplayerClockState = {
+    ...clock,
+    forfeitedBy: oppositeSeat(seat),
+  };
+  await writeClock(room, next, true, storage);
   return buildSnapshot(
-    room,
-    seatContext.seat,
-    seatContext.occupied[seatContext.seat === "away" ? "home" : "away"],
+    { ...room, status: "finished", clock: next },
+    seatContext,
   );
 }
 
@@ -140,11 +264,10 @@ export async function submitMultiplayerCommand(
   },
   storage: MultiplayerStorage = getMultiplayerStorage(),
 ): Promise<MultiplayerRoomSnapshot> {
-  const room = await requireRoom(roomCode, storage);
-  const seatContext = await requireSeatContext(room, seatToken, storage);
+  const storedRoom = await requireRoom(roomCode, storage);
+  const seatContext = await requireSeatContext(storedRoom, seatToken, storage);
+  const room = await settleExpiredDecision(storedRoom, seatContext, storage);
   const seat = seatContext.seat;
-  const opponentConnected =
-    seatContext.occupied[seat === "away" ? "home" : "away"];
   if (room.status !== "playing") {
     throw new MultiplayerServiceError(
       "ROOM_UNAVAILABLE",
@@ -159,7 +282,7 @@ export async function submitMultiplayerCommand(
       input.idempotencyKey,
     );
     if (duplicateRevision !== null) {
-      return buildSnapshot(room, seat, opponentConnected);
+      return buildSnapshot(room, seatContext);
     }
     throw new MultiplayerServiceError(
       "REVISION_CONFLICT",
@@ -185,6 +308,10 @@ export async function submitMultiplayerCommand(
     throw new MultiplayerServiceError("INVALID_ACTION", result.error.message);
   }
 
+  const clock = nextClockAfterCommit(
+    resolveClockState(room.clock, room.revision),
+    { actor: seat, newRevision: result.state.revision, timedOut: false },
+  );
   let commit;
   try {
     commit = await storage.commitAction({
@@ -195,6 +322,7 @@ export async function submitMultiplayerCommand(
       action,
       events: result.events,
       idempotencyKey: input.idempotencyKey,
+      clock,
     });
   } catch {
     throw new MultiplayerServiceError(
@@ -221,10 +349,143 @@ export async function submitMultiplayerCommand(
       status: result.state.phase === "finished" ? "finished" : "playing",
       state: result.state,
       revision: result.state.revision,
+      revisionStartedAt: new Date().toISOString(),
+      clock,
     },
-    seat,
-    opponentConnected,
+    seatContext,
   );
+}
+
+async function loadPlayingRoom(
+  roomCode: string,
+  seatToken: string | null,
+  storage: MultiplayerStorage,
+) {
+  const storedRoom = await requireRoom(roomCode, storage);
+  const seatContext = await requireSeatContext(storedRoom, seatToken, storage);
+  const room = await settleExpiredDecision(storedRoom, seatContext, storage);
+  const clock = resolveClockState(room.clock, room.revision);
+  if (room.status !== "playing" || clock.forfeitedBy) {
+    throw new MultiplayerServiceError(
+      "ROOM_UNAVAILABLE",
+      "진행 중인 경기가 아닙니다.",
+    );
+  }
+  return { room, seatContext, clock };
+}
+
+async function writeClock(
+  room: MultiplayerRoomRecord,
+  clock: MultiplayerClockState,
+  finish: boolean,
+  storage: MultiplayerStorage,
+) {
+  let status;
+  try {
+    status = await storage.updateClock({
+      roomId: room.id,
+      revision: room.revision,
+      expectedClock: room.clock,
+      clock,
+      finish,
+    });
+  } catch {
+    throw new MultiplayerServiceError(
+      "STORAGE_ERROR",
+      "경기 시계를 저장하지 못했습니다.",
+    );
+  }
+  if (status === "conflict") {
+    throw new MultiplayerServiceError(
+      "REVISION_CONFLICT",
+      "다른 기기에서 경기가 먼저 진행되었습니다.",
+    );
+  }
+}
+
+/**
+ * Expired decisions are resolved lazily by whichever device asks first.
+ * The timeout idempotency key is derived from the revision, so concurrent
+ * detections from both devices commit at most one automatic action.
+ */
+async function settleExpiredDecision(
+  room: MultiplayerRoomRecord,
+  seatContext: SeatContext,
+  storage: MultiplayerStorage,
+  now = Date.now(),
+): Promise<MultiplayerRoomRecord> {
+  if (room.status !== "playing") return room;
+  const clock = resolveClockState(room.clock, room.revision);
+  if (clock.forfeitedBy) return room;
+  const window = getClockWindow(room.state, room.revisionStartedAt, clock);
+  if (!window || now < window.deadlineAt) return room;
+
+  try {
+    const ownerSeat = seatContext.presence[window.owner];
+    const ownerOffline =
+      !ownerSeat || getSeatPresence(ownerSeat, now) === "offline";
+    if (ownerOffline && !clock.graceUsed) {
+      const next: MultiplayerClockState = {
+        ...clock,
+        graceUsed: true,
+        extensionMs: clock.extensionMs + RECONNECT_GRACE_MS,
+      };
+      const status = await storage.updateClock({
+        roomId: room.id,
+        revision: room.revision,
+        expectedClock: room.clock,
+        clock: next,
+        finish: false,
+      });
+      return status === "applied"
+        ? { ...room, clock: next }
+        : await reloadRoom(room, storage);
+    }
+
+    const action = chooseTimeoutAction(room.state, (size) =>
+      randomInt(0, size),
+    );
+    if (!action) return room;
+    const result = transition(room.state, action);
+    if (!result.ok) return room;
+    await storage.commitAction({
+      roomId: room.id,
+      expectedRevision: room.revision,
+      newState: result.state,
+      actorTeam: window.owner,
+      action,
+      events: result.events,
+      idempotencyKey: timeoutIdempotencyKey(room.id, room.revision),
+      clock: nextClockAfterCommit(clock, {
+        actor: window.owner,
+        newRevision: result.state.revision,
+        timedOut: true,
+      }),
+    });
+    return await reloadRoom(room, storage);
+  } catch {
+    return room;
+  }
+}
+
+async function reloadRoom(
+  room: MultiplayerRoomRecord,
+  storage: MultiplayerStorage,
+) {
+  return (await storage.getRoom(room.roomCode)) ?? room;
+}
+
+export function timeoutIdempotencyKey(roomId: string, revision: number) {
+  const hex = createHash("sha256")
+    .update(`${roomId}:timeout:${revision}`)
+    .digest("hex");
+  return [
+    hex.slice(0, 8),
+    hex.slice(8, 12),
+    `5${hex.slice(13, 16)}`,
+    `8${hex.slice(17, 20)}`,
+    hex.slice(20, 32),
+  ].join("-");
 }
 
 async function requireRoom(roomCode: string, storage: MultiplayerStorage) {
@@ -273,23 +534,40 @@ async function requireSeatContext(
   return { ...context, seat: context.seat };
 }
 
+type SeatContext = MultiplayerSeatContext & { seat: TeamSide };
+
+function oppositeSeat(seat: TeamSide): TeamSide {
+  return seat === "away" ? "home" : "away";
+}
+
 function buildSnapshot(
   room: MultiplayerRoomRecord,
-  seat: TeamSide,
-  opponentConnected: boolean,
+  seatContext: SeatContext,
+  now = Date.now(),
 ): MultiplayerRoomSnapshot {
+  const seat = seatContext.seat;
+  const clock = resolveClockState(room.clock, room.revision);
+  const playing = room.status === "playing" && !clock.forfeitedBy;
   const actionOwner = getActionOwner(room.state);
+  const isYourTurn = playing && actionOwner === seat;
   return {
     roomCode: room.roomCode,
     status: room.status,
     seat,
-    opponentConnected,
+    opponent: getOpponentStatus(seatContext.presence[oppositeSeat(seat)], now),
     actionOwner,
-    isYourTurn: actionOwner === seat,
+    isYourTurn,
     legalCards:
-      actionOwner === seat && room.state.phase === "awaiting_card"
+      isYourTurn && room.state.phase === "awaiting_card"
         ? getLegalCards(room.state)
         : [],
     view: getGameView(room.state, seat),
+    clock: buildShotClockView({
+      state: room.state,
+      revisionStartedAt: room.revisionStartedAt,
+      clock,
+      playing,
+      now,
+    }),
   };
 }

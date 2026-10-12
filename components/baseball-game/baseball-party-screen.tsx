@@ -21,9 +21,10 @@ import {
   useAdaptiveGamePolling,
   useBaseballActionFeedback,
 } from "@/components/baseball-game/baseball-action-feedback";
+import { BaseballSoundControls } from "@/components/baseball-game/audio/baseball-sound-controls";
+import { useBaseballSoundscape } from "@/components/baseball-game/audio/use-baseball-soundscape";
 import { BaseballStadium } from "@/components/baseball-game/baseball-game-debug";
 import {
-  BaseballAudio,
   BaseballPlayReceipt,
   BroadcastLineScore,
 } from "@/components/baseball-game/baseball-broadcast";
@@ -499,6 +500,11 @@ function PartyLive({
 }) {
   const [presentationActive, setPresentationActive] = useState(false);
   const game = snapshot.view;
+  const soundscape = useBaseballSoundscape({
+    game,
+    perspective: "neutral",
+    presenting: presentationActive,
+  });
   const latest = game.eventLog.at(-1);
   const latestRevisionEvents = game.eventLog.filter(
     (event) => event.revision === game.revision,
@@ -520,10 +526,11 @@ function PartyLive({
         aria-label="파티플레이 공용 경기장"
       >
         <PartyScoreboard game={game} />
-        <BaseballAudio events={game.eventLog} />
+        <BaseballSoundControls soundscape={soundscape} />
         <BaseballStadium
           face={face}
           game={game}
+          onBeat={soundscape.onBeat}
           onPresentationChange={setPresentationActive}
         />
         <div className="bbg-party-live-result">

@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 
 import "./styles.css";
+import "./room.css";
 
 export const metadata: Metadata = {
   title: { absolute: "야구 게임" },

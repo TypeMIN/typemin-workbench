@@ -78,6 +78,7 @@ export type Database = {
           last_seen_at: string;
           team: string;
           token_hash: string;
+          visibility: string;
         };
         Insert: {
           game_id: string;
@@ -85,6 +86,7 @@ export type Database = {
           last_seen_at?: string;
           team: string;
           token_hash: string;
+          visibility?: string;
         };
         Update: {
           game_id?: string;
@@ -92,6 +94,7 @@ export type Database = {
           last_seen_at?: string;
           team?: string;
           token_hash?: string;
+          visibility?: string;
         };
         Relationships: [
           {
@@ -105,6 +108,7 @@ export type Database = {
       };
       baseball_games: {
         Row: {
+          clock: Json | null;
           created_at: string;
           expires_at: string;
           host_token_hash: string | null;
@@ -112,6 +116,7 @@ export type Database = {
           mode: string;
           party_state: Json | null;
           revision: number;
+          revision_started_at: string;
           room_code: string;
           room_revision: number;
           state: Json;
@@ -119,6 +124,7 @@ export type Database = {
           updated_at: string;
         };
         Insert: {
+          clock?: Json | null;
           created_at?: string;
           expires_at?: string;
           host_token_hash?: string | null;
@@ -126,6 +132,7 @@ export type Database = {
           mode?: string;
           party_state?: Json | null;
           revision?: number;
+          revision_started_at?: string;
           room_code: string;
           room_revision?: number;
           state: Json;
@@ -133,6 +140,7 @@ export type Database = {
           updated_at?: string;
         };
         Update: {
+          clock?: Json | null;
           created_at?: string;
           expires_at?: string;
           host_token_hash?: string | null;
@@ -140,6 +148,7 @@ export type Database = {
           mode?: string;
           party_state?: Json | null;
           revision?: number;
+          revision_started_at?: string;
           room_code?: string;
           room_revision?: number;
           state?: Json;
@@ -751,6 +760,7 @@ export type Database = {
         Args: {
           p_action: Json;
           p_actor_team: string;
+          p_clock: Json;
           p_events: Json;
           p_expected_revision: number;
           p_game_id: string;
@@ -798,6 +808,16 @@ export type Database = {
           p_room_code: string;
           p_team: string;
           p_token_hash: string;
+        };
+        Returns: Json;
+      };
+      baseball_update_clock: {
+        Args: {
+          p_clock: Json;
+          p_expected_clock: Json;
+          p_finish: boolean;
+          p_game_id: string;
+          p_revision: number;
         };
         Returns: Json;
       };
