@@ -544,6 +544,22 @@ describe("baseball party service", () => {
     );
   });
 
+  it("reads a room and its players in one storage call per poll", async () => {
+    const storage = new MemoryPartyStorage();
+    const { room, hostToken } = await createPartyRoom(CONFIG, storage);
+    const joined = await joinPartyRoom(
+      room.roomCode,
+      { nickname: "타자", team: "away", expectedRoomRevision: 0 },
+      storage,
+    );
+    const combined = vi.spyOn(storage, "getRoomWithPlayers");
+    const reads = vi.spyOn(storage, "getRoom");
+    await getPartyPlayerSnapshot(room.roomCode, joined.playerToken, storage);
+    await getPartyPublicSnapshot(room.roomCode, hostToken, storage);
+    expect(combined).toHaveBeenCalledTimes(2);
+    expect(reads).toHaveBeenCalledTimes(2);
+  });
+
   it("marks a silent player offline after 25 seconds and restores presence on heartbeat", async () => {
     vi.useFakeTimers();
     const now = new Date("2026-09-08T00:00:00.000Z");

@@ -2,6 +2,8 @@ import "server-only";
 
 import { createHmac } from "node:crypto";
 
+import { after } from "next/server";
+
 // A lost notification only delays a device until its next fallback poll, so
 // the commit response never waits long on the broadcast.
 const BROADCAST_TIMEOUT_MS = 800;
@@ -29,13 +31,31 @@ export function roomTopic(roomId: string) {
   return `${TOPIC_PREFIX}${digest.slice(0, TOPIC_HEX_LENGTH)}`;
 }
 
-export async function notifyRoomChanged(
+/**
+ * Sends the notice once the response has gone out, so the acting device
+ * never waits on the broadcast. Outside a request (tests, scripts) it is
+ * sent right away instead.
+ */
+export function notifyRoomChanged(
   roomId: string,
   payload: { revision: number; roomRevision?: number },
 ) {
   const config = realtimeConfig();
   const topic = roomTopic(roomId);
   if (!config || !topic) return;
+  const send = () => broadcast(config, topic, payload);
+  try {
+    after(send);
+  } catch {
+    void send();
+  }
+}
+
+async function broadcast(
+  config: { url: string; secret: string },
+  topic: string,
+  payload: { revision: number; roomRevision?: number },
+) {
   try {
     const response = await fetch(`${config.url}/realtime/v1/api/broadcast`, {
       method: "POST",

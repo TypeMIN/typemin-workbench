@@ -155,7 +155,7 @@ export async function joinMultiplayerRoom(
       "이미 참가자가 있는 방입니다.",
     );
   }
-  await notifyRoomChanged(room.id, { revision: room.revision });
+  notifyRoomChanged(room.id, { revision: room.revision });
   return { seatToken };
 }
 
@@ -164,8 +164,11 @@ export async function getMultiplayerSnapshot(
   seatToken: string | null,
   storage: MultiplayerStorage = getMultiplayerStorage(),
 ): Promise<MultiplayerRoomSnapshot> {
-  const storedRoom = await requireRoom(roomCode, storage);
-  const seatContext = await requireSeatContext(storedRoom, seatToken, storage);
+  const { room: storedRoom, seatContext } = await requireSeatedRoom(
+    roomCode,
+    seatToken,
+    storage,
+  );
   const room = await settleExpiredDecision(storedRoom, seatContext, storage);
   return buildSnapshot(room, seatContext);
 }
@@ -176,18 +179,16 @@ export async function heartbeatMultiplayerSeat(
   visibility: SeatVisibility,
   storage: MultiplayerStorage = getMultiplayerStorage(),
 ) {
-  const room = await requireRoom(roomCode, storage);
-  if (!seatToken) {
-    throw new MultiplayerServiceError(
-      "SEAT_REQUIRED",
-      "이 기기는 아직 경기에 참가하지 않았습니다.",
-    );
-  }
+  const { room, seatContext } = await requireSeatedRoom(
+    roomCode,
+    seatToken,
+    storage,
+  );
   let seat;
   try {
     seat = await storage.touchSeat(
       room.id,
-      seatTokenHash(seatToken),
+      seatTokenHash(seatToken ?? ""),
       visibility,
     );
   } catch {
@@ -202,8 +203,15 @@ export async function heartbeatMultiplayerSeat(
       "유효한 참가 좌석이 없습니다.",
     );
   }
-  const seatContext = await requireSeatContext(room, seatToken, storage);
-  await settleExpiredDecision(room, seatContext, storage);
+  // The seats were read just before this touch; count this device as seen.
+  const touched: SeatContext = {
+    ...seatContext,
+    presence: {
+      ...seatContext.presence,
+      [seat]: { lastSeenAt: new Date().toISOString(), visibility },
+    },
+  };
+  await settleExpiredDecision(room, touched, storage);
   return { seat };
 }
 
@@ -291,8 +299,11 @@ export async function submitMultiplayerCommand(
   },
   storage: MultiplayerStorage = getMultiplayerStorage(),
 ): Promise<MultiplayerRoomSnapshot> {
-  const storedRoom = await requireRoom(roomCode, storage);
-  const seatContext = await requireSeatContext(storedRoom, seatToken, storage);
+  const { room: storedRoom, seatContext } = await requireSeatedRoom(
+    roomCode,
+    seatToken,
+    storage,
+  );
   let room = await settleExpiredDecision(storedRoom, seatContext, storage);
   const seat = seatContext.seat;
 
@@ -392,7 +403,7 @@ export async function submitMultiplayerCommand(
       );
     }
     if (commit.status === "applied") {
-      await notifyRoomChanged(room.id, { revision: commit.revision });
+      notifyRoomChanged(room.id, { revision: commit.revision });
     }
 
     return buildSnapshot(
@@ -415,8 +426,11 @@ export async function sendMultiplayerReaction(
   kind: ReactionKind,
   storage: MultiplayerStorage = getMultiplayerStorage(),
 ) {
-  const room = await requireRoom(roomCode, storage);
-  const seatContext = await requireSeatContext(room, seatToken, storage);
+  const { room, seatContext } = await requireSeatedRoom(
+    roomCode,
+    seatToken,
+    storage,
+  );
   if (room.status !== "playing" && room.status !== "finished") {
     throw new MultiplayerServiceError(
       "ROOM_UNAVAILABLE",
@@ -450,7 +464,7 @@ export async function sendMultiplayerReaction(
       "응원을 보낼 수 없는 경기 상태입니다.",
     );
   }
-  await notifyRoomChanged(room.id, { revision: room.revision });
+  notifyRoomChanged(room.id, { revision: room.revision });
   return getMultiplayerSnapshot(roomCode, seatToken, storage);
 }
 
@@ -463,8 +477,11 @@ export async function voteMultiplayerRematch(
   seatToken: string | null,
   storage: MultiplayerStorage = getMultiplayerStorage(),
 ) {
-  const storedRoom = await requireRoom(roomCode, storage);
-  const seatContext = await requireSeatContext(storedRoom, seatToken, storage);
+  const { room: storedRoom, seatContext } = await requireSeatedRoom(
+    roomCode,
+    seatToken,
+    storage,
+  );
   const room = await settleExpiredDecision(storedRoom, seatContext, storage);
   const clock = resolveClockState(room.clock, room.revision);
   if (room.status !== "finished" || !isGameOver(room.state, clock)) {
@@ -519,7 +536,7 @@ export async function voteMultiplayerRematch(
       "상대 기기에서 먼저 처리되었습니다. 다시 시도해 주세요.",
     );
   }
-  await notifyRoomChanged(room.id, {
+  notifyRoomChanged(room.id, {
     revision: start ? start.newState.revision : room.revision,
   });
   return getMultiplayerSnapshot(roomCode, seatToken, storage);
@@ -530,8 +547,11 @@ async function loadPlayingRoom(
   seatToken: string | null,
   storage: MultiplayerStorage,
 ) {
-  const storedRoom = await requireRoom(roomCode, storage);
-  const seatContext = await requireSeatContext(storedRoom, seatToken, storage);
+  const { room: storedRoom, seatContext } = await requireSeatedRoom(
+    roomCode,
+    seatToken,
+    storage,
+  );
   const room = await settleExpiredDecision(storedRoom, seatContext, storage);
   const clock = resolveClockState(room.clock, room.revision);
   if (room.status !== "playing" || clock.forfeitedBy) {
@@ -570,7 +590,7 @@ async function writeClock(
       "다른 기기에서 경기가 먼저 진행되었습니다.",
     );
   }
-  await notifyRoomChanged(room.id, { revision: room.revision });
+  notifyRoomChanged(room.id, { revision: room.revision });
 }
 
 /**
@@ -636,7 +656,7 @@ async function settleExpiredDecision(
       }),
     });
     if (commit.status === "applied") {
-      await notifyRoomChanged(room.id, { revision: commit.revision });
+      notifyRoomChanged(room.id, { revision: commit.revision });
     }
     return await reloadRoom(room, storage);
   } catch {
@@ -664,50 +684,47 @@ export function timeoutIdempotencyKey(roomId: string, revision: number) {
   ].join("-");
 }
 
-async function requireRoom(roomCode: string, storage: MultiplayerStorage) {
-  let room;
+/** Room and seat in one read; errors keep the room-first order. */
+async function requireSeatedRoom(
+  roomCode: string,
+  seatToken: string | null,
+  storage: MultiplayerStorage,
+) {
+  let loaded;
   try {
-    room = await storage.getRoom(normalizeRoomCode(roomCode));
+    loaded = await storage.getRoomWithSeats(
+      normalizeRoomCode(roomCode),
+      seatToken ? seatTokenHash(seatToken) : null,
+    );
   } catch {
     throw new MultiplayerServiceError(
       "STORAGE_ERROR",
       "멀티플레이 방을 불러오지 못했습니다.",
     );
   }
-  if (!room) {
+  if (!loaded) {
     throw new MultiplayerServiceError(
       "ROOM_NOT_FOUND",
       "방을 찾을 수 없습니다.",
     );
   }
+  const { room, seats } = loaded;
   if (room.status === "expired" || Date.parse(room.expiresAt) <= Date.now()) {
     throw new MultiplayerServiceError("ROOM_UNAVAILABLE", "만료된 방입니다.");
   }
-  return room;
-}
-
-async function requireSeatContext(
-  room: MultiplayerRoomRecord,
-  seatToken: string | null,
-  storage: MultiplayerStorage,
-) {
   if (!seatToken) {
     throw new MultiplayerServiceError(
       "SEAT_REQUIRED",
       "이 기기는 아직 경기에 참가하지 않았습니다.",
     );
   }
-  const context = await storage.getSeatContext(
-    room.id,
-    seatTokenHash(seatToken),
-  );
-  if (!context.seat) {
+  if (!seats.seat) {
     throw new MultiplayerServiceError(
       "SEAT_REQUIRED",
       "유효한 참가 좌석이 없습니다.",
     );
   }
-  return { ...context, seat: context.seat };
+  return { room, seatContext: { ...seats, seat: seats.seat } };
 }
 
 type SeatContext = MultiplayerSeatContext & { seat: TeamSide };

@@ -15,7 +15,7 @@ describe("room realtime notices", () => {
     const fetchMock = vi.fn();
     vi.stubGlobal("fetch", fetchMock);
     expect(roomTopic("room-1")).toBeNull();
-    await notifyRoomChanged("room-1", { revision: 3 });
+    notifyRoomChanged("room-1", { revision: 3 });
     expect(fetchMock).not.toHaveBeenCalled();
   });
 
@@ -35,7 +35,7 @@ describe("room realtime notices", () => {
     vi.stubEnv("SUPABASE_SECRET_KEY", "secret-a");
     const fetchMock = vi.fn().mockResolvedValue(new Response("{}"));
     vi.stubGlobal("fetch", fetchMock);
-    await notifyRoomChanged("room-1", { revision: 7, roomRevision: 2 });
+    notifyRoomChanged("room-1", { revision: 7, roomRevision: 2 });
     const [url, init] = fetchMock.mock.calls[0];
     expect(url).toBe("https://example.supabase.co/realtime/v1/api/broadcast");
     expect(JSON.parse(init.body)).toEqual({
@@ -48,10 +48,9 @@ describe("room realtime notices", () => {
       ],
     });
 
-    vi.spyOn(console, "error").mockImplementation(() => {});
+    const logged = vi.spyOn(console, "error").mockImplementation(() => {});
     vi.stubGlobal("fetch", vi.fn().mockRejectedValue(new Error("offline")));
-    await expect(
-      notifyRoomChanged("room-1", { revision: 8 }),
-    ).resolves.toBeUndefined();
+    expect(() => notifyRoomChanged("room-1", { revision: 8 })).not.toThrow();
+    await vi.waitFor(() => expect(logged).toHaveBeenCalled());
   });
 });

@@ -34,10 +34,14 @@ type CreateStoredRoomInput = {
 export interface MultiplayerStorage {
   createRoom(input: CreateStoredRoomInput): Promise<MultiplayerRoomRecord>;
   getRoom(roomCode: string): Promise<MultiplayerRoomRecord | null>;
-  getSeatContext(
-    roomId: string,
-    tokenHash: string,
-  ): Promise<MultiplayerSeatContext>;
+  /** The room and its seats in one round trip; the hot path of every poll. */
+  getRoomWithSeats(
+    roomCode: string,
+    tokenHash: string | null,
+  ): Promise<{
+    room: MultiplayerRoomRecord;
+    seats: MultiplayerSeatContext;
+  } | null>;
   touchSeat(
     roomId: string,
     tokenHash: string,
@@ -137,6 +141,12 @@ class MemoryMultiplayerStorage implements MultiplayerStorage {
         home: room?.presence.home ? { ...room.presence.home } : null,
       },
     };
+  }
+
+  async getRoomWithSeats(roomCode: string, tokenHash: string | null) {
+    const room = await this.getRoom(roomCode);
+    if (!room) return null;
+    return { room, seats: await this.getSeatContext(room.id, tokenHash ?? "") };
   }
 
   async touchSeat(
@@ -299,33 +309,18 @@ class SupabaseMultiplayerStorage implements MultiplayerStorage {
     return data ? rowToRoom(data) : null;
   }
 
-  async getSeatContext(
-    roomId: string,
-    tokenHash: string,
-  ): Promise<MultiplayerSeatContext> {
+  async getRoomWithSeats(roomCode: string, tokenHash: string | null) {
     const { data, error } = await getSupabaseAdmin()
-      .from("baseball_game_seats")
-      .select("team, token_hash, last_seen_at, visibility")
-      .eq("game_id", roomId)
-      .limit(2);
-    if (error) throw storageFailure("ROOM_SEAT_READ_FAILED", error);
-    const away = data?.find((row) => row.team === "away");
-    const home = data?.find((row) => row.team === "home");
+      .from("baseball_games")
+      .select(`${ROOM_COLUMNS}, baseball_game_seats(${SEAT_COLUMNS})`)
+      .eq("room_code", roomCode)
+      .maybeSingle();
+    if (error) throw storageFailure("ROOM_READ_FAILED", error);
+    if (!data) return null;
+    const { baseball_game_seats: seats, ...row } = data;
     return {
-      seat:
-        away?.token_hash === tokenHash
-          ? "away"
-          : home?.token_hash === tokenHash
-            ? "home"
-            : null,
-      occupied: {
-        away: Boolean(away),
-        home: Boolean(home),
-      },
-      presence: {
-        away: away ? rowToPresence(away) : null,
-        home: home ? rowToPresence(home) : null,
-      },
+      room: rowToRoom(row),
+      seats: seatContextFromRows(seats ?? [], tokenHash),
     };
   }
 
@@ -444,6 +439,39 @@ const ROOM_LIFETIME_MS = 24 * 60 * 60 * 1000;
 
 const ROOM_COLUMNS =
   "id, room_code, status, state, revision, revision_started_at, clock, reactions, series, expires_at";
+
+const SEAT_COLUMNS = "team, token_hash, last_seen_at, visibility";
+
+type SeatRow = {
+  team: string;
+  token_hash: string;
+  last_seen_at: string;
+  visibility: string;
+};
+
+function seatContextFromRows(
+  rows: SeatRow[],
+  tokenHash: string | null,
+): MultiplayerSeatContext {
+  const away = rows.find((row) => row.team === "away");
+  const home = rows.find((row) => row.team === "home");
+  return {
+    seat:
+      tokenHash && away?.token_hash === tokenHash
+        ? "away"
+        : tokenHash && home?.token_hash === tokenHash
+          ? "home"
+          : null,
+    occupied: {
+      away: Boolean(away),
+      home: Boolean(home),
+    },
+    presence: {
+      away: away ? rowToPresence(away) : null,
+      home: home ? rowToPresence(home) : null,
+    },
+  };
+}
 
 function freshPresence(visibility: SeatVisibility): StoredSeatPresence {
   return { lastSeenAt: new Date().toISOString(), visibility };
