@@ -1,7 +1,7 @@
 import type { CardDefinition } from "@/lib/baseball-game/cards";
 import type { CardTiming } from "@/lib/baseball-game/types";
 
-const CARD_TIMING_LABEL: Record<CardTiming, string> = {
+export const CARD_TIMING_LABEL: Record<CardTiming, string> = {
   before_pitch: "투구 전",
   after_pitch: "투구 직후",
   after_contact: "공에 맞힌 뒤",

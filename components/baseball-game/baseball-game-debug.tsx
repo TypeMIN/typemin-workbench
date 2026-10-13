@@ -24,6 +24,7 @@ import {
 import { BaseballStadium } from "@/components/baseball-game/stadium/baseball-stadium";
 import { useStagedView } from "@/components/baseball-game/use-staged-view";
 import { BaseballCardFace } from "@/components/baseball-game/baseball-card-face";
+import { BaseballCoachMarks } from "@/components/baseball-game/baseball-coach-marks";
 import { chooseAiAction } from "@/lib/baseball-game/ai";
 import { CARD_DEFINITIONS } from "@/lib/baseball-game/cards";
 import {
@@ -328,6 +329,9 @@ export default function BaseballGameDebug({
                   onPresentationChange={setPresentationActive}
                   onPresentedRevision={staged.onPresentedRevision}
                 />
+                {!presentationActive && display.phase !== "finished" ? (
+                  <BaseballCoachMarks />
+                ) : null}
                 {!presentationActive && staged.settled && humanChoice ? (
                   <div className="bbg-choice-dock">
                     <BaseballDuelControl
