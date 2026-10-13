@@ -10,7 +10,8 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { createGame } from "@/lib/baseball-game/engine";
 
-import BaseballGameDebug, { BaseballStadium } from "./baseball-game-debug";
+import BaseballGameDebug from "./baseball-game-debug";
+import { BaseballStadium } from "./stadium/baseball-stadium";
 
 const { routerPush } = vi.hoisted(() => ({ routerPush: vi.fn() }));
 
