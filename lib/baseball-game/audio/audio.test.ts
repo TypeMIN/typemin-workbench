@@ -27,6 +27,11 @@ const topContext: SceneAudioContext = {
   template: "generic",
   lastBeatId: null,
   walkOff: false,
+  battedFace: null,
+  walk: false,
+  hitByPitch: false,
+  strikeout: false,
+  firstPitchOfGame: false,
 };
 
 function event(overrides: Partial<GameEvent>): GameEvent {
@@ -135,6 +140,109 @@ describe("beat sounds", () => {
         "neutral",
       ).sfx,
     ).not.toContain("organ_inning");
+  });
+});
+
+describe("umpire calls and contact sounds", () => {
+  const call = (value: "strike" | "ball" | "foul" | "contact") =>
+    beat({ type: "call", call: value });
+
+  it("calls strikes and balls, but leaves the third strike to the strikeout", () => {
+    expect(getBeatSounds(call("strike"), topContext, "away").call).toBe(
+      "strike",
+    );
+    expect(getBeatSounds(call("ball"), topContext, "away").call).toBe("ball");
+    expect(
+      getBeatSounds(call("strike"), { ...topContext, strikeout: true }, "away")
+        .call,
+    ).toBeNull();
+    const strikeoutOut = beat({
+      type: "decision",
+      result: "out",
+      label: "삼진",
+      camera: "catcher",
+    });
+    const sounds = getBeatSounds(
+      strikeoutOut,
+      { ...topContext, strikeout: true },
+      "away",
+    );
+    expect(sounds.call).toBe("strikeout");
+    expect(sounds.sfx).toContain("strikeout");
+  });
+
+  it("calls a walk and a hit by pitch instead of a plain ball", () => {
+    expect(
+      getBeatSounds(call("ball"), { ...topContext, walk: true }, "away").call,
+    ).toBe("walk");
+    expect(
+      getBeatSounds(call("ball"), { ...topContext, hitByPitch: true }, "away")
+        .call,
+    ).toBe("hit_by_pitch");
+  });
+
+  it("picks the bat sound from the batted ball in the same scene", () => {
+    const sound = (face: string | null) =>
+      getBeatSounds(
+        call("contact"),
+        { ...topContext, battedFace: face },
+        "away",
+      ).sfx;
+    expect(sound("HR")).toEqual(["bat_crush"]);
+    expect(sound("D3")).toEqual(["bat_crush"]);
+    expect(sound("GA")).toEqual(["bat_dull"]);
+    expect(sound("PO")).toEqual(["bat_pop"]);
+    expect(sound("L1")).toEqual(["bat_solid"]);
+  });
+
+  it("uses a distant catch for outfield flies and hits the fence on extra bases", () => {
+    const catchBeat = beat({
+      type: "catch",
+      location: { x: 0, y: 0 },
+      label: "",
+    });
+    expect(
+      getBeatSounds(catchBeat, { ...topContext, battedFace: "FO" }, "home").sfx,
+    ).toEqual(["catch_far"]);
+    const double = beat({
+      type: "batted_ball",
+      face: "D2",
+      variation: 0,
+      label: "",
+    });
+    expect(getBeatSounds(double, topContext, "away").sfx).toContain("fence");
+  });
+
+  it("calls out, safe, home run, play ball and game set", () => {
+    const decision = (result: "out" | "safe") =>
+      beat({ type: "decision", result, label: "", camera: "field" });
+    expect(getBeatSounds(decision("out"), topContext, "home").call).toBe("out");
+    expect(getBeatSounds(decision("safe"), topContext, "home").call).toBe(
+      "safe",
+    );
+    const homeRun = beat({
+      type: "batted_ball",
+      face: "HR",
+      variation: 0,
+      label: "",
+    });
+    expect(getBeatSounds(homeRun, topContext, "away").call).toBe("home_run");
+    const pitch = beat({
+      type: "pitch",
+      face: "S",
+      location: { x: 50, y: 50, zone: "strike", pitchNumber: 1 },
+    });
+    expect(
+      getBeatSounds(pitch, { ...topContext, firstPitchOfGame: true }, "away")
+        .call,
+    ).toBe("play_ball");
+    const over = beat({
+      type: "interlude",
+      kind: "game_over",
+      label: "경기 종료",
+      detail: "",
+    });
+    expect(getBeatSounds(over, topContext, "neutral").call).toBe("game_set");
   });
 });
 
