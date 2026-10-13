@@ -13,6 +13,7 @@ import {
 } from "../engine";
 import { commandToGameAction } from "../multiplayer/command";
 import { getPresentationReadyAt } from "../presentation-gate";
+import { notifyRoomChanged, roomTopic } from "../realtime";
 import { canRebaseDuelLock, isDuelLock } from "../multiplayer/duel-lock";
 import { newRoomCode, normalizeRoomCode } from "../multiplayer/security";
 import type { GameConfig, TeamSide } from "../types";
@@ -137,6 +138,10 @@ export async function joinPartyRoom(
     playerToken,
     storage,
   );
+  await notifyRoomChanged(room.id, {
+    revision: room.revision,
+    roomRevision: snapshot.roomRevision,
+  });
   return { playerToken, snapshot };
 }
 
@@ -227,6 +232,10 @@ export async function submitPartyHostCommand(
       "현재 상태에서 실행할 수 없습니다.",
     );
   }
+  await notifyRoomChanged(room.id, {
+    revision: room.revision,
+    roomRevision: room.roomRevision + 1,
+  });
   return getPartyPublicSnapshot(room.roomCode, hostToken, storage);
 }
 
@@ -325,6 +334,10 @@ export async function submitPartyAction(
         "저장할 수 없는 경기 행동입니다.",
       );
     }
+    await notifyRoomChanged(room.id, {
+      revision: result.state.revision,
+      roomRevision: room.roomRevision + 1,
+    });
     return getPartyPlayerSnapshot(room.roomCode, playerToken, storage);
   }
 }
@@ -548,6 +561,7 @@ function buildPublicSnapshot(
       room.revisionStartedAt,
     ),
     serverNow: Date.now(),
+    realtimeTopic: roomTopic(room.id),
   };
 }
 

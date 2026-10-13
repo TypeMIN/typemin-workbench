@@ -35,6 +35,8 @@ export type MultiplayerRoomSnapshot = {
   clock: ShotClockView;
   reactions: MultiplayerReaction[];
   series: SeriesView;
+  /** Unguessable broadcast topic for revision notices; null without Supabase. */
+  realtimeTopic: string | null;
 };
 
 export type MultiplayerRoomRecord = {

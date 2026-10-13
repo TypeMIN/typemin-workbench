@@ -12,6 +12,7 @@ import {
   transition,
 } from "../engine";
 import type { GameConfig, TeamSide } from "../types";
+import { notifyRoomChanged, roomTopic } from "../realtime";
 import { commandToGameAction } from "./command";
 import { canRebaseDuelLock, isDuelLock } from "./duel-lock";
 import {
@@ -154,6 +155,7 @@ export async function joinMultiplayerRoom(
       "이미 참가자가 있는 방입니다.",
     );
   }
+  await notifyRoomChanged(room.id, { revision: room.revision });
   return { seatToken };
 }
 
@@ -389,6 +391,9 @@ export async function submitMultiplayerCommand(
         "저장할 수 없는 경기 행동입니다.",
       );
     }
+    if (commit.status === "applied") {
+      await notifyRoomChanged(room.id, { revision: commit.revision });
+    }
 
     return buildSnapshot(
       {
@@ -445,6 +450,7 @@ export async function sendMultiplayerReaction(
       "응원을 보낼 수 없는 경기 상태입니다.",
     );
   }
+  await notifyRoomChanged(room.id, { revision: room.revision });
   return getMultiplayerSnapshot(roomCode, seatToken, storage);
 }
 
@@ -513,6 +519,9 @@ export async function voteMultiplayerRematch(
       "상대 기기에서 먼저 처리되었습니다. 다시 시도해 주세요.",
     );
   }
+  await notifyRoomChanged(room.id, {
+    revision: start ? start.newState.revision : room.revision,
+  });
   return getMultiplayerSnapshot(roomCode, seatToken, storage);
 }
 
@@ -561,6 +570,7 @@ async function writeClock(
       "다른 기기에서 경기가 먼저 진행되었습니다.",
     );
   }
+  await notifyRoomChanged(room.id, { revision: room.revision });
 }
 
 /**
@@ -608,7 +618,7 @@ async function settleExpiredDecision(
     if (!action) return room;
     const result = transition(room.state, action);
     if (!result.ok) return room;
-    await storage.commitAction({
+    const commit = await storage.commitAction({
       roomId: room.id,
       expectedRevision: room.revision,
       newState: result.state,
@@ -625,6 +635,9 @@ async function settleExpiredDecision(
           : null,
       }),
     });
+    if (commit.status === "applied") {
+      await notifyRoomChanged(room.id, { revision: commit.revision });
+    }
     return await reloadRoom(room, storage);
   } catch {
     return room;
@@ -734,5 +747,6 @@ function buildSnapshot(
     }),
     reactions: visibleReactions(room.reactions, now),
     series: buildSeriesView(room.series, room.state, clock),
+    realtimeTopic: roomTopic(room.id),
   };
 }

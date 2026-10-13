@@ -47,6 +47,10 @@ import {
   useTurnAlert,
   type ReplayItem,
 } from "@/components/baseball-game/baseball-room-extras";
+import {
+  REALTIME_FALLBACK_POLL_MS,
+  useRoomRealtime,
+} from "@/components/baseball-game/use-room-realtime";
 import { useStagedView } from "@/components/baseball-game/use-staged-view";
 import { getHighlights } from "@/lib/baseball-game/highlights";
 import { isClutch } from "@/lib/baseball-game/audio/leverage";
@@ -159,8 +163,16 @@ export default function BaseballMultiplayerRoom({
     [acceptSnapshot, roomCode],
   );
 
+  const realtime = useRoomRealtime(
+    snapshot?.realtimeTopic ?? null,
+    useCallback(() => void loadSnapshot(true), [loadSnapshot]),
+  );
   useAdaptiveGamePolling(loadSnapshot, {
-    activeMs: snapshot?.isYourTurn ? 550 : 250,
+    activeMs: realtime
+      ? REALTIME_FALLBACK_POLL_MS
+      : snapshot?.isYourTurn
+        ? 550
+        : 250,
   });
   useSeatHeartbeat(roomCode, Boolean(snapshot));
   useRoomNotices(snapshot, actionFeedback.show);
