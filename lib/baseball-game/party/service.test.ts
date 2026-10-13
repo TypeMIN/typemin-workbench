@@ -19,6 +19,7 @@ import {
   joinPartyRoom,
   rotatePartyStateAfterTransition,
   submitPartyAction,
+  submitPartyCoHostCommand,
   submitPartyHostCommand,
 } from "./service";
 import { MemoryPartyStorage, resetPartyMemoryStorage } from "./storage";
@@ -577,6 +578,85 @@ describe("baseball party service", () => {
     await heartbeatPartyPlayer(room.roomCode, joined.playerToken, storage);
     const online = await getPartyPublicSnapshot(room.roomCode, null, storage);
     expect(online.players.away[0].connected).toBe(true);
+  });
+
+  it("lets a co-host run the game from a phone but not the roster", async () => {
+    const storage = new MemoryPartyStorage();
+    const { room, hostToken } = await createPartyRoom(CONFIG, storage);
+    const away = await joinPartyRoom(
+      room.roomCode,
+      { nickname: "타자", team: "away", expectedRoomRevision: 0 },
+      storage,
+    );
+    const home = await joinPartyRoom(
+      room.roomCode,
+      { nickname: "투수", team: "home", expectedRoomRevision: 1 },
+      storage,
+    );
+    const started = await submitPartyHostCommand(
+      room.roomCode,
+      hostToken,
+      { command: { type: "START_GAME" }, expectedRoomRevision: 2 },
+      storage,
+    );
+    const granted = await submitPartyHostCommand(
+      room.roomCode,
+      hostToken,
+      {
+        command: { type: "SET_CO_HOST", playerId: away.snapshot.me.id },
+        expectedRoomRevision: started.roomRevision,
+      },
+      storage,
+    );
+    expect(granted.coHostId).toBe(away.snapshot.me.id);
+
+    const paused = await submitPartyCoHostCommand(
+      room.roomCode,
+      away.playerToken,
+      {
+        command: { type: "PAUSE_GAME" },
+        expectedRoomRevision: granted.roomRevision,
+      },
+      storage,
+    );
+    expect(paused.status).toBe("paused");
+    expect(paused.me.nickname).toBe("타자");
+
+    for (const command of [
+      { type: "SET_CO_HOST", playerId: home.snapshot.me.id },
+      { type: "REMOVE_PLAYER", playerId: home.snapshot.me.id },
+    ] as const) {
+      await expect(
+        submitPartyCoHostCommand(
+          room.roomCode,
+          away.playerToken,
+          { command, expectedRoomRevision: paused.roomRevision },
+          storage,
+        ),
+      ).rejects.toMatchObject({ code: "HOST_REQUIRED" });
+    }
+    await expect(
+      submitPartyCoHostCommand(
+        room.roomCode,
+        home.playerToken,
+        {
+          command: { type: "RESUME_GAME" },
+          expectedRoomRevision: paused.roomRevision,
+        },
+        storage,
+      ),
+    ).rejects.toMatchObject({ code: "HOST_REQUIRED" });
+
+    const removed = await submitPartyHostCommand(
+      room.roomCode,
+      hostToken,
+      {
+        command: { type: "REMOVE_PLAYER", playerId: away.snapshot.me.id },
+        expectedRoomRevision: paused.roomRevision,
+      },
+      storage,
+    );
+    expect(removed.coHostId).toBeNull();
   });
 
   it("lets the host end a game without assigning a winner", async () => {

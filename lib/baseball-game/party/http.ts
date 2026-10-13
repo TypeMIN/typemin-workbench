@@ -27,6 +27,11 @@ export function parsePartyHostCommand(value: unknown): PartyHostCommand | null {
       ? { type: "REMOVE_PLAYER", playerId: record.playerId }
       : null;
   }
+  if (record.type === "SET_CO_HOST") {
+    return typeof record.playerId === "string" || record.playerId === null
+      ? { type: "SET_CO_HOST", playerId: record.playerId }
+      : null;
+  }
   if (
     record.type === "START_GAME" ||
     record.type === "PAUSE_GAME" ||

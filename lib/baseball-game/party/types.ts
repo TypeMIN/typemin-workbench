@@ -37,6 +37,8 @@ export type PartySessionState = {
   defenseIndex: Record<TeamSide, number>;
   endedReason: "host_ended" | null;
   clock?: PartyClockState | null;
+  /** A player the screen host trusted with game controls on their phone. */
+  coHostId?: string | null;
 };
 
 export type PartyClockState = {
@@ -56,7 +58,8 @@ export type PartyHostCommand =
   | { type: "PAUSE_GAME" }
   | { type: "RESUME_GAME" }
   | { type: "SKIP_ACTIVE_PLAYER" }
-  | { type: "END_GAME" };
+  | { type: "END_GAME" }
+  | { type: "SET_CO_HOST"; playerId: string | null };
 
 export type PartyRoomRecord = {
   id: string;
@@ -82,6 +85,7 @@ export type PartyPublicSnapshot = {
   activeDefenderId: string | null;
   view: GameView;
   isHost: boolean;
+  coHostId: string | null;
   /** Public batting order, so screens can show who is on deck. */
   lineups: Record<TeamSide, string[]>;
   battingIndex: Record<TeamSide, number>;

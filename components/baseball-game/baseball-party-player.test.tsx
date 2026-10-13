@@ -1,4 +1,4 @@
-import { fireEvent, render, screen } from "@testing-library/react";
+import { fireEvent, render, screen, within } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import {
@@ -50,6 +50,7 @@ function snapshot(canAct: boolean): PartyPlayerSnapshot {
     presentationReadyAt: 0,
     serverNow: Date.now(),
     realtimeTopic: null,
+    coHostId: null,
     shotClock: {
       startsAt: null,
       deadlineAt: null,
@@ -97,6 +98,56 @@ describe("BaseballPartyPlayer", () => {
     ).toBeVisible();
     expect(
       screen.queryByRole("button", { name: "스트라이크 선택" }),
+    ).not.toBeInTheDocument();
+  });
+
+  it("gives a co-host game controls and asks twice before ending", async () => {
+    const current = { ...snapshot(true), coHostId: "home1" };
+    const fetchMock = vi.fn<typeof fetch>((input) =>
+      Promise.resolve(
+        response({
+          snapshot: String(input).endsWith("/party/host")
+            ? { ...current, status: "paused" }
+            : current,
+        }),
+      ),
+    );
+    vi.stubGlobal("fetch", fetchMock);
+    render(<BaseballPartyPlayer roomCode="ABC234" />);
+    const panel = await screen.findByRole("region", { name: "방장 권한" });
+    const end = within(panel).getByRole("button", { name: "경기 종료" });
+    fireEvent.click(end);
+    expect(end).toHaveTextContent("한 번 더 누르면 종료");
+    expect(
+      fetchMock.mock.calls.some(([url]) => String(url).endsWith("/party/host")),
+    ).toBe(false);
+
+    fireEvent.click(within(panel).getByRole("button", { name: "일시정지" }));
+    expect(
+      await within(panel).findByRole("button", { name: "재개" }),
+    ).toBeVisible();
+    const [, init] = fetchMock.mock.calls.find(([url]) =>
+      String(url).endsWith("/party/host"),
+    )!;
+    expect(JSON.parse(String(init?.body))).toEqual({
+      command: { type: "PAUSE_GAME" },
+      expectedRoomRevision: current.roomRevision,
+    });
+  });
+
+  it("hides host controls from players who are not co-host", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi
+        .fn()
+        .mockResolvedValue(
+          response({ snapshot: { ...snapshot(true), coHostId: "away1" } }),
+        ),
+    );
+    render(<BaseballPartyPlayer roomCode="ABC234" />);
+    await screen.findByRole("button", { name: "스트라이크 선택" });
+    expect(
+      screen.queryByRole("region", { name: "방장 권한" }),
     ).not.toBeInTheDocument();
   });
 
