@@ -212,3 +212,12 @@
     font-size: 12px;
   }
 }
+
+.bbg-solo-shell .bbg-setup-rules {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin: 4px 14px 14px;
+  color: var(--room-muted);
+  font-size: 13px;
+}

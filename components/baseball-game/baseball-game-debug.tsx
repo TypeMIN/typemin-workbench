@@ -1,6 +1,6 @@
 "use client";
 
-import { ArrowRight, House, Layers3, RotateCcw } from "lucide-react";
+import { ArrowRight, BookOpen, House, Layers3, RotateCcw } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState, type FormEvent } from "react";
@@ -554,6 +554,10 @@ export default function BaseballGameDebug({
                     : "새 경기 시작"}
               </button>
             </form>
+            <Link className="bbg-setup-rules" href="/baseball-game/rules">
+              <BookOpen aria-hidden="true" size={14} />
+              규칙과 카드 전체 보기
+            </Link>
           </details>
         </div>
       </main>
