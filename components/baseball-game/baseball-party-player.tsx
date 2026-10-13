@@ -97,7 +97,6 @@ export default function BaseballPartyPlayer({
   async function submit(command: MultiplayerCommand) {
     if (!snapshot || busy || !snapshot.canAct) return;
     const intent = partyCommandLabel(command, snapshot.view);
-    const previousRevision = snapshot.view.revision;
     setBusy(true);
     setError(null);
     actionFeedback.show({
@@ -139,7 +138,7 @@ export default function BaseballPartyPlayer({
       actionFeedback.show({
         status: "success",
         title: `${intent} 반영 완료`,
-        detail: revisionSummary(payload.snapshot.view, previousRevision),
+        detail: "결과는 경기장 화면에서 확인하세요.",
       });
     } catch (cause) {
       const message =
@@ -458,11 +457,4 @@ function partyCommandLabel(command: MultiplayerCommand, game: GameView) {
     ...(game.cards.defense.hand ?? []),
   ].find((item) => item.instanceId === command.cardInstanceId);
   return card ? `${CARD_DEFINITIONS[card.cardId].name} 카드` : "전략카드";
-}
-
-function revisionSummary(game: GameView, previousRevision: number) {
-  return (
-    game.eventLog.findLast((event) => event.revision > previousRevision)
-      ?.summary ?? "다음 경기 단계가 준비됐습니다."
-  );
 }

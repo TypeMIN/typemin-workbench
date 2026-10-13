@@ -169,6 +169,20 @@ describe("BaseballGameDebug", () => {
       "F3 희생플라이",
     );
     expect(
+      screen.queryByRole("list", { name: "현재 타자 누적 투구" }),
+    ).not.toBeInTheDocument();
+    // The zone marker appears only after the pitch flight beat.
+    for (
+      let waited = 0;
+      waited < 10_000 &&
+      !screen.queryByRole("list", { name: "현재 타자 누적 투구" });
+      waited += 100
+    ) {
+      act(() => {
+        vi.advanceTimersByTime(100);
+      });
+    }
+    expect(
       screen.getByRole("list", { name: "현재 타자 누적 투구" }),
     ).toBeVisible();
     expect(
@@ -252,7 +266,9 @@ describe("BaseballGameDebug", () => {
       },
     ];
 
-    render(<BaseballStadium face="S" game={game} />);
+    render(
+      <BaseballStadium face="S" game={game} replayLatestOnMount={false} />,
+    );
 
     expect(
       screen.queryByRole("region", { name: "이번 승부 선택 기록" }),
@@ -303,7 +319,9 @@ describe("BaseballGameDebug", () => {
       },
     ];
 
-    render(<BaseballStadium face="B" game={game} />);
+    render(
+      <BaseballStadium face="B" game={game} replayLatestOnMount={false} />,
+    );
 
     const sequence = screen.getByRole("list", {
       name: "현재 타자 누적 투구",

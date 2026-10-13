@@ -169,7 +169,14 @@ describe("BaseballMultiplayerRoom", () => {
 
     resolveAction?.(response({ snapshot: updated }));
     expect(await screen.findByText("스트라이크 선택 반영 완료")).toBeVisible();
-    expect(screen.getByText("상대 타자가 노림수를 정하는 중")).toBeVisible();
+    // The board keeps the pre-pitch state until the lock scene finishes.
+    expect(
+      await screen.findByText(
+        "상대 타자가 노림수를 정하는 중",
+        {},
+        { timeout: 4_000 },
+      ),
+    ).toBeVisible();
   });
 
   it("shows the opponent's live activity, presence and clock", async () => {

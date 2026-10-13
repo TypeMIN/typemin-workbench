@@ -197,9 +197,10 @@ test("야구 게임에서 투타 심리전과 새 경기를 진행한다", async
   await expect(
     page.getByRole("region", { name: "이번 승부 선택 기록" }),
   ).toHaveCount(0);
+  // The zone marker waits for the pitch flight, so it is checked after it.
   await expect(
-    page.locator(".bbg-pitch-marker[data-current='true'] b"),
-  ).toHaveText("1");
+    page.locator(".bbg-pitch-marker[data-current='true']"),
+  ).toHaveCount(0);
   const revealCue = page.getByRole("button", {
     name: /현재 연출 1\/\d+, 다음 장면 보기/,
   });
@@ -211,6 +212,9 @@ test("야구 게임에서 투타 심리전과 새 경기를 진행한다", async
     }),
   ).toContainText("타자 선택");
   await advancePresentation(page);
+  await expect(
+    page.locator(".bbg-pitch-marker[data-current='true'] b"),
+  ).toHaveText("1");
   await passCardWindows(page);
   await expect(
     page.getByRole("list", { name: "현재 타자 누적 투구" }),
@@ -317,7 +321,8 @@ test("싱글플레이에서 AI가 타격 판단을 이어서 진행한다", asyn
   await expect(
     page.locator(".bbg-pitch-marker[data-current='true']"),
   ).toBeVisible({
-    timeout: 3_000,
+    // Commit scene, the AI's read, both choices and the pitch flight.
+    timeout: 8_000,
   });
   await expect(
     page.getByRole("list", { name: "현재 타자 누적 투구" }),

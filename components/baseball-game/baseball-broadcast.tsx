@@ -158,11 +158,18 @@ export function BaseballHaptics({ events }: { events: GameEvent[] }) {
   return null;
 }
 
-export function usePresentation(events: GameEvent[]) {
+// More queued scenes than this means the viewer fell behind (a hidden tab,
+// a slow network or fast opponents); older scenes are dropped to catch up.
+export const MAX_QUEUED_SCENES = 1;
+
+export function usePresentation(
+  events: GameEvent[],
+  { replayLatestOnMount = true }: { replayLatestOnMount?: boolean } = {},
+) {
   const latestRevision = events.at(-1)?.revision ?? 0;
   const scenes = useMemo(() => buildPresentationScenes(events), [events]);
   const [cursor, setCursor] = useState(() => ({
-    floorRevision: latestRevision,
+    floorRevision: replayLatestOnMount ? latestRevision : latestRevision + 1,
     sceneIndex: 0,
     beatIndex: 0,
   }));
@@ -202,6 +209,14 @@ export function usePresentation(events: GameEvent[]) {
       beatIndex: 0,
     });
   }, [events, latestRevision]);
+
+  if (eligibleScenes.length - cursor.sceneIndex - 1 > MAX_QUEUED_SCENES) {
+    setCursor({
+      ...cursor,
+      sceneIndex: eligibleScenes.length - 1 - MAX_QUEUED_SCENES,
+      beatIndex: 0,
+    });
+  }
 
   useEffect(() => {
     if (!beatId || sceneBeatCount === 0) return;
