@@ -1,0 +1,593 @@
+/* Party shared screen sized for a TV seen from across the room.
+   Everything here is in em, so one root size scales the whole screen. */
+
+.bbg-party-v2-shell:has(.bbg-tv-live) {
+  background: var(--room-bg);
+}
+
+.bbg-party-v2-main:has(.bbg-tv-live) {
+  padding: 0.6em 1em 1em;
+  font-size: clamp(13px, 0.95vw, 36px);
+}
+
+.bbg-party-live.bbg-tv-live {
+  width: 100%;
+  max-width: none;
+  grid-template-columns: minmax(9em, 15em) minmax(0, 1fr) minmax(9em, 15em);
+  gap: 0.8em;
+  color: var(--room-text);
+  font-size: 1em;
+}
+
+/* Stage */
+
+.bbg-tv-stage {
+  overflow: hidden;
+  border: 1px solid var(--room-line);
+  border-radius: var(--room-radius);
+  background: #05080c;
+}
+
+.bbg-tv-stage > .bbg-stadium {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  margin: 0;
+  border: 0;
+  border-radius: 0;
+}
+
+.bbg-tv-sound {
+  position: absolute;
+  z-index: 13;
+  top: 1em;
+  right: 1em;
+}
+
+/* Scorebug */
+
+.bbg-tv-scorebug {
+  position: absolute;
+  z-index: 12;
+  top: 1em;
+  left: 1em;
+  display: flex;
+  overflow: hidden;
+  border: 1px solid var(--room-line-strong);
+  border-radius: 0.3em;
+  background: rgb(8 11 16 / 94%);
+  box-shadow: 0 0.6em 1.6em rgb(0 0 0 / 45%);
+  font-size: 1.35em;
+  font-feature-settings: "tnum";
+}
+
+.bbg-tv-scorebug-teams > div {
+  position: relative;
+  display: flex;
+  height: 1.9em;
+  min-width: 9em;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.8em;
+  padding: 0 0.6em 0 0.8em;
+}
+
+.bbg-tv-scorebug-teams > div + div {
+  border-top: 1px solid var(--room-line);
+}
+
+.bbg-tv-scorebug-teams > div::before {
+  position: absolute;
+  inset: 0 auto 0 0;
+  width: 0.22em;
+  background: var(--room-away);
+  content: "";
+}
+
+.bbg-tv-scorebug-teams > div[data-team="home"]::before {
+  background: var(--room-home);
+}
+
+.bbg-tv-scorebug-teams span {
+  overflow: hidden;
+  max-width: 7em;
+  color: var(--room-muted);
+  font-size: 0.72em;
+  font-weight: 700;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.bbg-tv-scorebug-teams [data-batting="true"] span {
+  color: var(--room-text);
+}
+
+.bbg-tv-scorebug-teams strong {
+  font-size: 1.05em;
+  font-weight: 800;
+}
+
+.bbg-tv-scorebug-inning {
+  display: grid;
+  min-width: 2.4em;
+  place-content: center;
+  justify-items: center;
+  gap: 0.1em;
+  border-left: 1px solid var(--room-line);
+}
+
+.bbg-tv-scorebug-inning i {
+  width: 0;
+  height: 0;
+  border-right: 0.3em solid transparent;
+  border-bottom: 0.36em solid var(--room-accent);
+  border-left: 0.3em solid transparent;
+}
+
+.bbg-tv-scorebug-inning i[data-half="bottom"] {
+  order: 2;
+  border-top: 0.36em solid var(--room-accent);
+  border-bottom: 0;
+}
+
+.bbg-tv-scorebug-inning strong {
+  font-size: 0.95em;
+  font-weight: 800;
+}
+
+.bbg-tv-scorebug-bases {
+  position: relative;
+  width: 3.2em;
+  border-left: 1px solid var(--room-line);
+}
+
+.bbg-tv-scorebug-bases i {
+  position: absolute;
+  width: 0.72em;
+  height: 0.72em;
+  border: 0.09em solid rgb(255 255 255 / 40%);
+  rotate: 45deg;
+}
+
+.bbg-tv-scorebug-bases i[data-on="true"] {
+  border-color: var(--room-accent);
+  background: var(--room-accent);
+}
+
+.bbg-tv-scorebug-bases i[data-base="second"] {
+  top: 0.75em;
+  left: 1.24em;
+}
+
+.bbg-tv-scorebug-bases i[data-base="third"] {
+  top: 1.5em;
+  left: 0.5em;
+}
+
+.bbg-tv-scorebug-bases i[data-base="first"] {
+  top: 1.5em;
+  left: 1.98em;
+}
+
+.bbg-tv-scorebug-count {
+  display: grid;
+  align-content: center;
+  gap: 0.18em;
+  padding: 0 0.7em;
+  border-left: 1px solid var(--room-line);
+}
+
+.bbg-tv-scorebug-count div {
+  display: flex;
+  align-items: center;
+  gap: 0.25em;
+}
+
+.bbg-tv-scorebug-count b {
+  width: 0.7em;
+  color: var(--room-muted);
+  font-size: 0.6em;
+}
+
+.bbg-tv-scorebug-count i {
+  width: 0.42em;
+  height: 0.42em;
+  border-radius: 50%;
+  background: rgb(255 255 255 / 16%);
+}
+
+.bbg-tv-scorebug-count [data-tone="ball"] i[data-on="true"] {
+  background: var(--room-ball);
+}
+
+.bbg-tv-scorebug-count [data-tone="strike"] i[data-on="true"] {
+  background: var(--room-strike);
+}
+
+.bbg-tv-scorebug-count [data-tone="out"] i[data-on="true"] {
+  background: var(--room-out);
+}
+
+/* Who is deciding */
+
+.bbg-tv-deciders {
+  position: absolute;
+  z-index: 11;
+  bottom: 4.8em;
+  left: 50%;
+  display: flex;
+  gap: 0.6em;
+  translate: -50% 0;
+}
+
+.bbg-tv-deciders > div {
+  display: grid;
+  min-width: 8.5em;
+  gap: 0.15em;
+  padding: 0.55em 0.9em;
+  border: 1px solid var(--room-line-strong);
+  border-top: 0.18em solid var(--room-accent);
+  border-radius: 0.3em;
+  background: rgb(8 11 16 / 92%);
+}
+
+.bbg-tv-deciders > div[data-done="true"] {
+  border-top-color: var(--room-ball);
+}
+
+.bbg-tv-deciders small {
+  color: var(--room-muted);
+  font-size: 0.75em;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+}
+
+.bbg-tv-deciders strong {
+  font-size: 1.35em;
+  font-weight: 800;
+}
+
+.bbg-tv-deciders span {
+  color: var(--room-accent);
+  font-size: 0.85em;
+  font-weight: 700;
+}
+
+.bbg-tv-deciders > div[data-done="true"] span {
+  color: var(--room-ball);
+}
+
+/* Lower third */
+
+.bbg-tv-lower-third {
+  position: absolute;
+  z-index: 10;
+  right: 1em;
+  bottom: 1em;
+  left: 1em;
+  display: flex;
+  overflow: hidden;
+  border: 1px solid var(--room-line-strong);
+  border-radius: 0.3em;
+  background: rgb(8 11 16 / 92%);
+}
+
+.bbg-tv-lower-third span {
+  display: grid;
+  min-width: 4.4em;
+  place-items: center;
+  color: var(--room-accent-ink);
+  background: var(--room-accent);
+  font-size: 0.9em;
+  font-weight: 800;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+
+.bbg-tv-lower-third strong {
+  overflow: hidden;
+  padding: 0.6em 1em;
+  font-size: 1.45em;
+  font-weight: 700;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* Lineup rails */
+
+.bbg-tv-rail {
+  display: flex;
+  min-height: 0;
+  flex-direction: column;
+  overflow: hidden;
+  border: 1px solid var(--room-line);
+  border-radius: var(--room-radius);
+  background: var(--room-panel);
+}
+
+.bbg-tv-rail header {
+  display: grid;
+  gap: 0.15em;
+  padding: 0.8em 0.9em;
+  border-bottom: 1px solid var(--room-line);
+  border-top: 0.25em solid var(--room-away);
+}
+
+.bbg-tv-rail[data-team="home"] header {
+  border-top-color: var(--room-home);
+}
+
+.bbg-tv-rail header small {
+  color: var(--room-muted);
+  font-size: 0.75em;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+}
+
+.bbg-tv-rail header strong {
+  overflow: hidden;
+  font-size: 1.3em;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.bbg-tv-rail header span {
+  color: var(--room-dim);
+  font-size: 0.85em;
+  font-weight: 700;
+}
+
+.bbg-tv-rail[data-batting="true"] header span {
+  color: var(--room-accent);
+}
+
+.bbg-tv-rail ol {
+  display: grid;
+  align-content: start;
+  gap: 0.3em;
+  margin: 0;
+  padding: 0.6em;
+  overflow: auto;
+  list-style: none;
+}
+
+.bbg-tv-rail li {
+  display: grid;
+  grid-template-columns: 1.8em minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 0.5em;
+  padding: 0.45em 0.55em;
+  border-radius: 0.3em;
+  background: var(--room-raised);
+}
+
+.bbg-tv-rail li > span {
+  display: grid;
+  width: 1.8em;
+  height: 1.8em;
+  place-items: center;
+  border-radius: 50%;
+  color: var(--room-muted);
+  background: rgb(255 255 255 / 6%);
+  font-size: 0.85em;
+  font-weight: 800;
+}
+
+.bbg-tv-rail li strong {
+  overflow: hidden;
+  font-size: 1.1em;
+  font-weight: 700;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.bbg-tv-rail li em {
+  padding: 0.15em 0.45em;
+  border-radius: 0.2em;
+  color: var(--room-muted);
+  background: rgb(255 255 255 / 6%);
+  font-size: 0.75em;
+  font-style: normal;
+  font-weight: 800;
+}
+
+.bbg-tv-rail li[data-now="true"] {
+  outline: 0.12em solid var(--room-accent);
+  background: #1d1a12;
+}
+
+.bbg-tv-rail li[data-now="true"] em {
+  color: var(--room-accent-ink);
+  background: var(--room-accent);
+}
+
+.bbg-tv-rail li[data-connected="false"] {
+  opacity: 0.45;
+}
+
+/* Bigger callouts on the shared screen */
+
+.bbg-tv-stage .bbg-presentation-cue {
+  font-size: 1.35em;
+}
+
+.bbg-tv-stage .bbg-presentation-cue strong {
+  font-size: clamp(28px, 3.4vw, 120px);
+}
+
+@media (max-width: 900px) {
+  .bbg-party-live.bbg-tv-live {
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-rows: minmax(0, 1fr) auto auto;
+  }
+
+  .bbg-tv-rail ol {
+    display: flex;
+    overflow-x: auto;
+  }
+
+  .bbg-tv-deciders {
+    bottom: 4em;
+  }
+}
+
+/* Party header and lobby share the night-broadcast tokens */
+
+.bbg-party-v2-shell {
+  background: var(--room-bg);
+}
+
+.bbg-party-v2-topbar {
+  border-bottom: 1px solid var(--room-line);
+  background: var(--room-bg);
+}
+
+.bbg-party-v2-topbar .bbg-brand-mark {
+  display: grid;
+  width: 14px;
+  height: 14px;
+  border: 2px solid var(--room-accent);
+  border-radius: 0;
+  color: transparent;
+  background: none;
+  box-shadow: none;
+  font-size: 0;
+  rotate: 45deg;
+}
+
+.bbg-party-v2-topbar .bbg-brand small {
+  color: var(--room-muted);
+  letter-spacing: 0.08em;
+}
+
+.bbg-party-v2-topbar .bbg-mp-room-chip {
+  border: 1px solid var(--room-line);
+  border-radius: var(--room-radius-sm);
+  color: var(--room-text);
+  background: transparent;
+  box-shadow: none;
+}
+
+.bbg-party-v2-topbar .bbg-mp-room-chip strong {
+  font-family: ui-monospace, "SF Mono", Menlo, monospace;
+  letter-spacing: 0.14em;
+}
+
+/* Fixed-pixel pieces scale with the TV as well */
+.bbg-tv-stage .bbg-catcher-zone {
+  width: clamp(190px, 26%, 900px);
+}
+
+@media (min-width: 2200px) {
+  .bbg-party-v2-shell:has(.bbg-tv-live) .bbg-party-v2-topbar,
+  .bbg-tv-sound,
+  .bbg-party-host-panel,
+  .bbg-party-host-feedback {
+    zoom: 1.6;
+  }
+}
+
+@media (min-width: 3200px) {
+  .bbg-party-v2-shell:has(.bbg-tv-live) .bbg-party-v2-topbar,
+  .bbg-tv-sound,
+  .bbg-party-host-panel,
+  .bbg-party-host-feedback {
+    zoom: 2.2;
+  }
+}
+
+.bbg-party-v2-shell:has(.bbg-tv-live) {
+  display: grid;
+  height: 100vh;
+  height: 100dvh;
+  min-height: 0;
+  grid-template-rows: auto minmax(0, 1fr);
+}
+
+.bbg-party-v2-shell:has(.bbg-tv-live) .bbg-party-v2-main {
+  height: auto;
+  min-height: 0;
+}
+
+/* Party lobby, join and personal device panels use the same tokens */
+
+.bbg-party-invite,
+.bbg-party-lobby-board,
+.bbg-party-mobile-shell > section {
+  border: 1px solid var(--room-line);
+  border-radius: var(--room-radius);
+  background: var(--room-panel);
+  box-shadow: none;
+}
+
+.bbg-party-invite > small,
+.bbg-party-lobby-board > header small,
+.bbg-party-player-status > small,
+.bbg-party-player-hand header small {
+  color: var(--room-accent);
+  font-weight: 700;
+  letter-spacing: 0.1em;
+}
+
+.bbg-party-invite > button,
+.bbg-party-start,
+.bbg-party-settings button,
+.bbg-party-primary-link,
+.bbg-party-join-submit {
+  border-radius: var(--room-radius-sm);
+  color: var(--room-accent-ink);
+  background: var(--room-accent);
+  font-weight: 800;
+}
+
+.bbg-party-invite img,
+.bbg-party-qr-loading {
+  border-radius: var(--room-radius-sm);
+  background: #f4f1e8;
+}
+
+@media (min-width: 1700px) {
+  .bbg-party-lobby {
+    zoom: 1.3;
+  }
+}
+
+@media (min-width: 2600px) {
+  .bbg-party-lobby {
+    zoom: 1.9;
+  }
+}
+
+.bbg-tv-box {
+  margin-top: auto;
+  padding: 0.6em;
+  border-top: 1px solid var(--room-line);
+}
+
+.bbg-tv-box .bbg-line-score-grid {
+  grid-template-columns:
+    minmax(3.5em, 1fr) repeat(var(--inning-count), minmax(1em, 1fr))
+    repeat(4, minmax(1.2em, 1fr));
+  grid-auto-rows: 1.6em;
+  border-radius: 0;
+  background: none;
+}
+
+.bbg-tv-box :is(.bbg-line-score-head, .bbg-line-value, .bbg-line-total) {
+  color: var(--room-muted);
+  font-size: 0.7em;
+}
+
+.bbg-tv-box .bbg-line-team {
+  height: 1.6em;
+}
+
+.bbg-tv-box .bbg-line-team strong,
+.bbg-tv-box .bbg-line-runs {
+  font-size: 0.8em;
+}
+
+.bbg-tv-box .bbg-line-score .bbg-line-inning {
+  display: block !important;
+}

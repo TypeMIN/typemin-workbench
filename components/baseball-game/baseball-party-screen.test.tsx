@@ -38,6 +38,8 @@ function snapshot(): PartyPublicSnapshot {
     activeDefenderId: null,
     view: getGameView(state, "public"),
     isHost: true,
+    lineups: { away: [], home: [] },
+    battingIndex: { away: 0, home: 0 },
     presentationReadyAt: 0,
     serverNow: Date.now(),
   };
