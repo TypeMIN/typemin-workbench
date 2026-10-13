@@ -27,11 +27,18 @@ test("홈에서 두 앱으로 이동한다", async ({ page }) => {
     page.getByText("완료된 5인 월드컵 예측 결과 아카이브"),
   ).toHaveCount(0);
 
+  // Available projects share one row of equal cards on desktop.
   const desktopMealCard = await page
     .getByRole("link", { name: "오늘 뭐 먹지? 열기" })
     .boundingBox();
+  const desktopBaseballCard = await page
+    .getByRole("link", { name: "야구 게임 열기" })
+    .boundingBox();
   expect(desktopMealCard).not.toBeNull();
-  expect(desktopMealCard!.width).toBeGreaterThan(700);
+  expect(desktopBaseballCard).not.toBeNull();
+  expect(desktopMealCard!.width).toBeGreaterThan(450);
+  expect(desktopBaseballCard!.width).toBeCloseTo(desktopMealCard!.width, 0);
+  expect(desktopBaseballCard!.y).toBeCloseTo(desktopMealCard!.y, 0);
   expect(desktopMealCard!.height).toBeLessThanOrEqual(130);
   await expect(
     page
