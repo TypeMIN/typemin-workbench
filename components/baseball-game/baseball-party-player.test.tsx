@@ -50,6 +50,13 @@ function snapshot(canAct: boolean): PartyPlayerSnapshot {
     presentationReadyAt: 0,
     serverNow: Date.now(),
     realtimeTopic: null,
+    shotClock: {
+      startsAt: null,
+      deadlineAt: null,
+      serverNow: 0,
+      warningMs: 10_000,
+      lastTimeout: null,
+    },
     me,
     canAct,
     legalCards: [],

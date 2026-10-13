@@ -7,6 +7,7 @@ import type {
   TeamSide,
 } from "../types";
 import type { MultiplayerCommand } from "../multiplayer/types";
+import type { PartyShotClockView } from "./clock";
 
 export const PARTY_TEAM_CAPACITY = 8;
 export const PARTY_OFFLINE_AFTER_MS = 25_000;
@@ -35,6 +36,16 @@ export type PartySessionState = {
   battingIndex: Record<TeamSide, number>;
   defenseIndex: Record<TeamSide, number>;
   endedReason: "host_ended" | null;
+  clock?: PartyClockState | null;
+};
+
+export type PartyClockState = {
+  revision: number;
+  /** Restarts this revision's clock after a resume or a skipped player. */
+  anchorAt: number | null;
+  /** Shared deadline carried across the locks of one v4 duel. */
+  fixedDeadlineAt: number | null;
+  lastTimeout: { revision: number; team: TeamSide } | null;
 };
 
 export type PartyHostCommand =
@@ -79,6 +90,7 @@ export type PartyPublicSnapshot = {
   serverNow: number;
   /** Unguessable broadcast topic for revision notices; null without Supabase. */
   realtimeTopic: string | null;
+  shotClock: PartyShotClockView;
 };
 
 export type PartyPlayerSnapshot = PartyPublicSnapshot & {

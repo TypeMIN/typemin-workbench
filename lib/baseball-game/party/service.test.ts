@@ -3,6 +3,11 @@ import { randomUUID } from "node:crypto";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { createGame } from "../engine";
+import {
+  DECISION_LIMIT_MS,
+  MIN_DECISION_AFTER_LOCK_MS,
+  PRESENTATION_SYNC_BUFFER_MS,
+} from "../multiplayer/shot-clock";
 import type { GameEvent } from "../types";
 import { partyTokenHash } from "./security";
 import {
@@ -691,6 +696,124 @@ describe("baseball party service", () => {
       storage,
     );
     expect(accepted.view.revision).toBe(pitched.view.revision + 1);
+  });
+
+  describe("shot clock", () => {
+    const START = Date.parse("2026-10-14T00:00:00.000Z");
+    const FIRST_DEADLINE =
+      START + PRESENTATION_SYNC_BUFFER_MS + DECISION_LIMIT_MS.awaiting_pitch;
+
+    beforeEach(() => {
+      vi.useFakeTimers({ toFake: ["Date"] });
+      vi.setSystemTime(START);
+    });
+
+    async function startedRoom() {
+      const storage = new MemoryPartyStorage();
+      const { room, hostToken } = await createPartyRoom(CONFIG, storage);
+      const away = await joinPartyRoom(
+        room.roomCode,
+        { nickname: "타자", team: "away", expectedRoomRevision: 0 },
+        storage,
+      );
+      const home = await joinPartyRoom(
+        room.roomCode,
+        { nickname: "투수", team: "home", expectedRoomRevision: 1 },
+        storage,
+      );
+      const started = await submitPartyHostCommand(
+        room.roomCode,
+        hostToken,
+        { command: { type: "START_GAME" }, expectedRoomRevision: 2 },
+        storage,
+      );
+      return { storage, room, hostToken, away, home, started };
+    }
+
+    it("shares one deadline for the duel and fills both sides when it runs out", async () => {
+      const { storage, room, hostToken, started } = await startedRoom();
+      expect(started.shotClock.deadlineAt).toBe(FIRST_DEADLINE);
+
+      vi.setSystemTime(FIRST_DEADLINE - 1);
+      const waiting = await getPartyPublicSnapshot(
+        room.roomCode,
+        hostToken,
+        storage,
+      );
+      expect(waiting.view.revision).toBe(0);
+
+      vi.setSystemTime(FIRST_DEADLINE);
+      const settled = await getPartyPublicSnapshot(
+        room.roomCode,
+        hostToken,
+        storage,
+      );
+      expect(settled.view.revision).toBe(2);
+      expect(settled.view.eventLog.at(-1)).toMatchObject({ revision: 2 });
+      expect(settled.shotClock.lastTimeout).toEqual({
+        revision: 2,
+        team: "away",
+      });
+      expect(settled.shotClock.deadlineAt).toBeGreaterThan(FIRST_DEADLINE);
+    });
+
+    it("keeps the duel deadline after a lock but leaves the other side time", async () => {
+      const { storage, room, away, started } = await startedRoom();
+      const lockAt = FIRST_DEADLINE - 1_000;
+      vi.setSystemTime(lockAt);
+      const locked = await submitPartyAction(
+        room.roomCode,
+        away.playerToken,
+        {
+          command: { type: "SELECT_SWING", decision: "swing" },
+          expectedRevision: 0,
+          expectedRoomRevision: started.roomRevision,
+          idempotencyKey: randomUUID(),
+        },
+        storage,
+      );
+      expect(locked.view.batterLocked).toBe(true);
+      expect(locked.shotClock.deadlineAt).toBe(
+        lockAt + MIN_DECISION_AFTER_LOCK_MS,
+      );
+      expect(locked.shotClock.lastTimeout).toBeNull();
+    });
+
+    it("stops while paused and restarts in full on resume", async () => {
+      const { storage, room, hostToken, started } = await startedRoom();
+      const paused = await submitPartyHostCommand(
+        room.roomCode,
+        hostToken,
+        {
+          command: { type: "PAUSE_GAME" },
+          expectedRoomRevision: started.roomRevision,
+        },
+        storage,
+      );
+      expect(paused.shotClock.deadlineAt).toBeNull();
+
+      const resumeAt = FIRST_DEADLINE + 60_000;
+      vi.setSystemTime(resumeAt);
+      const idle = await getPartyPublicSnapshot(
+        room.roomCode,
+        hostToken,
+        storage,
+      );
+      expect(idle.view.revision).toBe(0);
+      const resumed = await submitPartyHostCommand(
+        room.roomCode,
+        hostToken,
+        {
+          command: { type: "RESUME_GAME" },
+          expectedRoomRevision: paused.roomRevision,
+        },
+        storage,
+      );
+      expect(resumed.view.revision).toBe(0);
+      expect(resumed.shotClock.deadlineAt).toBe(
+        resumeAt + DECISION_LIMIT_MS.awaiting_pitch,
+      );
+    });
   });
 });
 
