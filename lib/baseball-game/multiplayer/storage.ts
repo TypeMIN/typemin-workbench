@@ -3,6 +3,7 @@ import "server-only";
 import { randomUUID } from "node:crypto";
 
 import { getSupabaseAdmin } from "@/lib/supabase/admin";
+import { storageFailure } from "@/lib/supabase/log";
 import type { Json } from "@/lib/supabase/database.types";
 
 import type { GameState, TeamSide } from "../types";
@@ -272,7 +273,7 @@ class SupabaseMultiplayerStorage implements MultiplayerStorage {
       .single();
     if (error || !data) {
       if (error?.code === "23505") throw new Error("ROOM_CODE_CONFLICT");
-      throw new Error("ROOM_CREATE_FAILED");
+      throw storageFailure("ROOM_CREATE_FAILED", error);
     }
     const { error: seatError } = await supabase
       .from("baseball_game_seats")
@@ -283,7 +284,7 @@ class SupabaseMultiplayerStorage implements MultiplayerStorage {
       });
     if (seatError) {
       await supabase.from("baseball_games").delete().eq("id", data.id);
-      throw new Error("ROOM_CREATE_FAILED");
+      throw storageFailure("ROOM_SEAT_CREATE_FAILED", seatError);
     }
     return rowToRoom(data);
   }
@@ -294,7 +295,7 @@ class SupabaseMultiplayerStorage implements MultiplayerStorage {
       .select(ROOM_COLUMNS)
       .eq("room_code", roomCode)
       .maybeSingle();
-    if (error) throw new Error("ROOM_READ_FAILED");
+    if (error) throw storageFailure("ROOM_READ_FAILED", error);
     return data ? rowToRoom(data) : null;
   }
 
@@ -307,7 +308,7 @@ class SupabaseMultiplayerStorage implements MultiplayerStorage {
       .select("team, token_hash, last_seen_at, visibility")
       .eq("game_id", roomId)
       .limit(2);
-    if (error) throw new Error("ROOM_SEAT_READ_FAILED");
+    if (error) throw storageFailure("ROOM_SEAT_READ_FAILED", error);
     const away = data?.find((row) => row.team === "away");
     const home = data?.find((row) => row.team === "home");
     return {
@@ -340,7 +341,7 @@ class SupabaseMultiplayerStorage implements MultiplayerStorage {
       .eq("token_hash", tokenHash)
       .select("team")
       .maybeSingle();
-    if (error) throw new Error("ROOM_SEAT_TOUCH_FAILED");
+    if (error) throw storageFailure("ROOM_SEAT_TOUCH_FAILED", error);
     return data?.team === "away" || data?.team === "home" ? data.team : null;
   }
 
@@ -351,7 +352,7 @@ class SupabaseMultiplayerStorage implements MultiplayerStorage {
       .eq("game_id", roomId)
       .eq("idempotency_key", idempotencyKey)
       .maybeSingle();
-    if (error) throw new Error("ROOM_ACTION_READ_FAILED");
+    if (error) throw storageFailure("ROOM_ACTION_READ_FAILED", error);
     return data ? Number(data.result_revision) : null;
   }
 
@@ -360,7 +361,7 @@ class SupabaseMultiplayerStorage implements MultiplayerStorage {
       "baseball_claim_home_seat",
       { p_room_code: roomCode, p_token_hash: tokenHash },
     );
-    if (error) throw new Error("ROOM_JOIN_FAILED");
+    if (error) throw storageFailure("ROOM_JOIN_FAILED", error);
     return readRpcStatus(data) === "joined";
   }
 
@@ -380,7 +381,7 @@ class SupabaseMultiplayerStorage implements MultiplayerStorage {
         p_clock: input.clock as unknown as Json,
       },
     );
-    if (error) throw new Error("ROOM_COMMIT_FAILED");
+    if (error) throw storageFailure("ROOM_COMMIT_FAILED", error);
     const status = readRpcStatus(data);
     const revision = readRpcRevision(data);
     if ((status === "applied" || status === "duplicate") && revision !== null) {
@@ -402,7 +403,7 @@ class SupabaseMultiplayerStorage implements MultiplayerStorage {
         p_finish: input.finish,
       },
     );
-    if (error) throw new Error("ROOM_CLOCK_UPDATE_FAILED");
+    if (error) throw storageFailure("ROOM_CLOCK_UPDATE_FAILED", error);
     return readRpcStatus(data) === "applied" ? "applied" : "conflict";
   }
 
@@ -417,7 +418,7 @@ class SupabaseMultiplayerStorage implements MultiplayerStorage {
         p_limit: input.limit,
       },
     );
-    if (error) throw new Error("ROOM_REACTION_FAILED");
+    if (error) throw storageFailure("ROOM_REACTION_FAILED", error);
     const status = readRpcStatus(data);
     return status === "applied" || status === "cooldown" ? status : "conflict";
   }
@@ -434,7 +435,7 @@ class SupabaseMultiplayerStorage implements MultiplayerStorage {
         p_clock: (input.start?.clock ?? null) as unknown as Json,
       },
     );
-    if (error) throw new Error("ROOM_REMATCH_FAILED");
+    if (error) throw storageFailure("ROOM_REMATCH_FAILED", error);
     return readRpcStatus(data) === "applied" ? "applied" : "conflict";
   }
 }

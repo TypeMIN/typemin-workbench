@@ -41,6 +41,9 @@ export function parsePartyHostCommand(value: unknown): PartyHostCommand | null {
 
 export function partyErrorResponse(error: unknown) {
   if (!(error instanceof PartyServiceError)) {
+    console.error(
+      JSON.stringify({ scope: "party", unexpected: String(error) }),
+    );
     return Response.json(
       { error: "파티플레이 요청을 처리하지 못했습니다." },
       { status: 500 },
