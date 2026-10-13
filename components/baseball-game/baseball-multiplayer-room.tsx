@@ -35,7 +35,7 @@ import {
   pendingDuelChoice,
   type DuelRole,
 } from "@/components/baseball-game/baseball-duel-control";
-import { BaseballStadium } from "@/components/baseball-game/baseball-game-debug";
+import { BaseballStadium } from "@/components/baseball-game/stadium/baseball-stadium";
 import {
   ReactionBar,
   ReactionBubbles,

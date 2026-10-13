@@ -27,7 +27,7 @@ import {
 } from "@/components/baseball-game/baseball-action-feedback";
 import { BaseballSoundControls } from "@/components/baseball-game/audio/baseball-sound-controls";
 import { useBaseballSoundscape } from "@/components/baseball-game/audio/use-baseball-soundscape";
-import { BaseballStadium } from "@/components/baseball-game/baseball-game-debug";
+import { BaseballStadium } from "@/components/baseball-game/stadium/baseball-stadium";
 import { PartyShotClock } from "@/components/baseball-game/party-shot-clock";
 import { useStagedView } from "@/components/baseball-game/use-staged-view";
 import { BroadcastLineScore } from "@/components/baseball-game/baseball-broadcast";
