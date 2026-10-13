@@ -1,4 +1,4 @@
-import { fireEvent, render, screen } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, expect, test, vi } from "vitest";
 
 import WhatShouldEatPage from "./page";
@@ -101,17 +101,16 @@ test("표시 이름을 변경하면 헤더와 진행 중인 참가자에 즉시 
     gender: "female",
   };
   const updatedUser = { ...user, displayName: "새 이름" };
+  // Like the server, later reads return the saved name; a background
+  // session refresh must not bring the old one back.
+  let current = user;
   const fetchMock = vi.fn((input: RequestInfo | URL, options?: RequestInit) => {
     const url = String(input);
     if (url === "/what-should-eat/api/auth/me" && options?.method === "PATCH") {
-      return Promise.resolve(
-        new Response(JSON.stringify({ user: updatedUser }), {
-          headers: { "Content-Type": "application/json" },
-        }),
-      );
+      current = updatedUser;
     }
     return Promise.resolve(
-      new Response(JSON.stringify({ user }), {
+      new Response(JSON.stringify({ user: current }), {
         headers: { "Content-Type": "application/json" },
       }),
     );
@@ -130,7 +129,9 @@ test("표시 이름을 변경하면 헤더와 진행 중인 참가자에 즉시 
   expect(
     await screen.findByRole("button", { name: "프로필 편집: 새 이름" }),
   ).toBeVisible();
-  expect(screen.getAllByText("새 이름").length).toBeGreaterThanOrEqual(2);
+  await waitFor(() =>
+    expect(screen.getAllByText("새 이름").length).toBeGreaterThanOrEqual(2),
+  );
   expect(fetchMock).toHaveBeenCalledWith(
     "/what-should-eat/api/auth/me",
     expect.objectContaining({
