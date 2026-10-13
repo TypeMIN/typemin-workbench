@@ -762,6 +762,10 @@ export type Database = {
         Args: { p_room_code: string; p_token_hash: string };
         Returns: Json;
       };
+      baseball_cleanup_expired_rooms: {
+        Args: { p_retention_days: number };
+        Returns: number;
+      };
       baseball_commit_action: {
         Args: {
           p_action: Json;

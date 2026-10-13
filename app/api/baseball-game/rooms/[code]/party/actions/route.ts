@@ -10,7 +10,11 @@ import { partyErrorResponse } from "@/lib/baseball-game/party/http";
 import { partyPlayerCookieName } from "@/lib/baseball-game/party/security";
 import { submitPartyAction } from "@/lib/baseball-game/party/service";
 import { readJson } from "@/lib/what-should-eat/api";
-import { mutationOriginError } from "@/lib/workbench/request";
+import { mutationOriginError, requestIp } from "@/lib/workbench/request";
+import {
+  rateLimitedResponse,
+  takeRateLimit,
+} from "@/lib/baseball-game/rate-limit";
 
 export async function POST(
   request: Request,
@@ -45,6 +49,9 @@ export async function POST(
   try {
     const token =
       (await cookies()).get(partyPlayerCookieName(roomCode))?.value ?? null;
+    if (!takeRateLimit("action", token ?? requestIp(request))) {
+      return rateLimitedResponse();
+    }
     return Response.json({
       snapshot: await submitPartyAction(roomCode, token, {
         command,

@@ -7,9 +7,14 @@ import {
   normalizeRoomCode,
   seatCookieName,
 } from "@/lib/baseball-game/multiplayer/security";
+import {
+  rateLimitedResponse,
+  takeRateLimit,
+} from "@/lib/baseball-game/rate-limit";
+import { requestIp } from "@/lib/workbench/request";
 
 export async function GET(
-  _request: Request,
+  request: Request,
   context: { params: Promise<{ code: string }> },
 ) {
   const { code: rawCode } = await context.params;
@@ -23,6 +28,9 @@ export async function GET(
   try {
     const token =
       (await cookies()).get(seatCookieName(roomCode))?.value ?? null;
+    if (!takeRateLimit("view", token ?? requestIp(request))) {
+      return rateLimitedResponse();
+    }
     const snapshot = await getMultiplayerSnapshot(roomCode, token);
     return Response.json({ snapshot });
   } catch (error) {
