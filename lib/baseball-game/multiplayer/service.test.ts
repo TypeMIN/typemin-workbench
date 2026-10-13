@@ -11,6 +11,7 @@ import {
   callMultiplayerTimeout,
   claimMultiplayerForfeit,
   getMultiplayerSnapshot,
+  getMultiplayerSpectatorSnapshot,
   heartbeatMultiplayerSeat,
   sendMultiplayerReaction,
   submitMultiplayerCommand,
@@ -277,6 +278,20 @@ describe("baseball multiplayer service", () => {
     combined.mockClear();
     await heartbeatMultiplayerSeat("ABC234", AWAY_TOKEN, "visible", storage);
     expect(combined).toHaveBeenCalledTimes(1);
+  });
+
+  it("shows spectators the public game and both presences without a hand", async () => {
+    const storage = new TestStorage();
+    const watch = await getMultiplayerSpectatorSnapshot("ABC234", storage);
+    expect(watch.view.cards.offense.hand).toBeNull();
+    expect(watch.view.cards.defense.hand).toBeNull();
+    expect(watch.presence.away.presence).toBe("online");
+    expect(watch.presence.home.presence).toBe("online");
+    expect(watch).not.toHaveProperty("seat");
+    expect(JSON.stringify(watch)).not.toContain("rng");
+    await expect(
+      getMultiplayerSpectatorSnapshot("ZZZ999", storage),
+    ).rejects.toMatchObject({ code: "ROOM_NOT_FOUND" });
   });
 
   it("rejects a command from the team that does not own the turn", async () => {

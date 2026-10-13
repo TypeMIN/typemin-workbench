@@ -64,6 +64,7 @@ import type {
   MultiplayerCreateResult,
   MultiplayerRoomRecord,
   MultiplayerRoomSnapshot,
+  MultiplayerSpectatorSnapshot,
 } from "./types";
 
 export class MultiplayerServiceError extends Error {
@@ -171,6 +172,35 @@ export async function getMultiplayerSnapshot(
   );
   const room = await settleExpiredDecision(storedRoom, seatContext, storage);
   return buildSnapshot(room, seatContext);
+}
+
+export async function getMultiplayerSpectatorSnapshot(
+  roomCode: string,
+  storage: MultiplayerStorage = getMultiplayerStorage(),
+  now = Date.now(),
+): Promise<MultiplayerSpectatorSnapshot> {
+  const { room, seats } = await loadRoom(roomCode, null, storage);
+  const clock = resolveClockState(room.clock, room.revision);
+  return {
+    roomCode: room.roomCode,
+    status: room.status,
+    actionOwner: getActionOwner(room.state),
+    presence: {
+      away: getOpponentStatus(seats.presence.away, now),
+      home: getOpponentStatus(seats.presence.home, now),
+    },
+    view: getGameView(room.state, "public"),
+    clock: buildShotClockView({
+      state: room.state,
+      revisionStartedAt: room.revisionStartedAt,
+      clock,
+      playing: room.status === "playing" && !clock.forfeitedBy,
+      now,
+    }),
+    reactions: visibleReactions(room.reactions, now),
+    series: buildSeriesView(room.series, room.state, clock),
+    realtimeTopic: roomTopic(room.id),
+  };
 }
 
 export async function heartbeatMultiplayerSeat(
@@ -684,8 +714,7 @@ export function timeoutIdempotencyKey(roomId: string, revision: number) {
   ].join("-");
 }
 
-/** Room and seat in one read; errors keep the room-first order. */
-async function requireSeatedRoom(
+async function loadRoom(
   roomCode: string,
   seatToken: string | null,
   storage: MultiplayerStorage,
@@ -708,10 +737,22 @@ async function requireSeatedRoom(
       "방을 찾을 수 없습니다.",
     );
   }
-  const { room, seats } = loaded;
-  if (room.status === "expired" || Date.parse(room.expiresAt) <= Date.now()) {
+  if (
+    loaded.room.status === "expired" ||
+    Date.parse(loaded.room.expiresAt) <= Date.now()
+  ) {
     throw new MultiplayerServiceError("ROOM_UNAVAILABLE", "만료된 방입니다.");
   }
+  return loaded;
+}
+
+/** Room and seat in one read; errors keep the room-first order. */
+async function requireSeatedRoom(
+  roomCode: string,
+  seatToken: string | null,
+  storage: MultiplayerStorage,
+) {
+  const { room, seats } = await loadRoom(roomCode, seatToken, storage);
   if (!seatToken) {
     throw new MultiplayerServiceError(
       "SEAT_REQUIRED",

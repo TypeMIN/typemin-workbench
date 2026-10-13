@@ -39,6 +39,19 @@ export type MultiplayerRoomSnapshot = {
   realtimeTopic: string | null;
 };
 
+/** What a spectator link shows: the public view, never a hand. */
+export type MultiplayerSpectatorSnapshot = {
+  roomCode: string;
+  status: MultiplayerRoomStatus;
+  actionOwner: TeamSide | null;
+  presence: Record<TeamSide, OpponentStatus>;
+  view: GameView;
+  clock: ShotClockView;
+  reactions: MultiplayerReaction[];
+  series: SeriesView;
+  realtimeTopic: string | null;
+};
+
 export type MultiplayerRoomRecord = {
   id: string;
   roomCode: string;
