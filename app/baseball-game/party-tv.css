@@ -668,3 +668,75 @@
   color: var(--room-out);
   font-weight: 700;
 }
+
+/* Co-host: the host hands game controls to one player's phone. */
+
+.bbg-party-host-roster > div {
+  display: flex;
+  min-width: 0;
+  gap: 3px;
+}
+
+.bbg-party-host-roster > div > button:first-child {
+  flex: 1;
+}
+
+.bbg-party-host-panel .bbg-party-cohost-toggle {
+  flex: none;
+  color: var(--room-muted);
+}
+
+.bbg-party-host-panel .bbg-party-cohost-toggle[aria-pressed="true"] {
+  border-color: var(--room-accent);
+  color: var(--room-accent);
+}
+
+.bbg-party-cohost {
+  display: grid;
+  gap: 8px;
+  padding: 10px 12px;
+  border: 1px solid var(--room-accent);
+  border-radius: var(--room-radius);
+  background: var(--room-panel);
+}
+
+.bbg-party-cohost header {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--room-accent);
+}
+
+.bbg-party-cohost header strong {
+  font-size: 13px;
+}
+
+.bbg-party-cohost header span {
+  margin-left: auto;
+  color: var(--room-muted);
+  font-size: 11px;
+}
+
+.bbg-party-cohost > div {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 6px;
+}
+
+.bbg-party-cohost button {
+  display: flex;
+  min-height: 44px;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  border: 1px solid var(--room-line-strong);
+  border-radius: var(--room-radius-sm);
+  color: var(--room-text);
+  background: var(--room-raised);
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.bbg-party-cohost button.is-danger {
+  color: #ff8d84;
+}

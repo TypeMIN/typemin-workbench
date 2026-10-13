@@ -8,8 +8,14 @@ import {
   parsePartyHostCommand,
   partyErrorResponse,
 } from "@/lib/baseball-game/party/http";
-import { partyHostCookieName } from "@/lib/baseball-game/party/security";
-import { submitPartyHostCommand } from "@/lib/baseball-game/party/service";
+import {
+  partyHostCookieName,
+  partyPlayerCookieName,
+} from "@/lib/baseball-game/party/security";
+import {
+  submitPartyCoHostCommand,
+  submitPartyHostCommand,
+} from "@/lib/baseball-game/party/service";
 import { readJson } from "@/lib/what-should-eat/api";
 import { mutationOriginError } from "@/lib/workbench/request";
 
@@ -40,13 +46,19 @@ export async function POST(
     );
   }
   try {
-    const token =
-      (await cookies()).get(partyHostCookieName(roomCode))?.value ?? null;
+    const jar = await cookies();
+    const hostToken = jar.get(partyHostCookieName(roomCode))?.value ?? null;
+    const input = { command, expectedRoomRevision };
+    // The screen that opened the room is the host; a player's phone may
+    // act as co-host when the host granted it.
     return Response.json({
-      snapshot: await submitPartyHostCommand(roomCode, token, {
-        command,
-        expectedRoomRevision,
-      }),
+      snapshot: hostToken
+        ? await submitPartyHostCommand(roomCode, hostToken, input)
+        : await submitPartyCoHostCommand(
+            roomCode,
+            jar.get(partyPlayerCookieName(roomCode))?.value ?? null,
+            input,
+          ),
     });
   } catch (error) {
     return partyErrorResponse(error);

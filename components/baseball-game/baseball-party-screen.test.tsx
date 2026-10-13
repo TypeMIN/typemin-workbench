@@ -43,6 +43,7 @@ function snapshot(): PartyPublicSnapshot {
     presentationReadyAt: 0,
     serverNow: Date.now(),
     realtimeTopic: null,
+    coHostId: null,
     shotClock: {
       startsAt: null,
       deadlineAt: null,

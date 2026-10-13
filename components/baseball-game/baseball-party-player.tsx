@@ -4,7 +4,16 @@ import {
   REALTIME_FALLBACK_POLL_MS,
   useRoomRealtime,
 } from "@/components/baseball-game/use-room-realtime";
-import { Radio, RefreshCw, Tv, Users } from "lucide-react";
+import {
+  Pause,
+  Play,
+  Radio,
+  RefreshCw,
+  ShieldCheck,
+  SkipForward,
+  Tv,
+  Users,
+} from "lucide-react";
 import Link from "next/link";
 import { useCallback, useEffect, useMemo, useState } from "react";
 
@@ -17,7 +26,10 @@ import { CARD_DEFINITIONS } from "@/lib/baseball-game/cards";
 import { BaseballCardFace } from "./baseball-card-face";
 import { PITCH_TARGET_LABELS } from "@/lib/baseball-game/duel";
 import type { MultiplayerCommand } from "@/lib/baseball-game/multiplayer/types";
-import type { PartyPlayerSnapshot } from "@/lib/baseball-game/party/types";
+import type {
+  PartyHostCommand,
+  PartyPlayerSnapshot,
+} from "@/lib/baseball-game/party/types";
 import {
   BaseballHaptics,
   BaseballPlayReceipt,
@@ -169,6 +181,42 @@ export default function BaseballPartyPlayer({
     }
   }
 
+  async function host(command: PartyHostCommand) {
+    if (!snapshot || busy) return;
+    setBusy(true);
+    setError(null);
+    try {
+      const response = await fetch(
+        `/api/baseball-game/rooms/${roomCode}/party/host`,
+        {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({
+            command,
+            expectedRoomRevision: snapshot.roomRevision,
+          }),
+        },
+      );
+      const payload = (await response.json()) as {
+        snapshot?: PartyPlayerSnapshot;
+        error?: string;
+      };
+      if (!response.ok || !payload.snapshot) {
+        if (response.status === 409) await load(true);
+        throw new Error(payload.error ?? "방장 명령을 처리하지 못했습니다.");
+      }
+      setSnapshot(payload.snapshot);
+    } catch (cause) {
+      setError(
+        cause instanceof Error
+          ? cause.message
+          : "방장 명령을 보내지 못했습니다.",
+      );
+    } finally {
+      setBusy(false);
+    }
+  }
+
   if (!snapshot)
     return (
       <main className="bbg-party-mobile-shell">
@@ -192,6 +240,7 @@ export default function BaseballPartyPlayer({
       busy={busy}
       error={error}
       feedback={actionFeedback.feedback}
+      onHost={host}
       onSubmit={submit}
       snapshot={gated.snapshot ?? snapshot}
       waitingMs={gated.waitingMs}
@@ -203,6 +252,7 @@ function PartyPlayerBoard({
   busy,
   error,
   feedback,
+  onHost,
   onSubmit,
   snapshot,
   waitingMs,
@@ -210,6 +260,7 @@ function PartyPlayerBoard({
   busy: boolean;
   error: string | null;
   feedback: ReturnType<typeof useBaseballActionFeedback>["feedback"];
+  onHost: (command: PartyHostCommand) => void;
   onSubmit: (command: MultiplayerCommand) => void;
   waitingMs: number;
   snapshot: PartyPlayerSnapshot;
@@ -364,12 +415,83 @@ function PartyPlayerBoard({
         snapshot={snapshot}
         waitingMs={waitingMs}
       />
+      {snapshot.coHostId === snapshot.me.id &&
+      (snapshot.status === "playing" || snapshot.status === "paused") ? (
+        <PartyCoHostPanel busy={busy} onHost={onHost} snapshot={snapshot} />
+      ) : null}
       {error ? (
         <p className="bbg-error" role="alert">
           {error}
         </p>
       ) : null}
     </main>
+  );
+}
+
+/** Game controls for the player the screen host trusted with them. */
+function PartyCoHostPanel({
+  busy,
+  onHost,
+  snapshot,
+}: {
+  busy: boolean;
+  onHost: (command: PartyHostCommand) => void;
+  snapshot: PartyPlayerSnapshot;
+}) {
+  // Ending is one tap away from pausing on a small screen, so it asks twice.
+  const [confirmEnd, setConfirmEnd] = useState(false);
+  return (
+    <section aria-label="방장 권한" className="bbg-party-cohost">
+      <header>
+        <ShieldCheck aria-hidden="true" size={14} />
+        <strong>방장 권한</strong>
+        <span>공용 화면 대신 경기를 운영합니다</span>
+      </header>
+      <div>
+        {snapshot.status === "paused" ? (
+          <button
+            disabled={busy}
+            onClick={() => onHost({ type: "RESUME_GAME" })}
+            type="button"
+          >
+            <Play aria-hidden="true" size={14} />
+            재개
+          </button>
+        ) : (
+          <button
+            disabled={busy}
+            onClick={() => onHost({ type: "PAUSE_GAME" })}
+            type="button"
+          >
+            <Pause aria-hidden="true" size={14} />
+            일시정지
+          </button>
+        )}
+        <button
+          disabled={busy}
+          onClick={() => onHost({ type: "SKIP_ACTIVE_PLAYER" })}
+          type="button"
+        >
+          <SkipForward aria-hidden="true" size={14} />
+          현재 선수 넘기기
+        </button>
+        <button
+          className="is-danger"
+          disabled={busy}
+          onClick={() => {
+            if (!confirmEnd) {
+              setConfirmEnd(true);
+              return;
+            }
+            setConfirmEnd(false);
+            onHost({ type: "END_GAME" });
+          }}
+          type="button"
+        >
+          {confirmEnd ? "한 번 더 누르면 종료" : "경기 종료"}
+        </button>
+      </div>
+    </section>
   );
 }
 

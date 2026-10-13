@@ -216,11 +216,52 @@ export async function submitPartyHostCommand(
   storage: PartyStorage = getPartyStorage(),
 ) {
   const loaded = await requireRoomWithPlayers(roomCode, storage);
-  const room = loaded.room;
-  requireHost(room, hostToken);
+  requireHost(loaded.room, hostToken);
+  await commitHostCommand(
+    loaded.room,
+    activePlayers(loaded.players),
+    input,
+    storage,
+  );
+  return getPartyPublicSnapshot(loaded.room.roomCode, hostToken, storage);
+}
+
+// A co-host runs the game from their phone, but the roster, the settings
+// and who else may co-host stay with the screen that opened the room.
+const CO_HOST_COMMANDS = new Set<PartyHostCommand["type"]>([
+  "PAUSE_GAME",
+  "RESUME_GAME",
+  "SKIP_ACTIVE_PLAYER",
+  "END_GAME",
+]);
+
+export async function submitPartyCoHostCommand(
+  roomCode: string,
+  playerToken: string | null,
+  input: { command: PartyHostCommand; expectedRoomRevision: number },
+  storage: PartyStorage = getPartyStorage(),
+) {
+  const loaded = await requireRoomWithPlayers(roomCode, storage);
+  const players = activePlayers(loaded.players);
+  const player = requirePlayerIn(players, playerToken);
+  if (
+    loaded.room.partyState.coHostId !== player.id ||
+    !CO_HOST_COMMANDS.has(input.command.type)
+  ) {
+    throw new PartyServiceError("HOST_REQUIRED", "방장 권한이 필요합니다.");
+  }
+  await commitHostCommand(loaded.room, players, input, storage);
+  return getPartyPlayerSnapshot(loaded.room.roomCode, playerToken, storage);
+}
+
+async function commitHostCommand(
+  room: PartyRoomRecord,
+  players: PartyStoredPlayer[],
+  input: { command: PartyHostCommand; expectedRoomRevision: number },
+  storage: PartyStorage,
+) {
   if (room.roomRevision !== input.expectedRoomRevision)
     throw revisionConflict();
-  const players = activePlayers(loaded.players);
   const next = applyHostCommand(room, players, input.command, Date.now());
   let commit;
   try {
@@ -248,7 +289,6 @@ export async function submitPartyHostCommand(
     revision: room.revision,
     roomRevision: room.roomRevision + 1,
   });
-  return getPartyPublicSnapshot(room.roomCode, hostToken, storage);
 }
 
 // Both duel players can submit against the same revision; the later one is
@@ -473,6 +513,7 @@ function applyHostCommand(
     if (!player) throw invalidCommand("참가자를 찾을 수 없습니다.");
     playerOperation = { type: "remove", playerId: player.id };
     partyState = removeFromLineups(partyState, player.id);
+    if (partyState.coHostId === player.id) partyState.coHostId = null;
     const remaining = players.filter((candidate) => candidate.id !== player.id);
     if (
       room.status !== "lobby" &&
@@ -531,6 +572,15 @@ function applyHostCommand(
       );
     }
     partyState.clock = restartPartyClock(room, now);
+  } else if (command.type === "SET_CO_HOST") {
+    if (
+      command.playerId !== null &&
+      !players.some((candidate) => candidate.id === command.playerId)
+    ) {
+      throw invalidCommand("참가자를 찾을 수 없습니다.");
+    }
+    partyState.coHostId = command.playerId;
+    payload = { playerId: command.playerId };
   } else if (command.type === "END_GAME") {
     if (room.status === "finished" || room.status === "expired") {
       throw invalidCommand("이미 종료된 경기입니다.");
@@ -645,6 +695,7 @@ function buildPublicSnapshot(
       : null,
     view: getGameView(room.state, "public"),
     isHost,
+    coHostId: room.partyState.coHostId ?? null,
     lineups: {
       away: [...room.partyState.lineups.away],
       home: [...room.partyState.lineups.home],

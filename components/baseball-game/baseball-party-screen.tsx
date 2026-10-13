@@ -11,6 +11,7 @@ import {
   Play,
   Radio,
   Settings2,
+  ShieldCheck,
   SkipForward,
   Trash2,
   UserRoundX,
@@ -254,6 +255,8 @@ function hostCommandLabel(command: PartyHostCommand) {
       return "현재 선수 넘기기";
     case "END_GAME":
       return "경기 강제 종료";
+    case "SET_CO_HOST":
+      return command.playerId ? "방장 권한 주기" : "방장 권한 회수";
   }
 }
 
@@ -608,21 +611,38 @@ function PartyLive({
             <div className="bbg-party-host-roster">
               {[...snapshot.players.away, ...snapshot.players.home].map(
                 (player) => (
-                  <button
-                    aria-label={`${player.nickname} 경기에서 퇴장`}
-                    disabled={busy || snapshot.status === "finished"}
-                    key={player.id}
-                    onClick={() =>
-                      onHost({
-                        type: "REMOVE_PLAYER",
-                        playerId: player.id,
-                      })
-                    }
-                    type="button"
-                  >
-                    <UserRoundX size={12} />
-                    {player.nickname}
-                  </button>
+                  <div key={player.id}>
+                    <button
+                      aria-label={`${player.nickname} 경기에서 퇴장`}
+                      disabled={busy || snapshot.status === "finished"}
+                      onClick={() =>
+                        onHost({
+                          type: "REMOVE_PLAYER",
+                          playerId: player.id,
+                        })
+                      }
+                      type="button"
+                    >
+                      <UserRoundX size={12} />
+                      {player.nickname}
+                    </button>
+                    <button
+                      aria-label={`${player.nickname}에게 방장 권한 ${snapshot.coHostId === player.id ? "회수" : "주기"}`}
+                      aria-pressed={snapshot.coHostId === player.id}
+                      className="bbg-party-cohost-toggle"
+                      disabled={busy || snapshot.status === "finished"}
+                      onClick={() =>
+                        onHost({
+                          type: "SET_CO_HOST",
+                          playerId:
+                            snapshot.coHostId === player.id ? null : player.id,
+                        })
+                      }
+                      type="button"
+                    >
+                      <ShieldCheck size={12} />
+                    </button>
+                  </div>
                 ),
               )}
             </div>
