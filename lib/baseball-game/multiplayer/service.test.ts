@@ -1,6 +1,6 @@
 import { randomUUID } from "node:crypto";
 
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { createGame } from "../engine";
 import type { TeamSide } from "../types";
@@ -212,6 +212,11 @@ class TestStorage implements MultiplayerStorage {
     return { status: "applied", revision: this.room.revision };
   }
 }
+
+beforeEach(() => {
+  // Every test runs on the fixture's clock; deadlines depend on START.
+  at(START + 1_000);
+});
 
 afterEach(() => {
   vi.useRealTimers();
