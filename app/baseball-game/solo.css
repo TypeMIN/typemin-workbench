@@ -221,3 +221,18 @@
   color: var(--room-muted);
   font-size: 13px;
 }
+
+.bbg-solo-shell .bbg-setup-form > button {
+  border: 1px solid var(--room-accent);
+  border-radius: var(--room-radius-sm);
+  color: var(--room-accent-ink);
+  background: var(--room-accent);
+  box-shadow: none;
+}
+
+.bbg-solo-shell .bbg-setup-form input,
+.bbg-solo-shell .bbg-setup-form select {
+  border-color: var(--room-line-strong);
+  border-radius: var(--room-radius-sm);
+  background: var(--room-raised);
+}

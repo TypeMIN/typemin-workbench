@@ -128,6 +128,49 @@ describe("baseball game AI", () => {
     );
   });
 
+  it("lets easy flip coins and hard punish a habit sooner", () => {
+    const state = createGame(CONFIG);
+    const chaser = withPitches(state, 6, { swing: true });
+    expect(pitchBallChance(chaser, "home", "easy")).toBe(0.5);
+    expect(swingChance(chaser, "away", "easy")).toBe(0.5);
+    expect(pitchBallChance(chaser, "home", "hard")).toBeGreaterThan(
+      pitchBallChance(chaser, "home", "normal"),
+    );
+    expect(pitchBallChance(chaser, "home")).toBe(
+      pitchBallChance(chaser, "home", "normal"),
+    );
+  });
+
+  it("makes easy pass half of its card chances", () => {
+    const initial = createGame(CONFIG);
+    const state = {
+      ...initial,
+      phase: "awaiting_card",
+      bases: { first: true, second: false, third: false },
+      cardWindow: {
+        timing: "before_pitch",
+        priorityOrder: ["offense"],
+        priorityIndex: 0,
+        respondingTo: null,
+      },
+      cards: {
+        ...initial.cards,
+        offense: {
+          drawPile: [],
+          discardPile: [],
+          hand: [{ instanceId: "offense-HNR-test", cardId: "HNR" }],
+        },
+      },
+    } as GameState;
+    expect(chooseAiAction(state, "away", () => 0.2, "easy")).toEqual({
+      type: "PLAY_CARD",
+      cardInstanceId: "offense-HNR-test",
+    });
+    expect(chooseAiAction(state, "away", () => 0.8, "easy")).toEqual({
+      type: "PASS_CARD_WINDOW",
+    });
+  });
+
   it("avoids walks with three balls even against a chaser", () => {
     const chaser = withPitches(createGame(CONFIG), 12, { swing: true });
     expect(pitchBallChance({ ...chaser, balls: 3 }, "home")).toBeLessThan(

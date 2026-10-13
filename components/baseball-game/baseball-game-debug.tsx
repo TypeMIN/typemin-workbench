@@ -25,7 +25,7 @@ import { BaseballStadium } from "@/components/baseball-game/stadium/baseball-sta
 import { useStagedView } from "@/components/baseball-game/use-staged-view";
 import { BaseballCardFace } from "@/components/baseball-game/baseball-card-face";
 import { BaseballCoachMarks } from "@/components/baseball-game/baseball-coach-marks";
-import { chooseAiAction } from "@/lib/baseball-game/ai";
+import { chooseAiAction, type AiDifficulty } from "@/lib/baseball-game/ai";
 import { CARD_DEFINITIONS } from "@/lib/baseball-game/cards";
 import {
   createGame,
@@ -62,11 +62,20 @@ type PlayMode = "solo_ai" | "multiplayer" | "party";
 type SessionConfig = {
   mode: PlayMode;
   humanTeam: TeamSide;
+  aiDifficulty: AiDifficulty;
 };
 
 const DEFAULT_SESSION: SessionConfig = {
   mode: "solo_ai",
   humanTeam: "home",
+  aiDifficulty: "normal",
+};
+
+// Easy flips coins, normal learns habits slowly, hard punishes them fast.
+const AI_DIFFICULTY_LABEL: Record<AiDifficulty, string> = {
+  easy: "쉬움",
+  normal: "보통",
+  hard: "어려움",
 };
 
 const AI_TURN_DELAY_MS = 650;
@@ -141,7 +150,12 @@ export default function BaseballGameDebug({
 
   useEffect(() => {
     if (!isAiTurn || !aiTeam || modalOpen) return;
-    const action = chooseAiAction(game, aiTeam);
+    const action = chooseAiAction(
+      game,
+      aiTeam,
+      Math.random,
+      session.aiDifficulty,
+    );
     if (!action) return;
 
     const timer = window.setTimeout(
@@ -175,6 +189,7 @@ export default function BaseballGameDebug({
     aiTeam,
     currentPresentationDuration,
     game,
+    session.aiDifficulty,
     isAiTurn,
     modalOpen,
     showActionFeedback,
@@ -469,6 +484,29 @@ export default function BaseballGameDebug({
                   >
                     <option value="away">{draft.awayTeamName} · 원정</option>
                     <option value="home">{draft.homeTeamName} · 홈</option>
+                  </select>
+                </label>
+              ) : null}
+              {draftSession.mode === "solo_ai" ? (
+                <label className="bbg-setup-team">
+                  AI 난이도
+                  <select
+                    aria-label="AI 난이도"
+                    onChange={(event) =>
+                      setDraftSession((current) => ({
+                        ...current,
+                        aiDifficulty: event.target.value as AiDifficulty,
+                      }))
+                    }
+                    value={draftSession.aiDifficulty}
+                  >
+                    {(Object.keys(AI_DIFFICULTY_LABEL) as AiDifficulty[]).map(
+                      (difficulty) => (
+                        <option key={difficulty} value={difficulty}>
+                          {AI_DIFFICULTY_LABEL[difficulty]}
+                        </option>
+                      ),
+                    )}
                   </select>
                 </label>
               ) : null}

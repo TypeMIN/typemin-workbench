@@ -578,6 +578,10 @@ describe("BaseballGameDebug", () => {
     const form = within(setup);
 
     expect(form.getByLabelText("게임 모드")).toHaveValue("solo_ai");
+    expect(form.getByLabelText("AI 난이도")).toHaveValue("normal");
+    fireEvent.change(form.getByLabelText("AI 난이도"), {
+      target: { value: "hard" },
+    });
     expect(form.queryByRole("option", { name: /로컬 2인/ })).toBeNull();
 
     fireEvent.change(form.getByLabelText("원정팀"), {
