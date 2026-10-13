@@ -1,6 +1,6 @@
 "use client";
 
-import { Radio, RefreshCw, Users } from "lucide-react";
+import { Radio, RefreshCw, Tv, Users } from "lucide-react";
 import Link from "next/link";
 import { useCallback, useEffect, useMemo, useState } from "react";
 
@@ -20,6 +20,7 @@ import {
   BroadcastLineScore,
 } from "./baseball-broadcast";
 import { BaseballDuelControl } from "./baseball-duel-control";
+import { useTimeGatedSnapshot } from "./use-time-gated-snapshot";
 import type { CardRole, GameAction, GameView } from "@/lib/baseball-game/types";
 
 const PHASE = {
@@ -80,6 +81,7 @@ export default function BaseballPartyPlayer({
   );
 
   useAdaptiveGamePolling(load);
+  const gated = useTimeGatedSnapshot(snapshot);
 
   useEffect(() => {
     const heartbeat = window.setInterval(
@@ -178,7 +180,8 @@ export default function BaseballPartyPlayer({
       error={error}
       feedback={actionFeedback.feedback}
       onSubmit={submit}
-      snapshot={snapshot}
+      snapshot={gated.snapshot ?? snapshot}
+      waitingMs={gated.waitingMs}
     />
   );
 }
@@ -189,11 +192,13 @@ function PartyPlayerBoard({
   feedback,
   onSubmit,
   snapshot,
+  waitingMs,
 }: {
   busy: boolean;
   error: string | null;
   feedback: ReturnType<typeof useBaseballActionFeedback>["feedback"];
   onSubmit: (command: MultiplayerCommand) => void;
+  waitingMs: number;
   snapshot: PartyPlayerSnapshot;
 }) {
   const game = snapshot.view;
@@ -328,6 +333,7 @@ function PartyPlayerBoard({
         game={game}
         onSubmit={onSubmit}
         snapshot={snapshot}
+        waitingMs={waitingMs}
       />
       {error ? (
         <p className="bbg-error" role="alert">
@@ -343,12 +349,24 @@ function PartyAction({
   game,
   onSubmit,
   snapshot,
+  waitingMs,
 }: {
   busy: boolean;
   game: GameView;
   onSubmit: (command: MultiplayerCommand) => void;
   snapshot: PartyPlayerSnapshot;
+  waitingMs: number;
 }) {
+  if (waitingMs > 0)
+    return (
+      <section className="bbg-party-player-action is-waiting" role="status">
+        <Tv />
+        <strong>경기장 화면을 보세요</strong>
+        <span>
+          플레이가 끝나면 {Math.ceil(waitingMs / 1_000)}초 뒤 결과가 열립니다
+        </span>
+      </section>
+    );
   if (game.phase === "finished")
     return (
       <section className="bbg-party-player-action">

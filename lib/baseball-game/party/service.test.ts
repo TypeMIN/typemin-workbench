@@ -602,6 +602,7 @@ describe("baseball party service", () => {
       state,
       revision: 0,
       roomRevision: 0,
+      revisionStartedAt: new Date().toISOString(),
       hostTokenHash: partyTokenHash("host"),
       partyState,
       expiresAt: new Date(Date.now() + 60_000).toISOString(),
@@ -621,6 +622,75 @@ describe("baseball party service", () => {
     ]);
     expect(rotated.battingIndex.away).toBe(1);
     expect(rotated.defenseIndex.away).toBe(0);
+  });
+  it("makes party devices wait until the shared screen has played the pitch", async () => {
+    vi.useFakeTimers({ toFake: ["Date"] });
+    vi.setSystemTime(Date.parse("2026-10-14T00:00:00.000Z"));
+    const storage = new MemoryPartyStorage();
+    const { room, hostToken } = await createPartyRoom(CONFIG, storage);
+    const away = await joinPartyRoom(
+      room.roomCode,
+      { nickname: "타자", team: "away", expectedRoomRevision: 0 },
+      storage,
+    );
+    const home = await joinPartyRoom(
+      room.roomCode,
+      { nickname: "투수", team: "home", expectedRoomRevision: 1 },
+      storage,
+    );
+    const started = await submitPartyHostCommand(
+      room.roomCode,
+      hostToken,
+      { command: { type: "START_GAME" }, expectedRoomRevision: 2 },
+      storage,
+    );
+    const swing = await submitPartyAction(
+      room.roomCode,
+      away.playerToken,
+      {
+        command: { type: "SELECT_SWING", decision: "take" },
+        expectedRevision: 0,
+        expectedRoomRevision: started.roomRevision,
+        idempotencyKey: randomUUID(),
+      },
+      storage,
+    );
+    // A lock plays no scene, so the pitcher may answer at once.
+    const pitched = await submitPartyAction(
+      room.roomCode,
+      home.playerToken,
+      {
+        command: { type: "SELECT_PITCH", target: "ball" },
+        expectedRevision: swing.view.revision,
+        expectedRoomRevision: swing.roomRevision,
+        idempotencyKey: randomUUID(),
+      },
+      storage,
+    );
+    expect(pitched.presentationReadyAt).toBeGreaterThan(pitched.serverNow);
+
+    const next = {
+      command: { type: "SELECT_SWING", decision: "take" } as const,
+      expectedRevision: pitched.view.revision,
+      expectedRoomRevision: pitched.roomRevision,
+    };
+    await expect(
+      submitPartyAction(
+        room.roomCode,
+        away.playerToken,
+        { ...next, idempotencyKey: randomUUID() },
+        storage,
+      ),
+    ).rejects.toMatchObject({ code: "PRESENTATION_IN_PROGRESS" });
+
+    vi.setSystemTime(pitched.presentationReadyAt);
+    const accepted = await submitPartyAction(
+      room.roomCode,
+      away.playerToken,
+      { ...next, idempotencyKey: randomUUID() },
+      storage,
+    );
+    expect(accepted.view.revision).toBe(pitched.view.revision + 1);
   });
 });
 

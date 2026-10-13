@@ -57,6 +57,8 @@ export function partyErrorResponse(error: unknown) {
     TEAM_FULL: 409,
     NICKNAME_TAKEN: 409,
     NOT_ACTIVE_PLAYER: 403,
+    // 425 Too Early: the shared screen is still playing the last revision.
+    PRESENTATION_IN_PROGRESS: 425,
     INVALID_ACTION: 400,
     INVALID_COMMAND: 400,
     REVISION_CONFLICT: 409,

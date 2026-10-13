@@ -45,6 +45,8 @@ function snapshot(canAct: boolean): PartyPlayerSnapshot {
     activeDefenderId: "home1",
     view: getGameView(state, "home"),
     isHost: false,
+    presentationReadyAt: 0,
+    serverNow: Date.now(),
     me,
     canAct,
     legalCards: [],

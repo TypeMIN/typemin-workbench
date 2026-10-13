@@ -54,6 +54,8 @@ export type PartyRoomRecord = {
   state: GameState;
   revision: number;
   roomRevision: number;
+  /** When the current revision was committed; gates the next decision. */
+  revisionStartedAt: string;
   hostTokenHash: string;
   partyState: PartySessionState;
   expiresAt: string;
@@ -69,6 +71,9 @@ export type PartyPublicSnapshot = {
   activeDefenderId: string | null;
   view: GameView;
   isHost: boolean;
+  /** Epoch ms when the shared screen finishes this revision's scenes. */
+  presentationReadyAt: number;
+  serverNow: number;
 };
 
 export type PartyPlayerSnapshot = PartyPublicSnapshot & {
