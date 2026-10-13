@@ -387,6 +387,7 @@ function PartyAction({
         <BaseballDuelControl
           busy={busy}
           game={game}
+          role={snapshot.me.team === game.battingTeam ? "batter" : "pitcher"}
           onAction={(action: GameAction) => {
             if (
               action.type === "SELECT_PITCH" ||

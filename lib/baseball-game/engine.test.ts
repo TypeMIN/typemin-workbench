@@ -122,7 +122,8 @@ describe("pitch and phase flow", () => {
       awayTeamName: "원정팀",
       homeTeamName: "홈",
     });
-    expect(getLegalActions(state)).toEqual(["SELECT_PITCH"]);
+    expect(state.rulesetVersion).toBe("pitch-duel-v4");
+    expect(getLegalActions(state)).toEqual(["SELECT_PITCH", "SELECT_SWING"]);
     expect(JSON.parse(JSON.stringify(state))).toEqual(state);
   });
 

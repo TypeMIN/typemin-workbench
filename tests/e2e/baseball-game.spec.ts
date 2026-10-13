@@ -183,17 +183,8 @@ test("야구 게임에서 투타 심리전과 새 경기를 진행한다", async
   await expect(page.locator(".bbg-card-timing")).toHaveCount(4);
 
   await page.getByRole("button", { name: "스트라이크 선택" }).click();
-  const firstChoiceCue = page.getByRole("button", {
-    name: "현재 연출 1/1, 다음 장면 보기",
-  });
-  await expect(firstChoiceCue).toContainText("투수 선택선택 완료");
-  await page.waitForTimeout(700);
-  await expect(firstChoiceCue).toBeVisible();
+  // v4: no lock scene; the play is revealed once the AI batter has decided.
   await expect(page.locator(".bbg-choice-dock")).toHaveCount(0);
-  await expect(page.getByText("원정팀 판단 중")).toBeVisible();
-  await expect(page.getByLabel("현재 승부 진행 기록")).toContainText(
-    "투수선택 완료타자판단 중카드대기판정대기",
-  );
   await expect(
     page.getByRole("region", { name: "이번 승부 선택 기록" }),
   ).toHaveCount(0);
@@ -327,8 +318,10 @@ test("싱글플레이에서 AI가 타격 판단을 이어서 진행한다", asyn
   await expect(
     page.getByRole("list", { name: "현재 타자 누적 투구" }),
   ).toBeVisible();
+  // The log follows the staged view, so it updates after the scene ends.
   await expect(page.locator(".bbg-log-panel summary strong")).not.toHaveText(
     "0",
+    { timeout: 8_000 },
   );
   await expect(page.locator(".bbg-d12")).toHaveCount(0);
 });
@@ -367,15 +360,16 @@ test("새 경기 설정은 싱글 AI·멀티·파티 모드만 제공한다", as
   await page.getByLabel("게임 모드", { exact: true }).selectOption("solo_ai");
   await page.getByLabel("내 팀").selectOption("away");
   await page.getByRole("button", { name: /새 경기 시작/ }).click();
-  await expect(page.getByRole("status")).toContainText("홈팀 판단 중");
+  // v4: the batter decides alongside the AI pitcher, so no wait banner.
   await expect(page.getByRole("region", { name: "타격 선택" })).toBeVisible({
     timeout: 3_000,
   });
   await expect(page.getByText(/예상 투구 위치/)).toHaveCount(0);
   await expect(page.locator(".bbg-d12")).toHaveCount(0);
+  await page.getByRole("button", { name: /지켜보기/ }).click();
   await expect(page.locator(".bbg-log-panel summary strong")).not.toHaveText(
     "0",
-    { timeout: 3_000 },
+    { timeout: 6_000 },
   );
 });
 

@@ -13,7 +13,13 @@ const CONFIG = {
 describe("baseball game AI", () => {
   it("acts only for the configured AI team", () => {
     const state = createGame(CONFIG);
-    expect(chooseAiAction(state, "away", () => 0)).toBeNull();
+    const v3 = { ...state, rulesetVersion: "pitch-duel-v3" as const };
+    expect(chooseAiAction(v3, "away", () => 0)).toBeNull();
+    // In a v4 duel the batting AI may lock its decision before the pitch.
+    expect(chooseAiAction(state, "away", () => 0)).toEqual({
+      type: "SELECT_SWING",
+      decision: "swing",
+    });
     expect(chooseAiAction(state, "home", () => 0)).toEqual({
       type: "SELECT_PITCH",
       target: "ball",

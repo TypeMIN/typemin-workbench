@@ -236,7 +236,10 @@ describe("baseball party service", () => {
         getPartyPlayerSnapshot(room.roomCode, candidate.playerToken, storage),
       ),
     );
-    const active = snapshots.find((snapshot) => snapshot.canAct)!;
+    // v4 duel: the away batter may act too, so pick the home pitcher here.
+    const active = snapshots.find(
+      (snapshot) => snapshot.canAct && snapshot.me.team === "home",
+    )!;
     const inactive = snapshots.find(
       (snapshot) => snapshot.me.team === active.me.team && !snapshot.canAct,
     );

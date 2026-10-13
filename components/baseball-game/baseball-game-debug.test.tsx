@@ -143,15 +143,11 @@ describe("BaseballGameDebug", () => {
     fireEvent.click(screen.getByRole("button", { name: "볼 선택" }));
     expect(screen.getByText("볼을 선택했습니다")).toBeVisible();
     expect(screen.getByText("원정팀 판단 중")).toBeVisible();
+    // v4: a lock plays no scene and reveals nothing until both have chosen.
     expect(
-      screen.getByRole("button", {
-        name: "현재 연출 1/1, 다음 장면 보기",
-      }),
-    ).toHaveTextContent("투수 선택선택 완료");
+      screen.queryByRole("button", { name: /현재 연출 \d+\/\d+/ }),
+    ).not.toBeInTheDocument();
     expect(document.querySelector(".bbg-choice-dock")).not.toBeInTheDocument();
-    expect(screen.getByLabelText("현재 승부 진행 기록")).toHaveTextContent(
-      "투수선택 완료타자판단 중카드대기판정대기",
-    );
     expect(
       screen.queryByRole("region", { name: "이번 승부 선택 기록" }),
     ).not.toBeInTheDocument();
@@ -574,10 +570,11 @@ describe("BaseballGameDebug", () => {
 
     expect(screen.getByText("야구 게임")).toBeVisible();
     expect(screen.getByText("AI 대전 · 원정팀")).toBeVisible();
-    expect(screen.getByRole("status")).toHaveTextContent("홈팀 판단 중");
     expect(
       screen.queryByRole("region", { name: "투구 선택" }),
     ).not.toBeInTheDocument();
+    // v4: the batter decides while the AI pitcher is still choosing.
+    expect(screen.getByRole("region", { name: "타격 선택" })).toBeVisible();
     expect(
       screen.getByRole("region", { name: "원정팀 공격 손패" }),
     ).toBeVisible();
@@ -590,19 +587,8 @@ describe("BaseballGameDebug", () => {
     });
 
     expect(
-      screen.getByRole("button", {
-        name: "현재 연출 1/1, 다음 장면 보기",
-      }),
-    ).toHaveTextContent("투수 선택선택 완료");
-    expect(document.querySelector(".bbg-stadium")).toHaveAttribute(
-      "data-cue",
-      "choice",
-    );
-
-    act(() => {
-      vi.advanceTimersByTime(1_300);
-    });
-
+      screen.queryByRole("button", { name: /현재 연출 \d+\/\d+/ }),
+    ).not.toBeInTheDocument();
     expect(screen.getByRole("region", { name: "타격 선택" })).toBeVisible();
     expect(
       screen.getByRole("img", { name: "포수 시점 스트라이크존" }),

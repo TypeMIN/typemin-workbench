@@ -83,7 +83,7 @@ export function createGame(
 
   const state: GameState = {
     schemaVersion: 7,
-    rulesetVersion: "pitch-duel-v3",
+    rulesetVersion: "pitch-duel-v4",
     presentationVersion: "rts-scenes-v1",
     revision: 0,
     config: {
@@ -127,7 +127,35 @@ export function getLegalActions(state: GameState): GameAction["type"][] {
       ? ["PLAY_CARD", "PASS_CARD_WINDOW"]
       : ["PASS_CARD_WINDOW"];
   }
+  if (canLockEarlySwing(state)) return ["SELECT_PITCH", "SELECT_SWING"];
   return [PHASE_ACTION[state.phase]];
+}
+
+/** v4: the batter may decide while the pitcher is still choosing. */
+export function canLockEarlySwing(state: GameState) {
+  return (
+    state.rulesetVersion === "pitch-duel-v4" &&
+    state.phase === "awaiting_pitch" &&
+    !state.earlySwing &&
+    state.activeStrategy?.cardId !== "HNR"
+  );
+}
+
+/** Every team that still owes a decision. Both can owe one in a v4 duel. */
+export function getPendingOwners(state: GameState): TeamSide[] {
+  const owner = getActionOwner(state);
+  if (!owner) return [];
+  return canLockEarlySwing(state) ? [owner, state.battingTeam] : [owner];
+}
+
+/** The team that must submit this action, or null if nobody can. */
+export function getActionActor(
+  state: GameState,
+  action: GameAction,
+): TeamSide | null {
+  if (action.type === "SELECT_SWING") return state.battingTeam;
+  if (action.type === "SELECT_PITCH") return oppositeTeam(state.battingTeam);
+  return getActionOwner(state);
 }
 
 export function getActionOwner(state: GameState): TeamSide | null {
@@ -164,11 +192,13 @@ export function getGameView(state: GameState, viewer: GameViewer): GameView {
     cards: privateCards,
     rng: privateRng,
     pitchDuel: privatePitchDuel,
+    earlySwing: privateEarlySwing,
     ...publicState
   } = cloned;
   void privateCards;
   void privateRng;
   void privatePitchDuel;
+  void privateEarlySwing;
   return {
     ...publicState,
     cards: {
@@ -182,6 +212,7 @@ export function getGameView(state: GameState, viewer: GameViewer): GameView {
       ),
     },
     pitchDuel: pitchDuelView(state, viewer),
+    batterLocked: Boolean(state.earlySwing),
   };
 }
 
@@ -203,7 +234,11 @@ export function transition(
   } else if (action.type === "SELECT_PITCH") {
     selectPitch(next, action.target, events);
   } else if (action.type === "SELECT_SWING") {
-    selectSwing(next, action.decision, events);
+    if (canLockEarlySwing(next)) {
+      next.earlySwing = action.decision;
+    } else {
+      selectSwing(next, action.decision, events);
+    }
   } else if (action.type === "PITCH_RESULT") {
     emit(next, events, {
       kind: "die_roll",
@@ -270,6 +305,25 @@ function validateAction(
           code: "CARD_NOT_PLAYABLE",
           message: availability.reason ?? "지금 사용할 수 없는 카드입니다.",
           expectedAction: "PLAY_CARD",
+        };
+  }
+
+  if (action.type === "SELECT_SWING" && state.phase === "awaiting_pitch") {
+    if (!canLockEarlySwing(state)) {
+      return state.earlySwing
+        ? {
+            code: "ALREADY_LOCKED",
+            message: "이번 투구의 타격 판단은 이미 정했습니다.",
+            expectedAction: "SELECT_PITCH",
+          }
+        : wrongPhase("SELECT_PITCH");
+    }
+    return action.decision === "swing" || action.decision === "take"
+      ? null
+      : {
+          code: "INVALID_FACE",
+          message: "선택할 수 없는 타격 판단입니다.",
+          expectedAction: "SELECT_SWING",
         };
   }
 
@@ -364,8 +418,9 @@ function cloneState(state: GameState): GameState {
       : null,
     activeStrategy: state.activeStrategy ? { ...state.activeStrategy } : null,
     schemaVersion: 7,
-    rulesetVersion: "pitch-duel-v3",
+    rulesetVersion: state.rulesetVersion ?? "pitch-duel-v3",
     presentationVersion: "rts-scenes-v1",
+    earlySwing: state.earlySwing ?? null,
     pitchDuel: state.pitchDuel
       ? {
           sequence: state.pitchDuel.sequence,
@@ -500,14 +555,24 @@ function selectPitch(
     result: null,
   };
   state.phase = "awaiting_swing";
-  emit(state, events, {
-    kind: "pitch_commit",
-    summary: "투수가 코스를 선택했습니다.",
-  });
+  // v4 has no lock scene: the opponent learns only that a choice was made.
+  if (state.rulesetVersion !== "pitch-duel-v4") {
+    emit(state, events, {
+      kind: "pitch_commit",
+      summary: "투수가 코스를 선택했습니다.",
+    });
+  }
 
   if (state.activeStrategy?.cardId === "HNR") {
+    state.earlySwing = null;
     revealPitchDuel(state, "swing", "C", actualLocation, events);
     resolvePitch(state, "C", events);
+    return;
+  }
+  if (state.earlySwing) {
+    const decision = state.earlySwing;
+    state.earlySwing = null;
+    selectSwing(state, decision, events);
   }
 }
 
@@ -1206,6 +1271,7 @@ function isWalkOff(state: GameState) {
 function prepareNextPitch(state: GameState) {
   if (state.phase === "finished") return;
   state.pitchDuel = null;
+  state.earlySwing = null;
   state.phase = "awaiting_pitch";
   state.pendingResolution = null;
   state.cardWindow = null;
@@ -2389,6 +2455,7 @@ function drawToFour(zone: CardZone, rng: GameState["rng"]) {
 }
 
 function resetHandsForHalfInning(state: GameState) {
+  state.earlySwing = null;
   state.cardWindow = null;
   state.pendingResolution = null;
   state.activeStrategy = null;

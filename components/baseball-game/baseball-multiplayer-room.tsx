@@ -30,7 +30,11 @@ import {
   BroadcastLineScore,
 } from "@/components/baseball-game/baseball-broadcast";
 import { BaseballCardFace } from "@/components/baseball-game/baseball-card-face";
-import { BaseballDuelControl } from "@/components/baseball-game/baseball-duel-control";
+import {
+  BaseballDuelControl,
+  pendingDuelChoice,
+  type DuelRole,
+} from "@/components/baseball-game/baseball-duel-control";
 import { BaseballStadium } from "@/components/baseball-game/baseball-game-debug";
 import {
   ReactionBar,
@@ -51,6 +55,7 @@ import { PITCH_TARGET_LABELS } from "@/lib/baseball-game/duel";
 import {
   CARD_TIMING_LABELS,
   describeOpponentActivity,
+  hasLockedDuelChoice,
 } from "@/lib/baseball-game/multiplayer/activity";
 import {
   SEAT_HEARTBEAT_INTERVAL_MS,
@@ -641,8 +646,22 @@ function MultiplayerBoard({
   );
   const closeReplay = useCallback(() => setReplay(null), []);
 
+  const duelRole: DuelRole = seat === game.battingTeam ? "batter" : "pitcher";
+  const duelChoice = snapshot.isYourTurn
+    ? pendingDuelChoice(game, duelRole)
+    : null;
+  const opponentLocked = hasLockedDuelChoice(game, opponentSeat);
+  const opponentLockedRef = useRef(opponentLocked);
+  useEffect(() => {
+    if (opponentLocked && !opponentLockedRef.current) {
+      soundscape.playCue("lock");
+    }
+    opponentLockedRef.current = opponentLocked;
+  }, [opponentLocked, soundscape]);
+
   useTurnAlert(playing && snapshot.isYourTurn, soundscape.playCue);
   useDecisionShortcuts({
+    duelChoice,
     enabled:
       playing &&
       snapshot.isYourTurn &&
@@ -709,15 +728,12 @@ function MultiplayerBoard({
               onPresentedRevision={staged.onPresentedRevision}
               replayLatestOnMount={false}
             />
-            {playing &&
-            !presentationActive &&
-            snapshot.isYourTurn &&
-            (game.phase === "awaiting_pitch" ||
-              game.phase === "awaiting_swing") ? (
+            {playing && !presentationActive && duelChoice ? (
               <div className="bbg-choice-dock bbg-room-dock">
                 <BaseballDuelControl
                   busy={submitting}
                   game={game}
+                  role={duelRole}
                   onAction={(action: GameAction) => {
                     if (
                       action.type === "SELECT_PITCH" ||
@@ -1036,10 +1052,10 @@ function DecisionPanel({
   }
 
   const mine = snapshot.isYourTurn;
+  const duelRole: DuelRole = seat === game.battingTeam ? "batter" : "pitcher";
   const activity = describeOpponentActivity(
     game,
     opponentSeat,
-    snapshot.actionOwner,
     snapshot.opponent,
   );
   const canForfeit =
@@ -1056,12 +1072,16 @@ function DecisionPanel({
       <div className="bbg-room-turn-head">
         <div>
           <small>{mine ? "Your decision" : "Opponent"}</small>
-          <strong>{mine ? myDecisionTitle(game) : activity.title}</strong>
+          <strong>
+            {mine ? myDecisionTitle(game, duelRole) : activity.title}
+          </strong>
           {mine ? (
             <span>
-              {myDecisionDetail(game)}
-              {shortcutHint(game.phase) ? (
-                <kbd className="bbg-room-kbd">{shortcutHint(game.phase)}</kbd>
+              {myDecisionDetail(game, opponentSeat)}
+              {shortcutHint(game.phase, pendingDuelChoice(game, duelRole)) ? (
+                <kbd className="bbg-room-kbd">
+                  {shortcutHint(game.phase, pendingDuelChoice(game, duelRole))}
+                </kbd>
               ) : null}
             </span>
           ) : activity.detail ? (
@@ -1087,6 +1107,11 @@ function DecisionPanel({
         >
           {disabled ? "서버 확인 중…" : "카드 없이 진행"}
         </button>
+      ) : null}
+      {mine && snapshot.opponent.presence === "offline" ? (
+        <p className="bbg-room-alert" role="alert">
+          상대 연결 끊김
+        </p>
       ) : null}
       <div className="bbg-room-turn-tools">
         {mine ? (
@@ -1352,19 +1377,22 @@ function TendencyRow({
   );
 }
 
-function myDecisionTitle(game: GameView) {
-  if (game.phase === "awaiting_pitch") return "투구를 선택하세요";
-  if (game.phase === "awaiting_swing") return "스윙할지 정하세요";
+function myDecisionTitle(game: GameView, role: DuelRole) {
+  const choice = pendingDuelChoice(game, role);
+  if (choice === "pitch") return "투구를 선택하세요";
+  if (choice === "swing") return "스윙할지 정하세요";
   if (game.phase === "awaiting_card") return "사용할 카드를 선택하세요";
   return "판정 처리 중";
 }
 
-function myDecisionDetail(game: GameView) {
+function myDecisionDetail(game: GameView, opponentSeat: TeamSide) {
   if (game.phase === "awaiting_card" && game.cardWindow) {
     return `${CARD_TIMING_LABELS[game.cardWindow.timing]} 카드 창 · 손패에서 고르거나 넘기세요`;
   }
   if (game.phase === "awaiting_pitch" || game.phase === "awaiting_swing") {
-    return "경기장 아래에서 선택합니다";
+    return hasLockedDuelChoice(game, opponentSeat)
+      ? "상대는 이미 골랐습니다 · 경기장 아래에서 선택합니다"
+      : "상대와 동시에 고릅니다 · 경기장 아래에서 선택합니다";
   }
   return "";
 }

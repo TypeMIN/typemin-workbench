@@ -1,5 +1,5 @@
 import { CARD_DEFINITIONS } from "./cards";
-import { getActionOwner, getLegalCards } from "./engine";
+import { getLegalCards, getPendingOwners } from "./engine";
 import { getTeamTendencies, type RateSample } from "./scouting";
 import type {
   CardId,
@@ -77,7 +77,7 @@ export function chooseAiAction(
   aiTeam: TeamSide,
   random: () => number = Math.random,
 ): GameAction | null {
-  if (getActionOwner(state) !== aiTeam || state.phase === "finished") {
+  if (!getPendingOwners(state).includes(aiTeam) || state.phase === "finished") {
     return null;
   }
 
@@ -98,6 +98,13 @@ export function chooseAiAction(
       : { type: "PASS_CARD_WINDOW" };
   }
 
+  // In a v4 duel the batting AI locks its decision while the pitch is open.
+  if (state.phase === "awaiting_pitch" && aiTeam === state.battingTeam) {
+    return {
+      type: "SELECT_SWING",
+      decision: random() < swingChance(state, aiTeam) ? "swing" : "take",
+    };
+  }
   if (state.phase === "awaiting_pitch") {
     return {
       type: "SELECT_PITCH",

@@ -58,14 +58,14 @@ describe("opponent activity", () => {
   );
 
   it("describes the opponent pitcher choosing a sign", () => {
-    expect(describeOpponentActivity(view, "home", "home", online).title).toBe(
+    expect(describeOpponentActivity(view, "home", online).title).toBe(
       "상대 투수가 사인을 고르는 중",
     );
   });
 
   it("describes the opponent batter once the pitch is locked", () => {
     const swing = { ...view, phase: "awaiting_swing" as const };
-    expect(describeOpponentActivity(swing, "away", "away", online).title).toBe(
+    expect(describeOpponentActivity(swing, "away", online).title).toBe(
       "상대 타자가 노림수를 정하는 중",
     );
   });
@@ -81,17 +81,27 @@ describe("opponent activity", () => {
         respondingTo: null,
       },
     };
-    expect(describeOpponentActivity(card, "home", "home", online).title).toBe(
+    expect(describeOpponentActivity(card, "home", online).title).toBe(
       "상대 수비가 타구 직후 카드를 검토 중",
     );
   });
 
   it("prefers the offline state over any decision", () => {
-    const result = describeOpponentActivity(view, "home", "home", {
+    const result = describeOpponentActivity(view, "home", {
       presence: "offline",
       lastSeenAgoMs: 30_000,
     });
     expect(result.tone).toBe("offline");
     expect(result.title).toBe("상대 연결 끊김");
+  });
+
+  it("describes the opponent batter during a v4 pitch and their lock", () => {
+    expect(describeOpponentActivity(view, "away", online).title).toBe(
+      "상대 타자가 노림수를 정하는 중",
+    );
+    const locked = { ...view, batterLocked: true };
+    expect(describeOpponentActivity(locked, "away", online).title).toBe(
+      "상대 선택 완료",
+    );
   });
 });
