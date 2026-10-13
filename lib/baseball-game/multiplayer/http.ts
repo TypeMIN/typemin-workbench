@@ -40,6 +40,9 @@ export function isUuid(value: unknown): value is string {
 
 export function multiplayerErrorResponse(error: unknown) {
   if (!(error instanceof MultiplayerServiceError)) {
+    console.error(
+      JSON.stringify({ scope: "multiplayer", unexpected: String(error) }),
+    );
     return apiError("멀티플레이 요청을 처리하지 못했습니다.", 500);
   }
   const status = {

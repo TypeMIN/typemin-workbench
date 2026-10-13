@@ -3,6 +3,7 @@ import "server-only";
 import { randomUUID } from "node:crypto";
 
 import { getSupabaseAdmin } from "@/lib/supabase/admin";
+import { storageFailure } from "@/lib/supabase/log";
 import type { Json } from "@/lib/supabase/database.types";
 
 import type { GameState, TeamSide } from "../types";
@@ -261,7 +262,7 @@ class SupabasePartyStorage implements PartyStorage {
       .single();
     if (error || !data) {
       if (error?.code === "23505") throw new Error("ROOM_CODE_CONFLICT");
-      throw new Error("ROOM_CREATE_FAILED");
+      throw storageFailure("ROOM_CREATE_FAILED", error);
     }
     return rowToRoom(data);
   }
@@ -275,7 +276,7 @@ class SupabasePartyStorage implements PartyStorage {
       .eq("room_code", roomCode)
       .eq("mode", "party")
       .maybeSingle();
-    if (error) throw new Error("ROOM_READ_FAILED");
+    if (error) throw storageFailure("ROOM_READ_FAILED", error);
     return data ? rowToRoom(data) : null;
   }
 
@@ -287,7 +288,7 @@ class SupabasePartyStorage implements PartyStorage {
       )
       .eq("game_id", roomId)
       .order("joined_at");
-    if (error) throw new Error("PARTY_PLAYER_READ_FAILED");
+    if (error) throw storageFailure("PARTY_PLAYER_READ_FAILED", error);
     return (data ?? []).map(rowToPlayer);
   }
 
@@ -301,7 +302,7 @@ class SupabasePartyStorage implements PartyStorage {
       .eq("token_hash", tokenHash)
       .is("removed_at", null)
       .maybeSingle();
-    if (error) throw new Error("PARTY_PLAYER_READ_FAILED");
+    if (error) throw storageFailure("PARTY_PLAYER_READ_FAILED", error);
     return data ? rowToPlayer(data) : null;
   }
 
@@ -316,7 +317,7 @@ class SupabasePartyStorage implements PartyStorage {
         p_expected_room_revision: input.expectedRoomRevision,
       },
     );
-    if (error) throw new Error("PARTY_JOIN_FAILED");
+    if (error) throw storageFailure("PARTY_JOIN_FAILED", error);
     const result = readRpc(data);
     return result.status === "joined" && typeof result.player_id === "string"
       ? {
@@ -334,7 +335,7 @@ class SupabasePartyStorage implements PartyStorage {
         p_player_id: playerId,
       },
     );
-    if (error) throw new Error("PARTY_HEARTBEAT_FAILED");
+    if (error) throw storageFailure("PARTY_HEARTBEAT_FAILED", error);
     return data === true;
   }
 
@@ -352,7 +353,7 @@ class SupabasePartyStorage implements PartyStorage {
         p_payload: (input.payload ?? {}) as unknown as Json,
       },
     );
-    if (error) throw new Error("PARTY_HOST_COMMIT_FAILED");
+    if (error) throw storageFailure("PARTY_HOST_COMMIT_FAILED", error);
     return rpcToCommit(data);
   }
 
@@ -372,7 +373,7 @@ class SupabasePartyStorage implements PartyStorage {
         p_idempotency_key: input.idempotencyKey,
       },
     );
-    if (error) throw new Error("PARTY_ACTION_COMMIT_FAILED");
+    if (error) throw storageFailure("PARTY_ACTION_COMMIT_FAILED", error);
     return rpcToCommit(data);
   }
 
@@ -383,7 +384,7 @@ class SupabasePartyStorage implements PartyStorage {
       .eq("game_id", roomId)
       .eq("idempotency_key", key)
       .maybeSingle();
-    if (error) throw new Error("PARTY_ACTION_READ_FAILED");
+    if (error) throw storageFailure("PARTY_ACTION_READ_FAILED", error);
     return data
       ? {
           status: "duplicate" as const,
