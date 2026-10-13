@@ -12,6 +12,7 @@ import {
   transition,
 } from "../engine";
 import { commandToGameAction } from "../multiplayer/command";
+import { getPresentationReadyAt } from "../presentation-gate";
 import { canRebaseDuelLock, isDuelLock } from "../multiplayer/duel-lock";
 import { newRoomCode, normalizeRoomCode } from "../multiplayer/security";
 import type { GameConfig, TeamSide } from "../types";
@@ -41,6 +42,7 @@ export type PartyServiceErrorCode =
   | "INVALID_ACTION"
   | "INVALID_COMMAND"
   | "REVISION_CONFLICT"
+  | "PRESENTATION_IN_PROGRESS"
   | "STORAGE_ERROR";
 
 export class PartyServiceError extends Error {
@@ -253,12 +255,19 @@ export async function submitPartyAction(
           : "진행 중인 경기가 아닙니다.",
       );
     }
-    if (
+    const stale =
       room.roomRevision !== input.expectedRoomRevision ||
-      (room.revision !== input.expectedRevision &&
-        !canRebaseDuelLock(room.state, input))
-    ) {
+      room.revision !== input.expectedRevision;
+    if (stale && !canRebaseDuelLock(room.state, input)) {
       throw revisionConflict();
+    }
+    if (
+      Date.now() < getPresentationReadyAt(room.state, room.revisionStartedAt)
+    ) {
+      throw new PartyServiceError(
+        "PRESENTATION_IN_PROGRESS",
+        "경기장 화면에서 플레이가 끝난 뒤에 선택할 수 있습니다.",
+      );
     }
     const players = activePlayers(await storage.listPlayers(room.id));
     const action = commandToGameAction(room.state, input.command);
@@ -529,6 +538,11 @@ function buildPublicSnapshot(
       : null,
     view: getGameView(room.state, "public"),
     isHost,
+    presentationReadyAt: getPresentationReadyAt(
+      room.state,
+      room.revisionStartedAt,
+    ),
+    serverNow: Date.now(),
   };
 }
 

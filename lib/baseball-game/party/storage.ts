@@ -88,6 +88,7 @@ export class MemoryPartyStorage implements PartyStorage {
       state: structuredClone(input.state),
       revision: input.state.revision,
       roomRevision: 0,
+      revisionStartedAt: new Date().toISOString(),
       hostTokenHash: input.hostTokenHash,
       partyState: structuredClone(input.partyState),
       expiresAt: new Date(Date.now() + 86_400_000).toISOString(),
@@ -222,6 +223,7 @@ export class MemoryPartyStorage implements PartyStorage {
     }
     room.state = structuredClone(input.newState);
     room.revision = input.newState.revision;
+    room.revisionStartedAt = new Date().toISOString();
     room.partyState = structuredClone(input.newPartyState);
     room.status = input.newState.phase === "finished" ? "finished" : "playing";
     room.roomRevision += 1;
@@ -257,7 +259,7 @@ class SupabasePartyStorage implements PartyStorage {
         party_state: input.partyState as unknown as Json,
       })
       .select(
-        "id, room_code, status, state, revision, room_revision, host_token_hash, party_state, expires_at",
+        "id, room_code, status, state, revision, room_revision, revision_started_at, host_token_hash, party_state, expires_at",
       )
       .single();
     if (error || !data) {
@@ -271,7 +273,7 @@ class SupabasePartyStorage implements PartyStorage {
     const { data, error } = await getSupabaseAdmin()
       .from("baseball_games")
       .select(
-        "id, room_code, status, state, revision, room_revision, host_token_hash, party_state, expires_at",
+        "id, room_code, status, state, revision, room_revision, revision_started_at, host_token_hash, party_state, expires_at",
       )
       .eq("room_code", roomCode)
       .eq("mode", "party")
@@ -419,6 +421,7 @@ function cloneRoom(room: MemoryPartyRoom): PartyRoomRecord {
     state: structuredClone(room.state),
     revision: room.revision,
     roomRevision: room.roomRevision,
+    revisionStartedAt: room.revisionStartedAt,
     hostTokenHash: room.hostTokenHash,
     partyState: structuredClone(room.partyState),
     expiresAt: room.expiresAt,
@@ -432,6 +435,7 @@ function rowToRoom(row: {
   state: Json;
   revision: number;
   room_revision: number;
+  revision_started_at: string;
   host_token_hash: string | null;
   party_state: Json | null;
   expires_at: string;
@@ -443,6 +447,7 @@ function rowToRoom(row: {
     state: row.state as unknown as GameState,
     revision: Number(row.revision),
     roomRevision: Number(row.room_revision),
+    revisionStartedAt: row.revision_started_at,
     hostTokenHash: row.host_token_hash ?? "",
     partyState: row.party_state as unknown as PartySessionState,
     expiresAt: row.expires_at,
