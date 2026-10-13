@@ -674,15 +674,20 @@ describe("baseball party service", () => {
     );
     expect(pitched.presentationReadyAt).toBeGreaterThan(pitched.serverNow);
 
+    // Random hands can open a card window after the pitch instead.
+    const cardWindow = pitched.view.phase === "awaiting_card";
     const next = {
-      command: { type: "SELECT_SWING", decision: "take" } as const,
+      command: cardWindow
+        ? ({ type: "PASS_CARD_WINDOW" } as const)
+        : ({ type: "SELECT_SWING", decision: "take" } as const),
       expectedRevision: pitched.view.revision,
       expectedRoomRevision: pitched.roomRevision,
     };
+    const actor = cardWindow && pitched.actionOwner === "home" ? home : away;
     await expect(
       submitPartyAction(
         room.roomCode,
-        away.playerToken,
+        actor.playerToken,
         { ...next, idempotencyKey: randomUUID() },
         storage,
       ),
@@ -691,7 +696,7 @@ describe("baseball party service", () => {
     vi.setSystemTime(pitched.presentationReadyAt);
     const accepted = await submitPartyAction(
       room.roomCode,
-      away.playerToken,
+      actor.playerToken,
       { ...next, idempotencyKey: randomUUID() },
       storage,
     );
