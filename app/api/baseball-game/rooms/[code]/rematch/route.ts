@@ -7,7 +7,11 @@ import {
   normalizeRoomCode,
   seatCookieName,
 } from "@/lib/baseball-game/multiplayer/security";
-import { mutationOriginError } from "@/lib/workbench/request";
+import { mutationOriginError, requestIp } from "@/lib/workbench/request";
+import {
+  rateLimitedResponse,
+  takeRateLimit,
+} from "@/lib/baseball-game/rate-limit";
 
 export async function POST(
   request: Request,
@@ -27,6 +31,9 @@ export async function POST(
   try {
     const token =
       (await cookies()).get(seatCookieName(roomCode))?.value ?? null;
+    if (!takeRateLimit("rematch", token ?? requestIp(request))) {
+      return rateLimitedResponse();
+    }
     const snapshot = await voteMultiplayerRematch(roomCode, token);
     return Response.json({ snapshot });
   } catch (error) {

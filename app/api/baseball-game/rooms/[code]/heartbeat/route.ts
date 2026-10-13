@@ -9,7 +9,11 @@ import {
   seatCookieName,
 } from "@/lib/baseball-game/multiplayer/security";
 import { readJson } from "@/lib/what-should-eat/api";
-import { mutationOriginError } from "@/lib/workbench/request";
+import { mutationOriginError, requestIp } from "@/lib/workbench/request";
+import {
+  rateLimitedResponse,
+  takeRateLimit,
+} from "@/lib/baseball-game/rate-limit";
 
 export async function POST(
   request: Request,
@@ -37,6 +41,9 @@ export async function POST(
   try {
     const token =
       (await cookies()).get(seatCookieName(roomCode))?.value ?? null;
+    if (!takeRateLimit("heartbeat", token ?? requestIp(request))) {
+      return rateLimitedResponse();
+    }
     const { seat } = await heartbeatMultiplayerSeat(
       roomCode,
       token,

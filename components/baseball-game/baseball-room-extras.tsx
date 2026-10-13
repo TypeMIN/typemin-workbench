@@ -195,12 +195,37 @@ export function ReplayReel({
     [game, item.revision],
   );
 
+  const dialogRef = useRef<HTMLDivElement | null>(null);
   useEffect(() => {
+    const opener = document.activeElement as HTMLElement | null;
+    dialogRef.current
+      ?.querySelector<HTMLButtonElement>("button:not([disabled])")
+      ?.focus();
     const onKey = (event: KeyboardEvent) => {
       if (event.key === "Escape") onClose();
+      if (event.key !== "Tab" || !dialogRef.current) return;
+      // Keep keyboard focus inside the replay while it is open.
+      const buttons = [
+        ...dialogRef.current.querySelectorAll<HTMLButtonElement>(
+          "button:not([disabled])",
+        ),
+      ];
+      if (!buttons.length) return;
+      const first = buttons[0];
+      const last = buttons[buttons.length - 1];
+      if (event.shiftKey && document.activeElement === first) {
+        event.preventDefault();
+        last.focus();
+      } else if (!event.shiftKey && document.activeElement === last) {
+        event.preventDefault();
+        first.focus();
+      }
     };
     window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
+    return () => {
+      window.removeEventListener("keydown", onKey);
+      opener?.focus?.();
+    };
   }, [onClose]);
 
   const playbackRef = useRef({ started: false, scheduled: false });
@@ -258,6 +283,7 @@ export function ReplayReel({
       aria-label={`${title} ${index + 1}/${items.length}`}
       aria-modal="true"
       className="bbg-room-replay"
+      ref={dialogRef}
       role="dialog"
     >
       <BaseballStadium

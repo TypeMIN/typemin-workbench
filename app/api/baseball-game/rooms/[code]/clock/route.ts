@@ -11,7 +11,11 @@ import {
   seatCookieName,
 } from "@/lib/baseball-game/multiplayer/security";
 import { readJson } from "@/lib/what-should-eat/api";
-import { mutationOriginError } from "@/lib/workbench/request";
+import { mutationOriginError, requestIp } from "@/lib/workbench/request";
+import {
+  rateLimitedResponse,
+  takeRateLimit,
+} from "@/lib/baseball-game/rate-limit";
 
 type ClockBody = {
   type?: unknown;
@@ -48,6 +52,9 @@ export async function POST(
   try {
     const token =
       (await cookies()).get(seatCookieName(roomCode))?.value ?? null;
+    if (!takeRateLimit("clock", token ?? requestIp(request))) {
+      return rateLimitedResponse();
+    }
     const snapshot = validTimeout
       ? await callMultiplayerTimeout(roomCode, token, expectedRevision)
       : await claimMultiplayerForfeit(roomCode, token);
