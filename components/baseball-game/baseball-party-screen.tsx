@@ -1,6 +1,10 @@
 "use client";
 
 import {
+  REALTIME_FALLBACK_POLL_MS,
+  useRoomRealtime,
+} from "@/components/baseball-game/use-room-realtime";
+import {
   Check,
   Copy,
   Pause,
@@ -102,7 +106,15 @@ export default function BaseballPartyScreen({
       });
   }, [roomCode]);
 
-  useAdaptiveGamePolling(load);
+  const realtime = useRoomRealtime(
+    snapshot?.realtimeTopic ?? null,
+    useCallback(() => void load(true), [load]),
+  );
+  // Without live notices this keeps the shared default cadence.
+  useAdaptiveGamePolling(
+    load,
+    realtime ? { activeMs: REALTIME_FALLBACK_POLL_MS } : {},
+  );
 
   async function host(command: PartyHostCommand) {
     if (!snapshot || busy) return;

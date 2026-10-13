@@ -49,6 +49,7 @@ function snapshot(canAct: boolean): PartyPlayerSnapshot {
     battingIndex: { away: 0, home: 0 },
     presentationReadyAt: 0,
     serverNow: Date.now(),
+    realtimeTopic: null,
     me,
     canAct,
     legalCards: [],

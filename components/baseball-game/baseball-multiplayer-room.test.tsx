@@ -56,6 +56,7 @@ function snapshot(seat: "away" | "home", status: "lobby" | "playing") {
     }),
     reactions: [],
     series: buildSeriesView(null, state, createClockState(0)),
+    realtimeTopic: null,
   } satisfies MultiplayerRoomSnapshot;
 }
 

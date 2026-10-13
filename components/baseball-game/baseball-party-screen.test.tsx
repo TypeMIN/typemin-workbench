@@ -42,6 +42,7 @@ function snapshot(): PartyPublicSnapshot {
     battingIndex: { away: 0, home: 0 },
     presentationReadyAt: 0,
     serverNow: Date.now(),
+    realtimeTopic: null,
   };
 }
 

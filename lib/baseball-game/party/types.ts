@@ -77,6 +77,8 @@ export type PartyPublicSnapshot = {
   /** Epoch ms when the shared screen finishes this revision's scenes. */
   presentationReadyAt: number;
   serverNow: number;
+  /** Unguessable broadcast topic for revision notices; null without Supabase. */
+  realtimeTopic: string | null;
 };
 
 export type PartyPlayerSnapshot = PartyPublicSnapshot & {

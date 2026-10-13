@@ -1,5 +1,9 @@
 "use client";
 
+import {
+  REALTIME_FALLBACK_POLL_MS,
+  useRoomRealtime,
+} from "@/components/baseball-game/use-room-realtime";
 import { Radio, RefreshCw, Tv, Users } from "lucide-react";
 import Link from "next/link";
 import { useCallback, useEffect, useMemo, useState } from "react";
@@ -80,7 +84,15 @@ export default function BaseballPartyPlayer({
     [roomCode],
   );
 
-  useAdaptiveGamePolling(load);
+  const realtime = useRoomRealtime(
+    snapshot?.realtimeTopic ?? null,
+    useCallback(() => void load(true), [load]),
+  );
+  // Without live notices this keeps the shared default cadence.
+  useAdaptiveGamePolling(
+    load,
+    realtime ? { activeMs: REALTIME_FALLBACK_POLL_MS } : {},
+  );
   const gated = useTimeGatedSnapshot(snapshot);
 
   useEffect(() => {
