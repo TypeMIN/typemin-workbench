@@ -865,3 +865,55 @@ describe("catcher-view-v1 presentation", () => {
     expect(cues).toHaveLength(18);
   });
 });
+
+describe("inning break scenes", () => {
+  const base = { inning: 1, runs: 0, outsRecorded: 0, moves: [] };
+
+  it("ends a third-out revision with a break before the next half starts", () => {
+    const scenes = buildPresentationScenes([
+      {
+        ...base,
+        sequence: 1,
+        revision: 5,
+        half: "top",
+        kind: "plate_appearance",
+        summary: "삼진 아웃",
+        outsRecorded: 1,
+        moves: [{ runner: "batter", from: "batter", to: "out" }],
+      },
+      {
+        ...base,
+        sequence: 2,
+        revision: 5,
+        half: "bottom",
+        kind: "half_inning",
+        summary: "1회말 시작",
+      },
+    ]);
+    const last = scenes.at(-1)!.beats.at(-1)!.cue;
+    expect(last).toEqual({
+      type: "interlude",
+      kind: "inning_break",
+      label: "3아웃 · 공수교대",
+      detail: "1회말 시작",
+    });
+    expect(scenes.at(-1)!.template).toBe("inning_change");
+  });
+
+  it("closes the game with a final banner", () => {
+    const scenes = buildPresentationScenes([
+      {
+        ...base,
+        sequence: 1,
+        revision: 9,
+        half: "bottom",
+        kind: "game_end",
+        summary: "3회 경기 종료",
+      },
+    ]);
+    expect(scenes.at(-1)!.beats.at(-1)!.cue).toMatchObject({
+      type: "interlude",
+      kind: "game_over",
+    });
+  });
+});

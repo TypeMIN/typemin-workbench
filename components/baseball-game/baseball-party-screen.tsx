@@ -24,6 +24,7 @@ import {
 import { BaseballSoundControls } from "@/components/baseball-game/audio/baseball-sound-controls";
 import { useBaseballSoundscape } from "@/components/baseball-game/audio/use-baseball-soundscape";
 import { BaseballStadium } from "@/components/baseball-game/baseball-game-debug";
+import { useStagedView } from "@/components/baseball-game/use-staged-view";
 import {
   BaseballPlayReceipt,
   BroadcastLineScore,
@@ -499,15 +500,17 @@ function PartyLive({
   snapshot: PartyPublicSnapshot;
 }) {
   const [presentationActive, setPresentationActive] = useState(false);
-  const game = snapshot.view;
+  const liveGame = snapshot.view;
+  const staged = useStagedView(liveGame);
+  const game = staged.view;
   const soundscape = useBaseballSoundscape({
-    game,
+    game: liveGame,
     perspective: "neutral",
     presenting: presentationActive,
   });
   const latest = game.eventLog.at(-1);
-  const latestRevisionEvents = game.eventLog.filter(
-    (event) => event.revision === game.revision,
+  const latestRevisionEvents = liveGame.eventLog.filter(
+    (event) => event.revision === liveGame.revision,
   );
   const concealingOutcome =
     presentationActive && hasResolutionOutcome(latestRevisionEvents);
@@ -529,9 +532,11 @@ function PartyLive({
         <BaseballSoundControls soundscape={soundscape} />
         <BaseballStadium
           face={face}
-          game={game}
+          game={liveGame}
           onBeat={soundscape.onBeat}
           onPresentationChange={setPresentationActive}
+          onPresentedRevision={staged.onPresentedRevision}
+          replayLatestOnMount={false}
         />
         <div className="bbg-party-live-result">
           <span>{concealingOutcome ? "•" : (face ?? "▶")}</span>

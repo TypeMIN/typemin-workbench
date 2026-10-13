@@ -18,6 +18,7 @@ import {
   usePresentation,
 } from "@/components/baseball-game/baseball-broadcast";
 import { BaseballDuelControl } from "@/components/baseball-game/baseball-duel-control";
+import { useStagedView } from "@/components/baseball-game/use-staged-view";
 import { BaseballCardFace } from "@/components/baseball-game/baseball-card-face";
 import { chooseAiAction } from "@/lib/baseball-game/ai";
 import { CARD_DEFINITIONS } from "@/lib/baseball-game/cards";
@@ -113,6 +114,8 @@ export default function BaseballGameDebug({
   );
   const actionOwner = getActionOwner(game);
   const playerView = getGameView(game, session.humanTeam);
+  const staged = useStagedView(game);
+  const display = staged.view;
   const aiTeam =
     session.mode === "solo_ai" ? oppositeTeam(session.humanTeam) : null;
   const soundscape = useBaseballSoundscape({
@@ -120,10 +123,12 @@ export default function BaseballGameDebug({
     perspective: session.mode === "solo_ai" ? session.humanTeam : "neutral",
     presenting: presentationActive,
   });
-  const interludeKind = getInterludeKind(
-    currentRevisionEvents,
-    acknowledgedInterlude === game.revision,
-  );
+  const interludeKind = staged.settled
+    ? getInterludeKind(
+        currentRevisionEvents,
+        acknowledgedInterlude === game.revision,
+      )
+    : null;
   const modalOpen = Boolean(interludeKind);
   const isAiTurn = Boolean(
     aiTeam && actionOwner === aiTeam && game.phase !== "finished",
@@ -306,7 +311,7 @@ export default function BaseballGameDebug({
             <div className="bbg-broadcast-stage">
               <div className="bbg-broadcast-heading">
                 <h1 id="field-heading">야구 게임 라이브</h1>
-                <BroadcastScoreboard game={game} />
+                <BroadcastScoreboard game={display} />
                 <BaseballSoundControls soundscape={soundscape} />
               </div>
 
@@ -316,8 +321,10 @@ export default function BaseballGameDebug({
                   game={playerView}
                   onBeat={soundscape.onBeat}
                   onPresentationChange={setPresentationActive}
+                  onPresentedRevision={staged.onPresentedRevision}
                 />
                 {!presentationActive &&
+                staged.settled &&
                 !isAiTurn &&
                 (game.phase === "awaiting_pitch" ||
                   game.phase === "awaiting_swing") ? (
@@ -346,21 +353,21 @@ export default function BaseballGameDebug({
             inert={presentationActive ? true : undefined}
             aria-label="전략카드와 경기 조작"
           >
-            {game.phase === "finished" ? (
+            {display.phase === "finished" ? (
               <div className="bbg-winner-card">
                 <span>FINAL</span>
                 <strong>
-                  {game.winner === "home"
-                    ? game.config.homeTeamName
-                    : game.config.awayTeamName}
+                  {display.winner === "home"
+                    ? display.config.homeTeamName
+                    : display.config.awayTeamName}
                 </strong>
                 <p>
-                  {game.score.away} : {game.score.home} 승리
+                  {display.score.away} : {display.score.home} 승리
                 </p>
               </div>
             ) : isAiTurn && aiTeam ? (
-              <AiTurnIndicator game={game} team={aiTeam} />
-            ) : game.phase === "awaiting_card" ? (
+              <AiTurnIndicator game={display} team={aiTeam} />
+            ) : staged.settled && game.phase === "awaiting_card" ? (
               <CardDecision
                 game={game}
                 onPass={() => dispatchAction({ type: "PASS_CARD_WINDOW" })}
@@ -372,7 +379,7 @@ export default function BaseballGameDebug({
             </div>
 
             <CardHands
-              game={game}
+              game={display}
               viewer={cardViewer}
               onPlay={(cardInstanceId) =>
                 dispatchAction({ type: "PLAY_CARD", cardInstanceId })
@@ -391,13 +398,13 @@ export default function BaseballGameDebug({
           <details className="bbg-utility-card bbg-log-panel">
             <summary>
               <span>최근 기록</span>
-              <strong>{game.eventLog.length}</strong>
+              <strong>{display.eventLog.length}</strong>
             </summary>
-            {game.eventLog.length === 0 ? (
+            {display.eventLog.length === 0 ? (
               <p className="bbg-empty-log">아직 기록된 플레이가 없습니다.</p>
             ) : (
               <ol className="bbg-event-list">
-                {game.eventLog
+                {display.eventLog
                   .slice(-6)
                   .toReversed()
                   .map((event) => (
@@ -951,6 +958,9 @@ function presentationLabel(cue: PresentationCue) {
   if (cue.type === "pitch") {
     return { primary: `${cue.location.pitchNumber}구`, detail: "투구" };
   }
+  if (cue.type === "interlude") {
+    return { primary: cue.label, detail: cue.detail };
+  }
   if (cue.type === "batted_ball") {
     return { primary: "타격", detail: cue.label };
   }
@@ -987,6 +997,8 @@ export function BaseballStadium({
   game,
   onBeat,
   onPresentationChange,
+  onPresentedRevision,
+  replayLatestOnMount = true,
 }: {
   face?: DieFace;
   game: Pick<GameState, "bases" | "battingTeam" | "config" | "eventLog"> & {
@@ -995,14 +1007,27 @@ export function BaseballStadium({
   };
   onBeat?: (beat: PresentationBeat, scene: PresentationScene) => void;
   onPresentationChange?: (active: boolean) => void;
+  /** Reports the newest revision whose scenes have finished playing. */
+  onPresentedRevision?: (revision: number) => void;
+  /** Live rooms start idle after a reload; highlight replays start playing. */
+  replayLatestOnMount?: boolean;
 }) {
-  const pitchHistory = getPlateAppearancePitchHistory(game.eventLog);
   const { cue, cues, index, isPresenting, scene, skip } = usePresentation(
     game.eventLog,
+    { replayLatestOnMount },
+  );
+  const pitchHistory = visiblePitchHistory(
+    getPlateAppearancePitchHistory(game.eventLog),
+    scene,
+    index,
   );
   useEffect(() => {
     onPresentationChange?.(isPresenting);
   }, [isPresenting, onPresentationChange]);
+  const latestRevision = game.eventLog.at(-1)?.revision ?? 0;
+  useEffect(() => {
+    if (!isPresenting) onPresentedRevision?.(latestRevision);
+  }, [isPresenting, latestRevision, onPresentedRevision]);
   const onBeatRef = useRef(onBeat);
   useEffect(() => {
     onBeatRef.current = onBeat;
@@ -1291,6 +1316,25 @@ export function BaseballStadium({
         </button>
       ) : null}
     </div>
+  );
+}
+
+/**
+ * A pitch only appears on the zone once its flight beat has played, so the
+ * marker never announces the call before the ball arrives.
+ */
+function visiblePitchHistory(
+  history: ReturnType<typeof getPlateAppearancePitchHistory>,
+  scene: PresentationScene | undefined,
+  index: number,
+) {
+  if (!scene) return history;
+  const pitchBeat = scene.beats.findIndex((beat) => beat.cue.type === "pitch");
+  const pitchShown = pitchBeat >= 0 && index > pitchBeat;
+  return history.filter(
+    (item) =>
+      item.event.revision < scene.revision ||
+      (item.event.revision === scene.revision && pitchShown),
   );
 }
 

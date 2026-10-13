@@ -43,6 +43,7 @@ import {
   useTurnAlert,
   type ReplayItem,
 } from "@/components/baseball-game/baseball-room-extras";
+import { useStagedView } from "@/components/baseball-game/use-staged-view";
 import { getHighlights } from "@/lib/baseball-game/highlights";
 import { isClutch } from "@/lib/baseball-game/audio/leverage";
 import { CARD_DEFINITIONS } from "@/lib/baseball-game/cards";
@@ -189,7 +190,6 @@ export default function BaseballMultiplayerRoom({
   async function submitCommand(command: MultiplayerCommand) {
     if (!snapshot || submitting) return;
     const intent = multiplayerCommandLabel(command, snapshot.view);
-    const previousRevision = snapshot.view.revision;
     setSubmitting(true);
     setError(null);
     actionFeedback.show({
@@ -237,7 +237,7 @@ export default function BaseballMultiplayerRoom({
       actionFeedback.show({
         status: "success",
         title: `${intent} 반영 완료`,
-        detail: revisionSummary(payload.snapshot.view, previousRevision),
+        detail: "결과는 경기장에서 확인하세요.",
       });
     } catch {
       setError("경기 행동을 서버에 보내지 못했습니다.");
@@ -568,8 +568,8 @@ function MultiplayerBoard({
   onReaction,
   onRematch,
   onSubmit,
-  snapshot,
   submitting,
+  ...props
 }: {
   clockOffsetMs: number;
   connectionLost: boolean;
@@ -585,11 +585,18 @@ function MultiplayerBoard({
   submitting: boolean;
 }) {
   const [presentationActive, setPresentationActive] = useState(false);
+  const liveSnapshot = props.snapshot;
+  const liveGame = liveSnapshot.view;
+  const staged = useStagedView(liveGame);
+  const snapshot = useMemo(
+    () => stageSnapshot(liveSnapshot, staged.view, staged.settled),
+    [liveSnapshot, staged.settled, staged.view],
+  );
   const game = snapshot.view;
   const seat = snapshot.seat;
   const opponentSeat: TeamSide = seat === "away" ? "home" : "away";
   const soundscape = useBaseballSoundscape({
-    game,
+    game: liveGame,
     perspective: seat,
     presenting: presentationActive,
   });
@@ -696,9 +703,11 @@ function MultiplayerBoard({
             ) : null}
             <BaseballStadium
               face={latestFace}
-              game={game}
+              game={liveGame}
               onBeat={soundscape.onBeat}
               onPresentationChange={setPresentationActive}
+              onPresentedRevision={staged.onPresentedRevision}
+              replayLatestOnMount={false}
             />
             {playing &&
             !presentationActive &&
@@ -1395,6 +1404,29 @@ function CountLights({
   );
 }
 
+/**
+ * While a new revision's scenes play, the board keeps showing the previous
+ * state and offers no decisions, so nothing reveals the result early.
+ */
+function stageSnapshot(
+  live: MultiplayerRoomSnapshot,
+  view: GameView,
+  settled: boolean,
+): MultiplayerRoomSnapshot {
+  if (settled) return live;
+  return {
+    ...live,
+    view,
+    status:
+      live.status === "finished" && view.phase !== "finished"
+        ? "playing"
+        : live.status,
+    actionOwner: null,
+    isYourTurn: false,
+    legalCards: [],
+  };
+}
+
 function roomUrl(roomCode: string) {
   return `${window.location.origin}/baseball-game/rooms/${roomCode}`;
 }
@@ -1440,11 +1472,4 @@ function multiplayerCommandLabel(command: MultiplayerCommand, game: GameView) {
     ...(game.cards.defense.hand ?? []),
   ].find((item) => item.instanceId === command.cardInstanceId);
   return card ? `${CARD_DEFINITIONS[card.cardId].name} 카드` : "전략카드";
-}
-
-function revisionSummary(game: GameView, previousRevision: number) {
-  return (
-    game.eventLog.findLast((event) => event.revision > previousRevision)
-      ?.summary ?? "다음 경기 단계가 준비됐습니다."
-  );
 }

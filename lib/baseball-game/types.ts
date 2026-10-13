@@ -242,6 +242,12 @@ export type PresentationCue =
       result: "safe" | "out" | "score";
       label: string;
       camera: "catcher" | "field";
+    }
+  | {
+      type: "interlude";
+      kind: "inning_break" | "game_over";
+      label: string;
+      detail: string;
     };
 
 export type PresentationSceneTemplate =

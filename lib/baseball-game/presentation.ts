@@ -426,6 +426,24 @@ export function buildPresentationCues(
         camera: "field",
       });
     }
+    // The half-inning event already carries the next half, so the break is
+    // shown after the final out instead of the field silently switching.
+    if (event.kind === "half_inning") {
+      cues.push({
+        type: "interlude",
+        kind: "inning_break",
+        label: "3아웃 · 공수교대",
+        detail: event.summary,
+      });
+    }
+    if (event.kind === "game_end") {
+      cues.push({
+        type: "interlude",
+        kind: "game_over",
+        label: "경기 종료",
+        detail: event.summary,
+      });
+    }
   });
 
   return dedupeAdjacent(cues);
@@ -549,6 +567,7 @@ function presentationCueTiming(cue: PresentationCue) {
   if (cue.type === "catch") return { durationMs: 650, holdMs: 300 };
   if (cue.type === "throw") return { durationMs: 850, holdMs: 250 };
   if (cue.type === "runner_move") return { durationMs: 850, holdMs: 250 };
+  if (cue.type === "interlude") return { durationMs: 600, holdMs: 1_600 };
   return { durationMs: 500, holdMs: 1_400 };
 }
 
