@@ -92,7 +92,8 @@ export async function joinPartyRoom(
   input: { nickname: string; team: TeamSide; expectedRoomRevision: number },
   storage: PartyStorage = getPartyStorage(),
 ) {
-  const room = await requireRoom(roomCode, storage);
+  const loaded = await requireRoomWithPlayers(roomCode, storage);
+  const room = loaded.room;
   if (room.status !== "lobby") {
     throw new PartyServiceError(
       "ROOM_UNAVAILABLE",
@@ -106,7 +107,7 @@ export async function joinPartyRoom(
       "닉네임은 1~12자로 입력해 주세요.",
     );
   }
-  const players = activePlayers(await storage.listPlayers(room.id));
+  const players = activePlayers(loaded.players);
   if (
     players.some(
       (player) =>
@@ -146,7 +147,7 @@ export async function joinPartyRoom(
     playerToken,
     storage,
   );
-  await notifyRoomChanged(room.id, {
+  notifyRoomChanged(room.id, {
     revision: room.revision,
     roomRevision: snapshot.roomRevision,
   });
@@ -158,11 +159,9 @@ export async function getPartyPublicSnapshot(
   hostToken: string | null,
   storage: PartyStorage = getPartyStorage(),
 ): Promise<PartyPublicSnapshot> {
-  const room = await settleExpiredPartyDecision(
-    await requireRoom(roomCode, storage),
-    storage,
-  );
-  const players = activePlayers(await storage.listPlayers(room.id));
+  const loaded = await requireRoomWithPlayers(roomCode, storage);
+  const players = activePlayers(loaded.players);
+  const room = await settleExpiredPartyDecision(loaded.room, players, storage);
   return buildPublicSnapshot(
     room,
     players,
@@ -175,10 +174,10 @@ export async function getPartyPlayerSnapshot(
   playerToken: string | null,
   storage: PartyStorage = getPartyStorage(),
 ): Promise<PartyPlayerSnapshot> {
-  const storedRoom = await requireRoom(roomCode, storage);
-  const player = await requirePlayer(storedRoom, playerToken, storage);
-  const room = await settleExpiredPartyDecision(storedRoom, storage);
-  const players = activePlayers(await storage.listPlayers(room.id));
+  const loaded = await requireRoomWithPlayers(roomCode, storage);
+  const players = activePlayers(loaded.players);
+  const player = requirePlayerIn(players, playerToken);
+  const room = await settleExpiredPartyDecision(loaded.room, players, storage);
   const publicSnapshot = buildPublicSnapshot(room, players, false);
   const actionOwner = getActionOwner(room.state);
   return {
@@ -200,8 +199,8 @@ export async function heartbeatPartyPlayer(
   playerToken: string | null,
   storage: PartyStorage = getPartyStorage(),
 ) {
-  const room = await requireRoom(roomCode, storage);
-  const player = await requirePlayer(room, playerToken, storage);
+  const { room, players } = await requireRoomWithPlayers(roomCode, storage);
+  const player = requirePlayerIn(activePlayers(players), playerToken);
   if (!(await storage.heartbeat(room.id, player.id))) {
     throw new PartyServiceError(
       "PLAYER_REQUIRED",
@@ -216,11 +215,12 @@ export async function submitPartyHostCommand(
   input: { command: PartyHostCommand; expectedRoomRevision: number },
   storage: PartyStorage = getPartyStorage(),
 ) {
-  const room = await requireRoom(roomCode, storage);
+  const loaded = await requireRoomWithPlayers(roomCode, storage);
+  const room = loaded.room;
   requireHost(room, hostToken);
   if (room.roomRevision !== input.expectedRoomRevision)
     throw revisionConflict();
-  const players = activePlayers(await storage.listPlayers(room.id));
+  const players = activePlayers(loaded.players);
   const next = applyHostCommand(room, players, input.command, Date.now());
   let commit;
   try {
@@ -244,7 +244,7 @@ export async function submitPartyHostCommand(
       "현재 상태에서 실행할 수 없습니다.",
     );
   }
-  await notifyRoomChanged(room.id, {
+  notifyRoomChanged(room.id, {
     revision: room.revision,
     roomRevision: room.roomRevision + 1,
   });
@@ -261,16 +261,17 @@ export async function submitPartyAction(
   input: PartyActionInput,
   storage: PartyStorage = getPartyStorage(),
 ) {
-  const storedRoom = await requireRoom(roomCode, storage);
-  const player = await requirePlayer(storedRoom, playerToken, storage);
+  const loaded = await requireRoomWithPlayers(roomCode, storage);
+  let players = activePlayers(loaded.players);
+  const player = requirePlayerIn(players, playerToken);
   const duplicate = await storage.getIdempotency(
-    storedRoom.id,
+    loaded.room.id,
     input.idempotencyKey,
   );
   if (duplicate) {
-    return getPartyPlayerSnapshot(storedRoom.roomCode, playerToken, storage);
+    return getPartyPlayerSnapshot(loaded.room.roomCode, playerToken, storage);
   }
-  let room = await settleExpiredPartyDecision(storedRoom, storage);
+  let room = await settleExpiredPartyDecision(loaded.room, players, storage);
   for (let attempt = 0; ; attempt += 1) {
     if (room.status !== "playing") {
       throw new PartyServiceError(
@@ -294,7 +295,6 @@ export async function submitPartyAction(
         "경기장 화면에서 플레이가 끝난 뒤에 선택할 수 있습니다.",
       );
     }
-    const players = activePlayers(await storage.listPlayers(room.id));
     const action = commandToGameAction(room.state, input.command);
     if (!action) {
       throw new PartyServiceError(
@@ -341,7 +341,9 @@ export async function submitPartyAction(
     }
     if (commit.status === "conflict") {
       if (attempt + 1 < MAX_DUEL_REBASE_ATTEMPTS && isDuelLock(input.command)) {
-        room = await requireRoom(roomCode, storage);
+        const reloaded = await requireRoomWithPlayers(roomCode, storage);
+        room = reloaded.room;
+        players = activePlayers(reloaded.players);
         continue;
       }
       throw revisionConflict();
@@ -352,7 +354,7 @@ export async function submitPartyAction(
         "저장할 수 없는 경기 행동입니다.",
       );
     }
-    await notifyRoomChanged(room.id, {
+    notifyRoomChanged(room.id, {
       revision: result.state.revision,
       roomRevision: room.roomRevision + 1,
     });
@@ -372,6 +374,7 @@ const MAX_TIMEOUT_STEPS = 2;
  */
 async function settleExpiredPartyDecision(
   room: PartyRoomRecord,
+  players: PartyStoredPlayer[],
   storage: PartyStorage,
 ): Promise<PartyRoomRecord> {
   let current = room;
@@ -388,7 +391,6 @@ async function settleExpiredPartyDecision(
     const team = getActionActor(current.state, action);
     if (!team) return current;
     try {
-      const players = activePlayers(await storage.listPlayers(current.id));
       const actorId =
         activePlayerForTeam(current, players, team) ??
         players.find((player) => player.team === team)?.id;
@@ -416,7 +418,7 @@ async function settleExpiredPartyDecision(
         idempotencyKey: timeoutIdempotencyKey(current.id, current.revision),
       });
       if (commit.status === "applied") {
-        await notifyRoomChanged(current.id, {
+        notifyRoomChanged(current.id, {
           revision: commit.revision,
           roomRevision: commit.roomRevision,
         });
@@ -716,41 +718,39 @@ function removeFromLineups(state: PartySessionState, playerId: string) {
   return next;
 }
 
-async function requireRoom(roomCode: string, storage: PartyStorage) {
-  let room;
+async function requireRoomWithPlayers(roomCode: string, storage: PartyStorage) {
+  let loaded;
   try {
-    room = await storage.getRoom(normalizeRoomCode(roomCode));
+    loaded = await storage.getRoomWithPlayers(normalizeRoomCode(roomCode));
   } catch {
     throw storageError("파티 방을 불러오지 못했습니다.");
   }
-  if (!room)
+  if (!loaded)
     throw new PartyServiceError("ROOM_NOT_FOUND", "방을 찾을 수 없습니다.");
+  const { room } = loaded;
   if (room.status === "expired" || Date.parse(room.expiresAt) <= Date.now()) {
     throw new PartyServiceError("ROOM_UNAVAILABLE", "만료된 방입니다.");
   }
-  return room;
+  return loaded;
 }
 
-function requireHost(room: PartyRoomRecord, token: string | null) {
-  if (!token || partyTokenHash(token) !== room.hostTokenHash) {
-    throw new PartyServiceError("HOST_REQUIRED", "방장 권한이 필요합니다.");
-  }
-}
-
-async function requirePlayer(
-  room: PartyRoomRecord,
-  token: string | null,
-  storage: PartyStorage,
-) {
+function requirePlayerIn(players: PartyStoredPlayer[], token: string | null) {
   if (!token)
     throw new PartyServiceError("PLAYER_REQUIRED", "참가자 세션이 필요합니다.");
-  const player = await storage.findPlayer(room.id, partyTokenHash(token));
+  const tokenHash = partyTokenHash(token);
+  const player = players.find((candidate) => candidate.tokenHash === tokenHash);
   if (!player)
     throw new PartyServiceError(
       "PLAYER_REQUIRED",
       "참가자 세션이 만료되었습니다.",
     );
   return player;
+}
+
+function requireHost(room: PartyRoomRecord, token: string | null) {
+  if (!token || partyTokenHash(token) !== room.hostTokenHash) {
+    throw new PartyServiceError("HOST_REQUIRED", "방장 권한이 필요합니다.");
+  }
 }
 
 function requireLobby(room: PartyRoomRecord) {

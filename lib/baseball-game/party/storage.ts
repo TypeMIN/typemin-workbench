@@ -42,11 +42,11 @@ type HostMutationInput = PartyMutationCommitInput & {
 export interface PartyStorage {
   createRoom(input: CreateRoomInput): Promise<PartyRoomRecord>;
   getRoom(roomCode: string): Promise<PartyRoomRecord | null>;
-  listPlayers(roomId: string): Promise<PartyStoredPlayer[]>;
-  findPlayer(
-    roomId: string,
-    tokenHash: string,
-  ): Promise<PartyStoredPlayer | null>;
+  /** The room and every player row in one round trip, oldest first. */
+  getRoomWithPlayers(roomCode: string): Promise<{
+    room: PartyRoomRecord;
+    players: PartyStoredPlayer[];
+  } | null>;
   joinPlayer(
     input: JoinPlayerInput,
   ): Promise<{ playerId: string; roomRevision: number } | null>;
@@ -111,15 +111,15 @@ export class MemoryPartyStorage implements PartyStorage {
     return cloneRoom(room);
   }
 
-  async listPlayers(roomId: string) {
-    return (findRoom(roomId)?.players ?? []).map((player) => ({ ...player }));
-  }
-
-  async findPlayer(roomId: string, tokenHash: string) {
-    const player = findRoom(roomId)?.players.find(
-      (candidate) => candidate.tokenHash === tokenHash && !candidate.removedAt,
-    );
-    return player ? { ...player } : null;
+  async getRoomWithPlayers(roomCode: string) {
+    const room = await this.getRoom(roomCode);
+    if (!room) return null;
+    return {
+      room,
+      players: (findRoom(room.id)?.players ?? []).map((player) => ({
+        ...player,
+      })),
+    };
   }
 
   async joinPlayer(input: JoinPlayerInput) {
@@ -272,9 +272,7 @@ class SupabasePartyStorage implements PartyStorage {
   async getRoom(roomCode: string) {
     const { data, error } = await getSupabaseAdmin()
       .from("baseball_games")
-      .select(
-        "id, room_code, status, state, revision, room_revision, revision_started_at, host_token_hash, party_state, expires_at",
-      )
+      .select(PARTY_ROOM_COLUMNS)
       .eq("room_code", roomCode)
       .eq("mode", "party")
       .maybeSingle();
@@ -282,30 +280,23 @@ class SupabasePartyStorage implements PartyStorage {
     return data ? rowToRoom(data) : null;
   }
 
-  async listPlayers(roomId: string) {
+  async getRoomWithPlayers(roomCode: string) {
     const { data, error } = await getSupabaseAdmin()
-      .from("baseball_party_players")
+      .from("baseball_games")
       .select(
-        "id, nickname, team, token_hash, joined_at, last_seen_at, removed_at",
+        `${PARTY_ROOM_COLUMNS}, baseball_party_players(${PARTY_PLAYER_COLUMNS})`,
       )
-      .eq("game_id", roomId)
-      .order("joined_at");
-    if (error) throw storageFailure("PARTY_PLAYER_READ_FAILED", error);
-    return (data ?? []).map(rowToPlayer);
-  }
-
-  async findPlayer(roomId: string, tokenHash: string) {
-    const { data, error } = await getSupabaseAdmin()
-      .from("baseball_party_players")
-      .select(
-        "id, nickname, team, token_hash, joined_at, last_seen_at, removed_at",
-      )
-      .eq("game_id", roomId)
-      .eq("token_hash", tokenHash)
-      .is("removed_at", null)
+      .eq("room_code", roomCode)
+      .eq("mode", "party")
+      .order("joined_at", { referencedTable: "baseball_party_players" })
       .maybeSingle();
-    if (error) throw storageFailure("PARTY_PLAYER_READ_FAILED", error);
-    return data ? rowToPlayer(data) : null;
+    if (error) throw storageFailure("ROOM_READ_FAILED", error);
+    if (!data) return null;
+    const { baseball_party_players: players, ...row } = data;
+    return {
+      room: rowToRoom(row),
+      players: (players ?? []).map(rowToPlayer),
+    };
   }
 
   async joinPlayer(input: JoinPlayerInput) {
@@ -453,6 +444,11 @@ function rowToRoom(row: {
     expiresAt: row.expires_at,
   };
 }
+
+const PARTY_ROOM_COLUMNS =
+  "id, room_code, status, state, revision, room_revision, revision_started_at, host_token_hash, party_state, expires_at";
+const PARTY_PLAYER_COLUMNS =
+  "id, nickname, team, token_hash, joined_at, last_seen_at, removed_at";
 
 function rowToPlayer(row: {
   id: string;

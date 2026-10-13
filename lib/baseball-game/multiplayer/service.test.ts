@@ -76,6 +76,12 @@ class TestStorage implements MultiplayerStorage {
   ]);
   commits: MultiplayerCommitInput[] = [];
 
+  async getRoomWithSeats(roomCode: string, tokenHash: string | null) {
+    const room = await this.getRoom(roomCode);
+    if (!room) return null;
+    return { room, seats: await this.getSeatContext(room.id, tokenHash ?? "") };
+  }
+
   async createRoom() {
     return structuredClone(this.room);
   }
@@ -257,6 +263,20 @@ describe("baseball multiplayer service", () => {
     // v4: the batter may lock a decision while the pitcher is choosing.
     expect(away.isYourTurn).toBe(true);
     expect(home.isYourTurn).toBe(true);
+  });
+
+  it("reads a room and its seats in one storage call per poll", async () => {
+    const storage = new TestStorage();
+    const combined = vi.spyOn(storage, "getRoomWithSeats");
+    const room = vi.spyOn(storage, "getRoom");
+    const seats = vi.spyOn(storage, "getSeatContext");
+    await getMultiplayerSnapshot("ABC234", AWAY_TOKEN, storage);
+    expect(combined).toHaveBeenCalledTimes(1);
+    expect(room).toHaveBeenCalledTimes(1);
+    expect(seats).toHaveBeenCalledTimes(1);
+    combined.mockClear();
+    await heartbeatMultiplayerSeat("ABC234", AWAY_TOKEN, "visible", storage);
+    expect(combined).toHaveBeenCalledTimes(1);
   });
 
   it("rejects a command from the team that does not own the turn", async () => {
