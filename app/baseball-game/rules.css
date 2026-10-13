@@ -1,0 +1,194 @@
+/* Rules page in the room's night-broadcast palette. */
+
+.bbg-rules {
+  max-width: 880px;
+  min-height: 100dvh;
+  margin: 0 auto;
+  padding: 28px 16px 64px;
+  color: var(--room-text);
+  background: var(--room-bg);
+  line-height: 1.6;
+}
+
+.baseball-game-app:has(.bbg-rules) {
+  background: var(--room-bg);
+}
+
+.bbg-rules-header a {
+  color: var(--room-muted);
+  font-size: 13px;
+  text-decoration: none;
+}
+
+.bbg-rules-header h1 {
+  margin: 12px 0 6px;
+  font-size: 28px;
+  font-weight: 800;
+}
+
+.bbg-rules-header p,
+.bbg-rules-note {
+  color: var(--room-muted);
+  font-size: 14px;
+}
+
+.bbg-rules section {
+  margin-top: 32px;
+}
+
+.bbg-rules h2 {
+  margin: 0 0 12px;
+  padding-bottom: 8px;
+  border-bottom: 1px solid var(--room-line-strong);
+  font-size: 18px;
+}
+
+.bbg-rules h2 small {
+  color: var(--room-muted);
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.bbg-rules-steps {
+  display: grid;
+  gap: 10px;
+  margin: 0;
+  padding: 0;
+  counter-reset: step;
+  list-style: none;
+}
+
+.bbg-rules-steps li {
+  display: grid;
+  gap: 2px;
+  padding: 12px 14px 12px 48px;
+  position: relative;
+  border: 1px solid var(--room-line);
+  border-radius: var(--room-radius);
+  background: var(--room-panel);
+  counter-increment: step;
+}
+
+.bbg-rules-steps li::before {
+  position: absolute;
+  top: 12px;
+  left: 14px;
+  display: grid;
+  width: 24px;
+  height: 24px;
+  place-items: center;
+  border-radius: 50%;
+  color: var(--room-accent-ink);
+  background: var(--room-accent);
+  content: counter(step);
+  font-size: 13px;
+  font-weight: 800;
+}
+
+.bbg-rules-steps span {
+  color: var(--room-muted);
+  font-size: 14px;
+}
+
+.bbg-rules-table {
+  display: grid;
+  gap: 6px;
+}
+
+.bbg-rules-table [role="row"] {
+  display: grid;
+  grid-template-columns: 88px repeat(2, minmax(0, 1fr));
+  gap: 6px;
+}
+
+.bbg-rules-table [role="columnheader"],
+.bbg-rules-table [role="rowheader"] {
+  align-self: center;
+  color: var(--room-muted);
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.bbg-rules-table [role="cell"] {
+  display: grid;
+  gap: 2px;
+  padding: 10px 12px;
+  border: 1px solid var(--room-line);
+  border-top: 3px solid var(--room-ball);
+  border-radius: var(--room-radius-sm);
+  background: var(--room-panel);
+  font-size: 13px;
+}
+
+.bbg-rules-table [role="cell"][data-winner="pitcher"] {
+  border-top-color: var(--room-strike);
+}
+
+.bbg-rules-list {
+  display: grid;
+  gap: 6px;
+  margin: 0;
+  padding-left: 18px;
+  font-size: 14px;
+}
+
+.bbg-rules-modes {
+  display: grid;
+  gap: 8px;
+  margin: 0;
+}
+
+.bbg-rules-modes div {
+  padding: 12px 14px;
+  border: 1px solid var(--room-line);
+  border-radius: var(--room-radius);
+  background: var(--room-panel);
+}
+
+.bbg-rules-modes dt {
+  font-weight: 800;
+}
+
+.bbg-rules-modes dd {
+  margin: 2px 0 0;
+  color: var(--room-muted);
+  font-size: 14px;
+}
+
+.bbg-rules-cards {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+  gap: 8px;
+  margin: 12px 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.bbg-rules-cards li {
+  display: grid;
+  align-content: start;
+  gap: 2px;
+  padding: 12px;
+  border: 1px solid var(--room-line);
+  border-radius: var(--room-radius-sm);
+  background: var(--room-panel);
+}
+
+.bbg-rules-card-code {
+  color: var(--room-accent);
+  font-family: ui-monospace, "SFMono-Regular", Menlo, monospace;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.bbg-rules-cards em {
+  color: var(--room-dim);
+  font-size: 12px;
+  font-style: normal;
+}
+
+.bbg-rules-cards p {
+  margin: 4px 0 0;
+  color: var(--room-muted);
+  font-size: 13px;
+}

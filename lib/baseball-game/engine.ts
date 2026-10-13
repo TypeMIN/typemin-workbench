@@ -40,6 +40,8 @@ import {
 } from "./types";
 
 const EMPTY_BASES: Bases = { first: false, second: false, third: false };
+/** Each side refills to this many cards after playing one. */
+export const HAND_SIZE = 4;
 
 type PlateAppearanceOutcome = {
   summary: string;
@@ -2442,7 +2444,7 @@ function spendCard(state: GameState, role: CardRole, card: CardInstance) {
 }
 
 function drawToFour(zone: CardZone, rng: GameState["rng"]) {
-  while (zone.hand.length < 4) {
+  while (zone.hand.length < HAND_SIZE) {
     if (zone.drawPile.length === 0) {
       if (zone.discardPile.length === 0) return;
       zone.drawPile = shuffle(zone.discardPile, rng);

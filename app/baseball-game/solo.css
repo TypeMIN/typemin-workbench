@@ -114,3 +114,101 @@
 .bbg-solo-shell .bbg-choice-dock .bbg-swing-actions .is-take > i {
   background: var(--room-ball);
 }
+
+/* First-game guide */
+
+/* Floats over the empty sky under the scoreboard, so the one-screen
+   layout never shifts and setup stays reachable; hidden while scenes play. */
+.bbg-coach {
+  position: absolute;
+  z-index: 6;
+  top: 64px;
+  right: 12px;
+  width: min(340px, calc(100% - 24px));
+  display: grid;
+  gap: 6px;
+  box-shadow: 0 14px 40px rgb(0 0 0 / 55%);
+  padding: 12px 14px;
+  border: 1px solid var(--room-accent);
+  border-radius: var(--room-radius);
+  background: var(--room-panel);
+}
+
+.bbg-coach header,
+.bbg-coach footer {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.bbg-coach header small {
+  color: var(--room-accent);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+}
+
+.bbg-coach header button {
+  display: grid;
+  width: 28px;
+  height: 28px;
+  margin-left: auto;
+  place-items: center;
+  border: 0;
+  color: var(--room-muted);
+  background: transparent;
+}
+
+.bbg-coach strong {
+  font-size: 15px;
+}
+
+.bbg-coach p {
+  margin: 0;
+  color: var(--room-muted);
+  font-size: 13px;
+  line-height: 1.55;
+}
+
+.bbg-coach footer a {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  margin-right: auto;
+  color: var(--room-muted);
+  font-size: 12px;
+}
+
+.bbg-coach footer button {
+  min-height: 32px;
+  padding: 0 12px;
+  border: 1px solid var(--room-line-strong);
+  border-radius: var(--room-radius-sm);
+  color: var(--room-text);
+  background: var(--room-raised);
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.bbg-coach footer button.is-primary {
+  border-color: var(--room-accent);
+  color: var(--room-accent-ink);
+  background: var(--room-accent);
+}
+
+@media (max-width: 760px) {
+  .bbg-coach {
+    top: 70px;
+    right: 8px;
+    width: calc(100% - 16px);
+    padding: 10px 12px;
+  }
+
+  .bbg-coach strong {
+    font-size: 14px;
+  }
+
+  .bbg-coach p {
+    font-size: 12px;
+  }
+}
