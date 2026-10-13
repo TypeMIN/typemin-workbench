@@ -1,6 +1,6 @@
 import type { CrowdReaction, SoundCue } from "@/lib/baseball-game/audio/cues";
 
-export type SoundBus = "sfx" | "crowd" | "music";
+export type SoundBus = "sfx" | "crowd" | "music" | "voice";
 
 export type SoundMix = {
   muted: boolean;
@@ -8,6 +8,8 @@ export type SoundMix = {
   sfx: number;
   crowd: number;
   music: number;
+  /** Umpire calls; spoken by the device voice, or synthesized as a fallback. */
+  voice: number;
 };
 
 export const DEFAULT_SOUND_MIX: SoundMix = {
@@ -16,6 +18,7 @@ export const DEFAULT_SOUND_MIX: SoundMix = {
   sfx: 0.9,
   crowd: 0.7,
   music: 0.6,
+  voice: 0.9,
 };
 
 type NoiseLayer = {
@@ -420,6 +423,293 @@ const SFX_PATCHES: Record<SoundCue, Layer[]> = {
       freq: 880,
     },
   ],
+  bat_crush: [
+    {
+      kind: "noise",
+      duration: 0.07,
+      attack: 0.001,
+      gain: 0.78,
+      filter: "highpass",
+      freq: 1500,
+    },
+    {
+      kind: "tone",
+      duration: 0.09,
+      attack: 0.001,
+      gain: 0.38,
+      wave: "triangle",
+      freq: 1150,
+      freqEnd: 480,
+    },
+    {
+      kind: "tone",
+      duration: 0.26,
+      attack: 0.002,
+      gain: 0.3,
+      wave: "sine",
+      freq: 190,
+      freqEnd: 110,
+    },
+    {
+      kind: "noise",
+      delay: 0.05,
+      duration: 0.45,
+      attack: 0.02,
+      gain: 0.07,
+      filter: "bandpass",
+      freq: 2800,
+      q: 0.8,
+    },
+  ],
+  bat_dull: [
+    {
+      kind: "noise",
+      duration: 0.06,
+      attack: 0.001,
+      gain: 0.46,
+      filter: "lowpass",
+      freq: 1900,
+    },
+    {
+      kind: "tone",
+      duration: 0.12,
+      attack: 0.002,
+      gain: 0.3,
+      wave: "sine",
+      freq: 270,
+      freqEnd: 140,
+    },
+  ],
+  bat_pop: [
+    {
+      kind: "noise",
+      duration: 0.04,
+      attack: 0.001,
+      gain: 0.3,
+      filter: "bandpass",
+      freq: 1400,
+      q: 1.2,
+    },
+    {
+      kind: "tone",
+      duration: 0.05,
+      attack: 0.001,
+      gain: 0.18,
+      wave: "triangle",
+      freq: 720,
+      freqEnd: 410,
+    },
+  ],
+  catch_far: [
+    {
+      kind: "tone",
+      duration: 0.06,
+      attack: 0.002,
+      gain: 0.16,
+      wave: "sine",
+      freq: 165,
+      freqEnd: 95,
+    },
+    {
+      kind: "tone",
+      delay: 0.12,
+      duration: 0.05,
+      attack: 0.002,
+      gain: 0.06,
+      wave: "sine",
+      freq: 160,
+      freqEnd: 95,
+    },
+  ],
+  fence: [
+    {
+      kind: "tone",
+      delay: 0.35,
+      duration: 0.26,
+      attack: 0.003,
+      gain: 0.34,
+      wave: "sine",
+      freq: 72,
+      freqEnd: 44,
+    },
+    {
+      kind: "noise",
+      delay: 0.35,
+      duration: 0.3,
+      attack: 0.004,
+      gain: 0.2,
+      filter: "lowpass",
+      freq: 420,
+    },
+  ],
+  strikeout: [
+    {
+      kind: "tone",
+      duration: 0.08,
+      attack: 0.004,
+      gain: 0.12,
+      wave: "triangle",
+      freq: 523,
+    },
+    {
+      kind: "tone",
+      delay: 0.09,
+      duration: 0.08,
+      attack: 0.004,
+      gain: 0.12,
+      wave: "triangle",
+      freq: 659,
+    },
+    {
+      kind: "tone",
+      delay: 0.18,
+      duration: 0.22,
+      attack: 0.004,
+      gain: 0.14,
+      wave: "triangle",
+      freq: 880,
+    },
+  ],
+  // Fallback umpire calls: each has its own contour so they stay distinct
+  // on devices without a Korean speech voice.
+  ump_play: [
+    {
+      kind: "tone",
+      bus: "voice",
+      duration: 0.16,
+      attack: 0.01,
+      gain: 0.14,
+      wave: "sawtooth",
+      freq: 330,
+      freqEnd: 440,
+    },
+    {
+      kind: "tone",
+      bus: "voice",
+      delay: 0.18,
+      duration: 0.26,
+      attack: 0.01,
+      gain: 0.14,
+      wave: "sawtooth",
+      freq: 440,
+      freqEnd: 400,
+    },
+  ],
+  ump_strike: [
+    {
+      kind: "tone",
+      bus: "voice",
+      duration: 0.12,
+      attack: 0.008,
+      gain: 0.13,
+      wave: "sawtooth",
+      freq: 300,
+      freqEnd: 420,
+    },
+    {
+      kind: "tone",
+      bus: "voice",
+      delay: 0.13,
+      duration: 0.2,
+      attack: 0.008,
+      gain: 0.13,
+      wave: "sawtooth",
+      freq: 420,
+      freqEnd: 360,
+    },
+  ],
+  ump_ball: [
+    {
+      kind: "tone",
+      bus: "voice",
+      duration: 0.18,
+      attack: 0.01,
+      gain: 0.09,
+      wave: "sawtooth",
+      freq: 240,
+      freqEnd: 200,
+    },
+  ],
+  ump_out: [
+    {
+      kind: "tone",
+      bus: "voice",
+      duration: 0.1,
+      attack: 0.006,
+      gain: 0.15,
+      wave: "sawtooth",
+      freq: 260,
+      freqEnd: 230,
+    },
+    {
+      kind: "tone",
+      bus: "voice",
+      delay: 0.13,
+      duration: 0.18,
+      attack: 0.006,
+      gain: 0.15,
+      wave: "sawtooth",
+      freq: 230,
+      freqEnd: 170,
+    },
+  ],
+  ump_safe: [
+    {
+      kind: "tone",
+      bus: "voice",
+      duration: 0.12,
+      attack: 0.008,
+      gain: 0.12,
+      wave: "sawtooth",
+      freq: 360,
+      freqEnd: 300,
+    },
+    {
+      kind: "tone",
+      bus: "voice",
+      delay: 0.14,
+      duration: 0.26,
+      attack: 0.008,
+      gain: 0.12,
+      wave: "sawtooth",
+      freq: 300,
+      freqEnd: 300,
+    },
+  ],
+  ump_strikeout: [
+    {
+      kind: "tone",
+      bus: "voice",
+      duration: 0.14,
+      attack: 0.008,
+      gain: 0.15,
+      wave: "sawtooth",
+      freq: 320,
+      freqEnd: 460,
+    },
+    {
+      kind: "tone",
+      bus: "voice",
+      delay: 0.16,
+      duration: 0.14,
+      attack: 0.008,
+      gain: 0.15,
+      wave: "sawtooth",
+      freq: 460,
+      freqEnd: 400,
+    },
+    {
+      kind: "tone",
+      bus: "voice",
+      delay: 0.34,
+      duration: 0.3,
+      attack: 0.008,
+      gain: 0.15,
+      wave: "sawtooth",
+      freq: 260,
+      freqEnd: 180,
+    },
+  ],
   timeout_call: [
     {
       kind: "tone",
@@ -594,7 +884,9 @@ export class SoundscapeEngine {
       sfx: context.createGain(),
       crowd: context.createGain(),
       music: context.createGain(),
+      voice: context.createGain(),
     };
+    this.buses.voice.connect(this.master);
     this.buses.sfx.connect(this.master);
     this.buses.music.connect(this.master);
     this.buses.crowd.connect(this.crowdDuck);
@@ -623,6 +915,7 @@ export class SoundscapeEngine {
     this.buses.sfx.gain.setTargetAtTime(mix.sfx, now, 0.05);
     this.buses.crowd.gain.setTargetAtTime(mix.crowd, now, 0.05);
     this.buses.music.gain.setTargetAtTime(mix.music, now, 0.05);
+    this.buses.voice.gain.setTargetAtTime(mix.voice, now, 0.05);
   }
 
   setTension(value: number) {

@@ -188,20 +188,11 @@ test("야구 게임에서 투타 심리전과 새 경기를 진행한다", async
   await expect(
     page.getByRole("region", { name: "이번 승부 선택 기록" }),
   ).toHaveCount(0);
-  // The zone marker waits for the pitch flight, so it is checked after it.
+  // Beats are short in v4, so wait for the scene and tap through it rather
+  // than racing a specific beat index.
   await expect(
-    page.locator(".bbg-pitch-marker[data-current='true']"),
-  ).toHaveCount(0);
-  const revealCue = page.getByRole("button", {
-    name: /현재 연출 1\/\d+, 다음 장면 보기/,
-  });
-  await expect(revealCue).toContainText("투수 선택");
-  await revealCue.click();
-  await expect(
-    page.getByRole("button", {
-      name: /현재 연출 2\/\d+, 다음 장면 보기/,
-    }),
-  ).toContainText("타자 선택");
+    page.getByRole("button", { name: /현재 연출 \d+\/\d+, 다음 장면 보기/ }),
+  ).toBeVisible();
   await advancePresentation(page);
   await expect(
     page.locator(".bbg-pitch-marker[data-current='true'] b"),
@@ -223,7 +214,18 @@ test("야구 게임에서 투타 심리전과 새 경기를 진행한다", async
       name: /현재 연출 \d+\/\d+, 다음 장면 보기/,
     }),
   ).toHaveCount(0);
-  await expect(page.locator(".bbg-choice-dock")).toBeVisible();
+  // A random hand can give the AI a card window first; answer any window
+  // that opens for us, then the next pitch dock appears.
+  await expect
+    .poll(
+      async () => {
+        await passCardWindows(page);
+        await advancePresentation(page);
+        return page.locator(".bbg-choice-dock").count();
+      },
+      { timeout: 15_000 },
+    )
+    .toBe(1);
   await expect(page.getByText("특정 면 강제 입력")).toHaveCount(0);
 
   await page
@@ -308,7 +310,8 @@ test("싱글플레이에서 AI가 타격 판단을 이어서 진행한다", asyn
   );
   await page.goto("/baseball-game");
   await page.getByRole("button", { name: "스트라이크 선택" }).click();
-  await expect(page.getByText("원정팀 판단 중")).toBeVisible();
+  // The AI batter may already have locked its decision in a v4 duel, so the
+  // pitch can resolve at once; the marker is the stable signal.
   await expect(
     page.locator(".bbg-pitch-marker[data-current='true']"),
   ).toBeVisible({

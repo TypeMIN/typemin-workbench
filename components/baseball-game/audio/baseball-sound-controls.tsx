@@ -9,6 +9,7 @@ const BUS_LABELS = [
   ["sfx", "효과음"],
   ["crowd", "관중"],
   ["music", "음악"],
+  ["voice", "심판 콜"],
 ] as const;
 
 export function BaseballSoundControls({

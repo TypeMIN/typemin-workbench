@@ -20,6 +20,7 @@ import {
   SoundscapeEngine,
   type SoundMix,
 } from "./soundscape-engine";
+import { FALLBACK_CALLS, UmpireVoice } from "./umpire-voice";
 
 export const SOUND_STORAGE_KEY = "bbg-broadcast-sound-v1";
 export const VOLUME_STORAGE_KEY = "bbg-broadcast-volume-v1";
@@ -58,7 +59,7 @@ export function readStoredMix(): SoundMix {
     const buses = JSON.parse(
       window.localStorage.getItem(BUS_STORAGE_KEY) ?? "{}",
     ) as Record<string, unknown>;
-    for (const bus of ["sfx", "crowd", "music"] as const) {
+    for (const bus of ["sfx", "crowd", "music", "voice"] as const) {
       const value = Number(buses[bus]);
       if (buses[bus] !== undefined && value >= 0 && value <= 1) {
         mix[bus] = value;
@@ -76,7 +77,12 @@ function storeMix(mix: SoundMix) {
     window.localStorage.setItem(VOLUME_STORAGE_KEY, String(mix.master));
     window.localStorage.setItem(
       BUS_STORAGE_KEY,
-      JSON.stringify({ sfx: mix.sfx, crowd: mix.crowd, music: mix.music }),
+      JSON.stringify({
+        sfx: mix.sfx,
+        crowd: mix.crowd,
+        music: mix.music,
+        voice: mix.voice,
+      }),
     );
   } catch {
     return;
@@ -97,6 +103,7 @@ export function useBaseballSoundscape({
   presenting: boolean;
 }): BaseballSoundscape {
   const engineRef = useRef<SoundscapeEngine | null>(null);
+  const voiceRef = useRef<UmpireVoice | null>(null);
   const eventLogRef = useRef(game.eventLog);
   const [mix, setMix] = useState<SoundMix>(DEFAULT_SOUND_MIX);
   const mixRef = useRef(mix);
@@ -116,14 +123,19 @@ export function useBaseballSoundscape({
       if (!engineRef.current) {
         engineRef.current = SoundscapeEngine.create();
         engineRef.current?.setMix(mixRef.current);
+        voiceRef.current = UmpireVoice.create();
+        voiceRef.current?.prime();
       }
       engineRef.current?.resume();
       setUnlocked(true);
     };
+    // iOS Safari unlocks audio on touchend rather than pointerdown.
     window.addEventListener("pointerdown", unlock, { once: true });
+    window.addEventListener("touchend", unlock, { once: true });
     window.addEventListener("keydown", unlock, { once: true });
     return () => {
       window.removeEventListener("pointerdown", unlock);
+      window.removeEventListener("touchend", unlock);
       window.removeEventListener("keydown", unlock);
     };
   }, []);
@@ -138,6 +150,8 @@ export function useBaseballSoundscape({
       document.removeEventListener("visibilitychange", onVisibility);
       engineRef.current?.close();
       engineRef.current = null;
+      voiceRef.current?.cancel();
+      voiceRef.current = null;
     };
   }, []);
 
@@ -176,6 +190,15 @@ export function useBaseballSoundscape({
       );
       for (const cue of sounds.sfx) engine.play(cue);
       if (sounds.crowd) engine.crowd(sounds.crowd);
+      const mix = mixRef.current;
+      if (sounds.call && !mix.muted && mix.voice > 0) {
+        const spoken = voiceRef.current?.speak(
+          sounds.call,
+          mix.master * mix.voice,
+        );
+        const fallback = FALLBACK_CALLS[sounds.call];
+        if (!spoken && fallback) engine.play(fallback);
+      }
       if (sounds.sfx.includes("walk_off")) engine.crowd("roar");
     },
     [perspective],
