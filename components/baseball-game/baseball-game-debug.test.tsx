@@ -18,6 +18,8 @@ vi.mock("next/navigation", () => ({
   useRouter: () => ({ push: routerPush }),
 }));
 
+const CURVED_ROUTE = /^M[\d.-]+ [\d.-]+( L[\d.-]+ [\d.-]+){8,}$/;
+
 describe("BaseballGameDebug", () => {
   beforeEach(() => {
     routerPush.mockReset();
@@ -485,9 +487,10 @@ describe("BaseballGameDebug", () => {
       "field",
     );
     expect(container.querySelector(".bbg-live-throw")).toBeVisible();
+    // Curved routes are sampled into projected polylines.
     expect(container.querySelector(".bbg-throw-route")).toHaveAttribute(
       "d",
-      expect.stringContaining(" Q"),
+      expect.stringMatching(CURVED_ROUTE),
     );
     expect(
       screen.getByRole("button", {
@@ -499,7 +502,7 @@ describe("BaseballGameDebug", () => {
     expect(container.querySelector(".bbg-live-runner")).toBeVisible();
     expect(container.querySelector(".bbg-runner-route")).toHaveAttribute(
       "d",
-      expect.stringContaining(" Q"),
+      expect.stringMatching(CURVED_ROUTE),
     );
     expect(
       screen.getByRole("button", {
@@ -519,6 +522,49 @@ describe("BaseballGameDebug", () => {
         name: "현재 연출 3/3, 다음 장면 보기",
       }),
     ).toBeVisible();
+  });
+
+  it("keeps the outfield scoreboard on the old score until the run scores on screen", () => {
+    vi.useFakeTimers();
+    const game = createGame({
+      innings: 3,
+      awayTeamName: "원정팀",
+      homeTeamName: "홈팀",
+    });
+    game.phase = "awaiting_pitch";
+    game.eventLog = [
+      {
+        sequence: 1,
+        revision: 1,
+        inning: 1,
+        half: "top",
+        kind: "batted_ball",
+        summary: "타구 판정 · HR",
+        face: "HR",
+        runs: 0,
+        outsRecorded: 0,
+        moves: [],
+      },
+      {
+        sequence: 2,
+        revision: 1,
+        inning: 1,
+        half: "top",
+        kind: "plate_appearance",
+        summary: "홈런",
+        runs: 1,
+        outsRecorded: 0,
+        moves: [{ runner: "batter", from: "batter", to: "home" }],
+      },
+    ];
+    const { container } = render(<BaseballStadium game={game} />);
+    const board = () => container.querySelector(".bbg-field-scoreboard");
+    expect(board()).toHaveTextContent("원정팀 0 : 0 홈팀");
+    // Each beat schedules the next after it renders, so step through them.
+    for (let step = 0; step < 30; step += 1) {
+      act(() => vi.advanceTimersByTime(1_000));
+    }
+    expect(board()).toHaveTextContent("원정팀 1 : 0 홈팀");
   });
 
   it("creates a new game from edited team names and innings", () => {

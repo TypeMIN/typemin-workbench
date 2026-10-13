@@ -1,0 +1,337 @@
+/* Broadcast camera field, shared by every mode. Loaded after the older
+   stadium rules so the projected art wins over the flat top-down styles. */
+
+.bbg-field-overview {
+  --field-team-away: var(--room-away);
+  --field-team-home: var(--room-home);
+  overflow: hidden;
+}
+
+/* Sky: sunset in the early innings, blue hour mid-game, lights at night. */
+
+.bbg-field-overview .bbg-sky-top {
+  stop-color: #1d2a4a;
+}
+
+.bbg-field-overview .bbg-sky-mid {
+  stop-color: #c4674a;
+}
+
+.bbg-field-overview .bbg-sky-low {
+  stop-color: #f2b36b;
+}
+
+.bbg-field-overview[data-sky="twilight"] .bbg-sky-top {
+  stop-color: #0d1630;
+}
+
+.bbg-field-overview[data-sky="twilight"] .bbg-sky-mid {
+  stop-color: #34407a;
+}
+
+.bbg-field-overview[data-sky="twilight"] .bbg-sky-low {
+  stop-color: #7b6a9a;
+}
+
+.bbg-field-overview[data-sky="night"] .bbg-sky-top {
+  stop-color: #03060d;
+}
+
+.bbg-field-overview[data-sky="night"] .bbg-sky-mid {
+  stop-color: #08101e;
+}
+
+.bbg-field-overview[data-sky="night"] .bbg-sky-low {
+  stop-color: #142238;
+}
+
+.bbg-field-overview .bbg-sky-top,
+.bbg-field-overview .bbg-sky-mid,
+.bbg-field-overview .bbg-sky-low {
+  transition: stop-color 1.6s ease;
+}
+
+.bbg-light-pole {
+  fill: none;
+  stroke: #2a3340;
+  stroke-width: 3;
+}
+
+.bbg-light-lamp {
+  fill: #fdf6dc;
+  stroke: #3c4654;
+  stroke-width: 1;
+}
+
+.bbg-light-glow {
+  opacity: 0.25;
+  transition: opacity 1.6s ease;
+}
+
+.bbg-field-overview[data-sky="twilight"] .bbg-light-glow {
+  opacity: 0.6;
+}
+
+.bbg-field-overview[data-sky="night"] .bbg-light-glow {
+  opacity: 1;
+}
+
+/* Stands */
+
+.bbg-foul-ground {
+  fill: #0c3a27;
+}
+
+.bbg-side-stands {
+  fill: #151c27;
+  stroke: rgb(255 255 255 / 6%);
+  stroke-width: 1;
+}
+
+.bbg-field-overview .bbg-stands-ring {
+  fill: #1a2230;
+  stroke: rgb(0 0 0 / 45%);
+  stroke-width: 1;
+}
+
+.bbg-field-overview .bbg-stands-ring[data-row="odd"] {
+  fill: #202a3a;
+}
+
+.bbg-crowd-dot {
+  fill: rgb(214 222 235 / 55%);
+}
+
+.bbg-crowd-dot.is-alt {
+  fill: rgb(242 183 64 / 45%);
+}
+
+.bbg-field-scoreboard path {
+  fill: #06090e;
+  stroke: #2f3a4a;
+  stroke-width: 1.5;
+}
+
+.bbg-field-scoreboard text {
+  fill: #ffd27a;
+  font-family: ui-monospace, "SFMono-Regular", Menlo, monospace;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+}
+
+.bbg-field-overview[data-detail="low"]
+  :is(.bbg-crowd-fill, .bbg-light-glow, .bbg-mow-band) {
+  display: none;
+}
+
+/* Ground */
+
+.bbg-outfield-wall {
+  fill: #0d3b52;
+}
+
+.bbg-field-overview .bbg-fence {
+  fill: none;
+  stroke: #f2c94c;
+  stroke-width: 2;
+}
+
+.bbg-field-overview .bbg-warning-track {
+  fill: #8a5a3a;
+}
+
+.bbg-field-overview .bbg-outfield {
+  stroke: none;
+}
+
+.bbg-mow-band {
+  fill: rgb(255 255 255 / 4.5%);
+}
+
+.bbg-field-overview .bbg-infield-dirt {
+  fill: #a8693f;
+  stroke: rgb(255 226 186 / 18%);
+  stroke-width: 1;
+}
+
+.bbg-field-overview .bbg-infield-grass {
+  fill: #1a7446;
+  stroke: none;
+}
+
+.bbg-base-line,
+.bbg-field-overview .bbg-foul-line-svg {
+  fill: none;
+  stroke: rgb(255 255 255 / 82%);
+  stroke-linejoin: round;
+  stroke-width: 1.6;
+}
+
+.bbg-foul-pole {
+  fill: none;
+  stroke: #f2c94c;
+  stroke-linecap: round;
+  stroke-width: 3;
+}
+
+.bbg-field-overview .bbg-mound-dirt,
+.bbg-field-overview .bbg-home-dirt {
+  fill: #b9784a;
+  stroke: rgb(255 226 186 / 30%);
+  stroke-width: 1;
+}
+
+.bbg-mound-rubber {
+  fill: none;
+  stroke: #f4f1ea;
+  stroke-width: 2.4;
+}
+
+.bbg-batters-box {
+  fill: none;
+  stroke: rgb(255 255 255 / 70%);
+  stroke-width: 1.2;
+}
+
+.bbg-field-overview .bbg-field-home path,
+.bbg-field-overview .bbg-field-base path {
+  fill: #f4f6f6;
+  stroke: rgb(5 14 22 / 55%);
+  stroke-width: 1;
+}
+
+.bbg-field-overview .bbg-field-base[data-occupied="true"] path {
+  fill: var(--room-accent);
+  stroke: #fff3bd;
+}
+
+/* Players */
+
+.bbg-figure {
+  transition: transform 900ms cubic-bezier(0.25, 0.8, 0.3, 1);
+}
+
+.bbg-figure-shadow {
+  fill: rgb(0 0 0 / 35%);
+}
+
+.bbg-figure-body,
+.bbg-figure-head {
+  stroke: rgb(4 8 14 / 75%);
+  stroke-width: 0.9;
+}
+
+.bbg-figure[data-team="away"] .bbg-figure-body {
+  fill: var(--field-team-away);
+}
+
+.bbg-figure[data-team="home"] .bbg-figure-body {
+  fill: var(--field-team-home);
+}
+
+.bbg-figure[data-team="umpire"] .bbg-figure-body {
+  fill: #20262f;
+}
+
+.bbg-figure-head {
+  fill: #f0d2b4;
+}
+
+.bbg-figure-bat {
+  fill: none;
+  stroke: #d9b37a;
+  stroke-linecap: round;
+  stroke-width: 1.8;
+}
+
+.bbg-figure.is-chasing .bbg-figure-body {
+  stroke: #fff;
+  stroke-width: 1.2;
+}
+
+/* Ball and routes: the shadow sits on the ground under the ball. */
+
+.bbg-field-overview .bbg-live-ball-shadow,
+.bbg-field-overview .bbg-live-throw-shadow {
+  fill: rgb(0 0 0 / 42%);
+  filter: none;
+  transform: none;
+}
+
+.bbg-field-overview .bbg-ball-trail-shadow,
+.bbg-field-overview .bbg-throw-route-shadow {
+  stroke: rgb(0 0 0 / 30%);
+  stroke-dasharray: 4 6;
+  stroke-width: 3;
+}
+
+.bbg-pitch-ball {
+  fill: #fff;
+  stroke: #d32d3f;
+  stroke-width: 1.5;
+}
+
+/* While the ball is live the call card moves up out of the camera's path;
+   rulings still land center screen. */
+
+.bbg-stadium[data-camera="field"]
+  > .bbg-presentation-cue:is(
+    [data-cue="batted_ball"],
+    [data-cue="catch"],
+    [data-cue="throw"],
+    [data-cue="runner_move"]
+  ) {
+  top: 19%;
+  scale: 0.86;
+}
+
+@media (max-width: 760px) {
+  .bbg-stadium[data-camera="field"]
+    > .bbg-presentation-cue:is(
+      [data-cue="batted_ball"],
+      [data-cue="catch"],
+      [data-cue="throw"],
+      [data-cue="runner_move"]
+    ) {
+    top: calc(19% + 40px);
+  }
+}
+
+/* Camera: cuts from the catcher view zoom out to the field, then follow the
+   ball with a slow push. Only transform and opacity animate. */
+
+.bbg-field-camera {
+  transform-origin: 0 0;
+  transition: transform 700ms cubic-bezier(0.22, 0.7, 0.2, 1);
+}
+
+.bbg-stadium[data-camera="field"] > .bbg-field-overview {
+  animation: bbg-field-cut-in 350ms ease-out both;
+}
+
+@keyframes bbg-field-cut-in {
+  from {
+    opacity: 0.4;
+    transform: scale(1.18);
+  }
+
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .bbg-field-camera,
+  .bbg-figure {
+    transition: none;
+  }
+
+  .bbg-field-camera[data-active="true"] {
+    transform: none !important;
+  }
+
+  .bbg-stadium[data-camera="field"] > .bbg-field-overview {
+    animation: none;
+  }
+}

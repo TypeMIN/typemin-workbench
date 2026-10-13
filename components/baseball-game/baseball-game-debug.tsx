@@ -22,6 +22,8 @@ import {
   pendingDuelChoice,
   type DuelRole,
 } from "@/components/baseball-game/baseball-duel-control";
+import { getBallFlight } from "@/components/baseball-game/stadium/ball-flight";
+import { BaseballFieldView } from "@/components/baseball-game/stadium/baseball-field-view";
 import { useStagedView } from "@/components/baseball-game/use-staged-view";
 import { BaseballCardFace } from "@/components/baseball-game/baseball-card-face";
 import { chooseAiAction } from "@/lib/baseball-game/ai";
@@ -276,7 +278,7 @@ export default function BaseballGameDebug({
   }
 
   return (
-    <div className="bbg-shell">
+    <div className="bbg-shell bbg-solo-shell">
       <header className="bbg-topbar">
         <Link
           aria-label="Workbench 홈으로 돌아가기"
@@ -934,14 +936,6 @@ function BroadcastBases({ game }: { game: GameState }) {
   );
 }
 
-type BallFlight = {
-  kind: "ground" | "fly" | "line" | "contact";
-  label: string;
-  path: string;
-  target: { x: number; y: number };
-  rotation: number;
-};
-
 function presentationLabel(cue: PresentationCue) {
   if (cue.type === "choice") {
     const actor = {
@@ -1100,207 +1094,20 @@ export function BaseballStadium({
       {catcherView ? (
         <CatcherPitchStage cue={cue} pitchHistory={pitchHistory} />
       ) : null}
-      <svg
-        aria-label={`${battingTeamName} 공격, ${baseLabel}${flight ? `, ${flight.label} 타구 표시` : ""}`}
-        preserveAspectRatio="xMidYMid meet"
-        role="img"
-        className="bbg-field-overview"
-        viewBox="0 0 900 700"
-      >
-        <defs>
-          <linearGradient id="stands" x1="0" x2="0" y1="0" y2="1">
-            <stop offset="0" stopColor="#17283a" />
-            <stop offset="1" stopColor="#07111b" />
-          </linearGradient>
-          <linearGradient id="grass" x1="0" x2="1" y1="0" y2="1">
-            <stop offset="0" stopColor="#176846" />
-            <stop offset="0.5" stopColor="#0f573b" />
-            <stop offset="1" stopColor="#0b412e" />
-          </linearGradient>
-          <pattern
-            height="56"
-            id="mow-pattern"
-            patternUnits="userSpaceOnUse"
-            width="56"
-            x="0"
-            y="0"
-          >
-            <rect fill="rgba(255,255,255,.018)" height="56" width="28" />
-            <rect fill="rgba(0,0,0,.028)" height="56" width="28" x="28" />
-          </pattern>
-          <filter id="ball-glow" height="300%" width="300%" x="-100%" y="-100%">
-            <feGaussianBlur result="blur" stdDeviation="6" />
-            <feMerge>
-              <feMergeNode in="blur" />
-              <feMergeNode in="SourceGraphic" />
-            </feMerge>
-          </filter>
-        </defs>
-
-        <rect fill="url(#stands)" height="700" rx="24" width="900" />
-        <path
-          className="bbg-stands-ring"
-          d="M42 252 Q450 -38 858 252 L830 278 Q450 14 70 278 Z"
-        />
-        <path
-          className="bbg-warning-track"
-          d="M450 664 L55 263 Q450 -24 845 263 L823 288 Q450 23 77 288 Z"
-        />
-        <path
-          className="bbg-outfield"
-          d="M450 650 L77 279 Q450 18 823 279 Z"
-          fill="url(#grass)"
-        />
-        <path
-          d="M450 650 L77 279 Q450 18 823 279 Z"
-          fill="url(#mow-pattern)"
-          opacity=".58"
-        />
-        <path className="bbg-fence" d="M77 279 Q450 18 823 279" />
-        <path className="bbg-foul-line-svg" d="M450 650 L77 279" />
-        <path className="bbg-foul-line-svg" d="M450 650 L823 279" />
-        <path
-          className="bbg-infield-dirt"
-          d="M450 438 C507 443 558 491 571 548 C582 598 542 641 450 670 C358 641 318 598 329 548 C342 491 393 443 450 438 Z"
-        />
-        <path
-          className="bbg-infield-grass"
-          d="M450 470 L540 560 L450 650 L360 560 Z"
-        />
-        <circle className="bbg-mound-dirt" cx="450" cy="560" r="27" />
-        <circle className="bbg-home-dirt" cx="450" cy="650" r="27" />
-
-        <SvgBaseMarker
-          base="second"
-          label="2루"
-          occupied={displayedBases.second}
-          x={450}
-          y={470}
-        />
-        <SvgBaseMarker
-          base="third"
-          label="3루"
-          occupied={displayedBases.third}
-          x={360}
-          y={560}
-        />
-        <SvgBaseMarker
-          base="first"
-          label="1루"
-          occupied={displayedBases.first}
-          x={540}
-          y={560}
-        />
-        <g className="bbg-field-mound" transform="translate(450 560)">
-          <ellipse rx="22" ry="10" />
-          <text dy="3" textAnchor="middle">
-            투수
-          </text>
-        </g>
-        <g className="bbg-field-home" transform="translate(450 650)">
-          <path d="M-10 -9 H10 V2 L0 11 L-10 2 Z" />
-          <text dy="26" textAnchor="middle">
-            홈
-          </text>
-        </g>
-
-        {flight ? (
-          <BallFlightVisual
-            face={activeBattedBallCue?.face}
-            flight={flight}
-            key={`flight-${scene?.beats[index]?.id ?? activeBattedBallCue?.face}`}
-          />
-        ) : null}
-        {cue?.type === "pitch" ? (
-          <g
-            className="bbg-pitch-flight"
-            key={`pitch-${scene?.beats[index]?.id}`}
-          >
-            <path
-              d={`M450 555 Q${430 + cue.location.x * 0.4} 600 ${438 + cue.location.x * 0.24} 650`}
-            />
-            <circle r="6">
-              <animateMotion
-                dur="420ms"
-                fill="freeze"
-                path={`M450 555 Q${430 + cue.location.x * 0.4} 600 ${438 + cue.location.x * 0.24} 650`}
-              />
-            </circle>
-          </g>
-        ) : null}
-        {cue?.type !== "pitch" && latestPitchLocation && !catcherView ? (
-          <path
-            className="bbg-last-pitch-path"
-            d={`M450 555 Q${430 + latestPitchLocation.x * 0.4} 600 ${438 + latestPitchLocation.x * 0.24} 650`}
-          />
-        ) : null}
-        {cue?.type === "throw" ? (
-          <g
-            className="bbg-throw-cue"
-            data-kind={cue.kind}
-            key={`throw-${scene?.beats[index]?.id}`}
-          >
-            <path className="bbg-throw-route-shadow" d={cue.path} />
-            <path className="bbg-throw-route" d={cue.path} />
-            <circle
-              className="bbg-throw-target bbg-throw-target--outer"
-              cx={cue.to.x}
-              cy={cue.to.y}
-              r="23"
-            />
-            <circle
-              className="bbg-throw-target bbg-throw-target--inner"
-              cx={cue.to.x}
-              cy={cue.to.y}
-              r="10"
-            />
-            <circle className="bbg-live-throw-shadow" r="9">
-              <animateMotion dur="820ms" fill="freeze" path={cue.path} />
-            </circle>
-            <circle className="bbg-live-throw" r="6">
-              <animateMotion dur="820ms" fill="freeze" path={cue.path} />
-            </circle>
-          </g>
-        ) : null}
-        {cue?.type === "catch" ? (
-          <g
-            className="bbg-catch-cue"
-            transform={`translate(${cue.location.x} ${cue.location.y})`}
-          >
-            <circle className="bbg-catch-ring bbg-catch-ring--outer" r="29" />
-            <circle className="bbg-catch-ring bbg-catch-ring--inner" r="18" />
-            <path className="bbg-catch-glove" d="M-9 1 L0 -9 L9 1 L0 10 Z" />
-            <circle className="bbg-catch-ball" r="5" />
-          </g>
-        ) : null}
-        {cue?.type === "runner_move" ? (
-          <g
-            className="bbg-runner-cue"
-            data-out={cue.move.to === "out"}
-            key={`runner-${scene?.beats[index]?.id}`}
-          >
-            <path className="bbg-runner-route-shadow" d={cue.path} />
-            <path className="bbg-runner-route" d={cue.path} />
-            <circle
-              className="bbg-runner-origin"
-              cx={cue.origin.x}
-              cy={cue.origin.y}
-              r="11"
-            />
-            <circle
-              className="bbg-runner-destination"
-              cx={cue.destination.x}
-              cy={cue.destination.y}
-              r="17"
-            />
-            <g className="bbg-live-runner">
-              <animateMotion dur="820ms" fill="freeze" path={cue.path} />
-              <circle r="10" />
-              <path d="M-15 0 H-5" />
-            </g>
-          </g>
-        ) : null}
-      </svg>
+      <BaseballFieldView
+        ariaLabel={`${battingTeamName} 공격, ${baseLabel}${flight ? `, ${flight.label} 타구 표시` : ""}`}
+        bases={displayedBases}
+        battingTeam={game.battingTeam}
+        beatId={activeBeat?.id}
+        cue={cue}
+        cues={cues}
+        face={activeBattedBallCue?.face}
+        flight={flight}
+        index={index}
+        lastPitch={catcherView ? undefined : latestPitchLocation}
+        score={presentedScore(game, isPresenting ? scene?.revision : undefined)}
+        sky={skyForInning(game)}
+      />
       {!catcherView ? (
         <>
           <div className="bbg-strike-zone" aria-label="투구 위치">
@@ -1329,6 +1136,38 @@ export function BaseballStadium({
       ) : null}
     </div>
   );
+}
+
+// Innings split evenly into a sunset, a blue hour and full night lights.
+const SKY_STAGES = ["dusk", "twilight", "night"] as const;
+
+function skyForInning(game: Pick<GameState, "config" | "eventLog">) {
+  const inning = game.eventLog.at(-1)?.inning ?? 1;
+  const progress = (inning - 1) / Math.max(1, game.config.innings);
+  return SKY_STAGES[
+    Math.min(SKY_STAGES.length - 1, Math.floor(progress * SKY_STAGES.length))
+  ];
+}
+
+/** The outfield board only counts runs whose scenes have already played. */
+function presentedScore(
+  game: Pick<GameState, "config" | "eventLog">,
+  presentingRevision: number | undefined,
+) {
+  const score = { away: 0, home: 0 };
+  for (const event of game.eventLog) {
+    if (
+      presentingRevision !== undefined &&
+      event.revision >= presentingRevision
+    )
+      continue;
+    score[event.half === "top" ? "away" : "home"] += event.runs;
+  }
+  return {
+    ...score,
+    awayName: game.config.awayTeamName,
+    homeName: game.config.homeTeamName,
+  };
 }
 
 /**
@@ -1599,265 +1438,6 @@ function catcherPitchPoint(location: PitchLocation) {
     x: 300 + location.x * 3,
     y: 235 + location.y * 3,
   };
-}
-
-function BallFlightVisual({
-  face,
-  flight,
-}: {
-  face?: DieFace;
-  flight: BallFlight;
-}) {
-  const target = rotateFieldPoint(flight.target, flight.rotation);
-  return (
-    <g
-      aria-label={`${face ?? ""} ${flight.label} 타구 궤적`}
-      className="bbg-ball-flight"
-      data-kind={flight.kind}
-      data-variation={flight.rotation.toFixed(2)}
-      role="img"
-    >
-      <g transform={`rotate(${flight.rotation} 450 650)`}>
-        <path className="bbg-ball-trail-shadow" d={flight.path} />
-        <path className="bbg-ball-trail-glow" d={flight.path} />
-        <path className="bbg-ball-trail" d={flight.path} />
-        {flight.kind === "ground" ? (
-          <g className="bbg-ground-bounces">
-            <circle
-              cx={450 + (flight.target.x - 450) * 0.34}
-              cy={650 + (flight.target.y - 650) * 0.34}
-              r="5"
-            />
-            <circle
-              cx={450 + (flight.target.x - 450) * 0.67}
-              cy={650 + (flight.target.y - 650) * 0.67}
-              r="4"
-            />
-          </g>
-        ) : null}
-        <circle
-          className="bbg-ball-landing bbg-ball-landing--outer"
-          cx={flight.target.x}
-          cy={flight.target.y}
-          r="24"
-        />
-        <circle
-          className="bbg-ball-landing bbg-ball-landing--inner"
-          cx={flight.target.x}
-          cy={flight.target.y}
-          r="10"
-        />
-        <circle className="bbg-live-ball-shadow" r="10">
-          <animateMotion dur="820ms" fill="freeze" path={flight.path} />
-        </circle>
-        <circle className="bbg-live-ball" filter="url(#ball-glow)" r="6">
-          <animateMotion dur="820ms" fill="freeze" path={flight.path} />
-        </circle>
-      </g>
-      <g
-        className="bbg-flight-label"
-        transform={`translate(${target.x} ${target.y - 27})`}
-      >
-        <rect height="29" rx="14" width="112" x="-56" y="-17" />
-        <text dy="2" textAnchor="middle">
-          {flight.label}
-        </text>
-      </g>
-    </g>
-  );
-}
-
-function rotateFieldPoint(point: { x: number; y: number }, degrees: number) {
-  const radians = (degrees * Math.PI) / 180;
-  const x = point.x - 450;
-  const y = point.y - 650;
-  return {
-    x: 450 + x * Math.cos(radians) - y * Math.sin(radians),
-    y: 650 + x * Math.sin(radians) + y * Math.cos(radians),
-  };
-}
-
-function getBallFlight(face?: DieFace, variation = 0): BallFlight | null {
-  if (!face) return null;
-  const flights: Partial<Record<DieFace, Omit<BallFlight, "rotation">>> = {
-    C: {
-      kind: "contact",
-      label: "컨택",
-      path: "M450 560 Q450 605 450 650",
-      target: { x: 450, y: 650 },
-    },
-    GF: {
-      kind: "ground",
-      label: "1루 땅볼",
-      path: "M450 650 Q495 605 540 560",
-      target: { x: 540, y: 560 },
-    },
-    G3: {
-      kind: "ground",
-      label: "3루 땅볼",
-      path: "M450 650 Q405 605 360 560",
-      target: { x: 360, y: 560 },
-    },
-    GA: {
-      kind: "ground",
-      label: "유격수 땅볼",
-      path: "M450 650 Q425 580 400 510",
-      target: { x: 400, y: 510 },
-    },
-    PO: {
-      kind: "fly",
-      label: "내야 뜬공",
-      path: "M450 650 Q398 515 445 490",
-      target: { x: 445, y: 490 },
-    },
-    FO: {
-      kind: "fly",
-      label: "외야 뜬공",
-      path: "M450 650 Q520 430 525 350",
-      target: { x: 525, y: 350 },
-    },
-    F2: {
-      kind: "fly",
-      label: "좌익수 뜬공",
-      path: "M450 650 Q320 430 230 330",
-      target: { x: 230, y: 330 },
-    },
-    F3: {
-      kind: "fly",
-      label: "중견수 뜬공",
-      path: "M450 650 Q450 420 450 250",
-      target: { x: 450, y: 250 },
-    },
-    FA: {
-      kind: "fly",
-      label: "우익수 뜬공",
-      path: "M450 650 Q580 430 670 330",
-      target: { x: 670, y: 330 },
-    },
-    HIT: {
-      kind: "line",
-      label: "안타 방향 판정",
-      path: "M450 650 Q450 440 450 320",
-      target: { x: 450, y: 320 },
-    },
-    HR: {
-      kind: "fly",
-      label: "HOME RUN",
-      path: "M450 650 Q530 350 490 60",
-      target: { x: 490, y: 60 },
-    },
-    IH: {
-      kind: "ground",
-      label: "내야 안타",
-      path: "M450 650 Q470 590 490 530",
-      target: { x: 490, y: 530 },
-    },
-    L1: {
-      kind: "line",
-      label: "좌전 안타",
-      path: "M450 650 Q345 485 270 390",
-      target: { x: 270, y: 390 },
-    },
-    L2: {
-      kind: "line",
-      label: "좌중간 안타",
-      path: "M450 650 Q350 400 300 275",
-      target: { x: 300, y: 275 },
-    },
-    C1: {
-      kind: "line",
-      label: "중전 안타",
-      path: "M450 650 Q450 470 450 370",
-      target: { x: 450, y: 370 },
-    },
-    C2: {
-      kind: "line",
-      label: "중견수 앞 안타",
-      path: "M450 650 Q450 410 450 290",
-      target: { x: 450, y: 290 },
-    },
-    R1: {
-      kind: "line",
-      label: "우전 안타",
-      path: "M450 650 Q555 485 630 390",
-      target: { x: 630, y: 390 },
-    },
-    R2: {
-      kind: "line",
-      label: "우중간 안타",
-      path: "M450 650 Q550 400 600 275",
-      target: { x: 600, y: 275 },
-    },
-    D2: {
-      kind: "fly",
-      label: "좌중간 2루타",
-      path: "M450 650 Q310 390 200 260",
-      target: { x: 200, y: 260 },
-    },
-    D3: {
-      kind: "fly",
-      label: "중앙 펜스 2루타",
-      path: "M450 650 Q450 340 450 180",
-      target: { x: 450, y: 180 },
-    },
-    T3: {
-      kind: "fly",
-      label: "우중간 3루타",
-      path: "M450 650 Q590 390 700 260",
-      target: { x: 700, y: 260 },
-    },
-  };
-  const flight = flights[face];
-  if (!flight) return null;
-  const maximumRotation =
-    flight.kind === "contact"
-      ? 0
-      : flight.kind === "fly"
-        ? 8
-        : flight.kind === "line"
-          ? 6
-          : 5;
-  return {
-    ...flight,
-    rotation: Math.max(-1, Math.min(1, variation)) * maximumRotation,
-  };
-}
-
-function SvgBaseMarker({
-  base,
-  label,
-  occupied,
-  x,
-  y,
-}: {
-  base: "first" | "second" | "third";
-  label: string;
-  occupied: boolean;
-  x: number;
-  y: number;
-}) {
-  return (
-    <g
-      aria-hidden="true"
-      className={`bbg-field-base bbg-field-base--${base}`}
-      data-occupied={occupied}
-      key={`${base}-${occupied}`}
-      transform={`translate(${x} ${y})`}
-    >
-      <rect
-        height="18"
-        rx="2"
-        transform="rotate(45)"
-        width="18"
-        x="-9"
-        y="-9"
-      />
-      {occupied ? <circle className="bbg-runner-dot" cy="-1" r="5" /> : null}
-      <text dy="27" textAnchor="middle">
-        {label}
-      </text>
-    </g>
-  );
 }
 
 function PlayResult({

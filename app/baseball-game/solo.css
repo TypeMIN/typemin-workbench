@@ -1,0 +1,116 @@
+/* AI game screen in the same night-broadcast skin as the multiplayer room.
+   The older stylesheet reads these tokens, so remapping them carries most of
+   the change; the rest are the few places that hard-coded the old mint. */
+
+.bbg-solo-shell {
+  --bbg-navy: var(--room-bg);
+  --bbg-panel: var(--room-panel);
+  --bbg-panel-soft: var(--room-raised);
+  --bbg-line: var(--room-line-strong);
+  --bbg-text: var(--room-text);
+  --bbg-muted: var(--room-muted);
+  --bbg-mint: var(--room-accent);
+  --bbg-yellow: var(--room-accent);
+  --bbg-red: var(--room-out);
+  color: var(--room-text);
+  background: var(--room-bg);
+}
+
+.bbg-solo-shell .bbg-topbar {
+  border-bottom: 1px solid var(--room-line);
+  background: rgb(9 12 17 / 92%);
+}
+
+.bbg-solo-shell .bbg-brand-mark {
+  border: 1px solid var(--room-accent);
+  border-radius: var(--room-radius-sm);
+  color: var(--room-accent);
+  background: transparent;
+}
+
+.bbg-solo-shell .bbg-mode-badge {
+  border-radius: var(--room-radius-sm);
+  color: var(--room-text);
+}
+
+.bbg-solo-shell .bbg-game-console {
+  border-color: var(--room-line);
+  border-radius: var(--room-radius);
+  background: var(--room-panel);
+}
+
+.bbg-solo-shell .bbg-broadcast-field {
+  background: #060a10;
+}
+
+.bbg-solo-shell .bbg-broadcast-stage {
+  background-image: none;
+}
+
+.bbg-solo-shell .bbg-control-panel {
+  border-left: 1px solid var(--room-line);
+  background: var(--room-bg);
+  background-image: none;
+}
+
+.bbg-solo-shell .bbg-card-hand,
+.bbg-solo-shell .bbg-utility-card {
+  border-color: var(--room-line);
+  border-radius: var(--room-radius);
+  background: var(--room-panel);
+}
+
+.bbg-solo-shell .bbg-card-preview {
+  border-color: var(--room-line);
+  border-radius: var(--room-radius-sm);
+  background: var(--room-raised);
+}
+
+.bbg-solo-shell .bbg-scoreboard,
+.bbg-solo-shell .bbg-play-result {
+  border: 1px solid var(--room-line-strong);
+  border-radius: var(--room-radius-sm);
+  background: rgb(8 11 16 / 92%);
+}
+
+/* Duel dock: the room's colors, so strike and ball read the same everywhere. */
+
+.bbg-solo-shell .bbg-choice-dock .bbg-duel {
+  border-color: var(--room-line-strong);
+  border-radius: var(--room-radius);
+  background: rgb(8 11 16 / 94%);
+  box-shadow: 0 10px 30px rgb(0 0 0 / 45%);
+}
+
+.bbg-solo-shell .bbg-choice-dock .bbg-pitch-choice,
+.bbg-solo-shell .bbg-choice-dock .bbg-pitch-choice.is-ball,
+.bbg-solo-shell .bbg-choice-dock .bbg-swing-actions button {
+  border: 1px solid var(--room-line-strong);
+  border-radius: var(--room-radius-sm);
+  color: var(--room-text);
+  background: var(--room-raised);
+  box-shadow: none;
+}
+
+.bbg-solo-shell .bbg-choice-dock .bbg-pitch-choice:hover:not(:disabled),
+.bbg-solo-shell .bbg-choice-dock .bbg-swing-actions button:hover:not(:disabled),
+.bbg-solo-shell .bbg-choice-dock .bbg-pitch-choice:focus-visible,
+.bbg-solo-shell .bbg-choice-dock .bbg-swing-actions button:focus-visible {
+  border-color: var(--room-accent);
+  background: #1d2430;
+}
+
+.bbg-solo-shell .bbg-choice-dock .bbg-pitch-choice > i,
+.bbg-solo-shell .bbg-choice-dock .bbg-swing-actions button > i {
+  width: 10px;
+  height: 10px;
+  border: 0;
+  border-radius: 50%;
+  background: var(--room-strike);
+  box-shadow: none;
+}
+
+.bbg-solo-shell .bbg-choice-dock .bbg-pitch-choice.is-ball > i,
+.bbg-solo-shell .bbg-choice-dock .bbg-swing-actions .is-take > i {
+  background: var(--room-ball);
+}

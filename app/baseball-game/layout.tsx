@@ -3,6 +3,8 @@ import type { Metadata } from "next";
 import "./styles.css";
 import "./room.css";
 import "./party-tv.css";
+import "./field.css";
+import "./solo.css";
 
 export const metadata: Metadata = {
   title: { absolute: "야구 게임" },
