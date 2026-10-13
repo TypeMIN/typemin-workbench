@@ -338,7 +338,8 @@ export type GameEvent = {
 
 export type GameState = {
   schemaVersion: 7;
-  rulesetVersion: "pitch-duel-v3";
+  /** v4 lets the batter lock a decision before the pitcher; v3 is sequential. */
+  rulesetVersion: "pitch-duel-v3" | "pitch-duel-v4";
   presentationVersion: "rts-scenes-v1";
   revision: number;
   config: GameConfig;
@@ -362,6 +363,8 @@ export type GameState = {
   pendingResolution: PendingResolution | null;
   activeStrategy: ActiveStrategy;
   pitchDuel: PitchDuelState | null;
+  /** v4 only: the batter's secret decision made before the pitch is locked. */
+  earlySwing?: SwingDecision | null;
   eventLog: GameEvent[];
 };
 
@@ -370,7 +373,8 @@ export type RuleErrorCode =
   | "WRONG_PHASE"
   | "INVALID_FACE"
   | "CARD_NOT_IN_HAND"
-  | "CARD_NOT_PLAYABLE";
+  | "CARD_NOT_PLAYABLE"
+  | "ALREADY_LOCKED";
 
 export type GameViewer = "public" | TeamSide | "debug";
 
@@ -382,9 +386,14 @@ export type CardZoneView = {
   hand: CardInstance[] | null;
 };
 
-export type GameView = Omit<GameState, "cards" | "rng" | "pitchDuel"> & {
+export type GameView = Omit<
+  GameState,
+  "cards" | "rng" | "pitchDuel" | "earlySwing"
+> & {
   cards: Record<CardRole, CardZoneView>;
   pitchDuel: PitchDuelView | null;
+  /** Whether the batter has already locked a decision for this pitch. */
+  batterLocked: boolean;
 };
 
 export type RuleError = {

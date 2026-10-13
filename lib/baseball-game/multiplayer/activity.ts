@@ -15,12 +15,42 @@ export type OpponentActivity = {
   detail: string | null;
 };
 
+type ActivityView = Pick<
+  GameView,
+  "phase" | "battingTeam" | "cardWindow" | "rulesetVersion" | "activeStrategy"
+> & { batterLocked?: boolean };
+
+/** View-side mirror of the engine's pending owners, from public fields only. */
+export function getPendingTeams(view: ActivityView): TeamSide[] {
+  const fielding: TeamSide = view.battingTeam === "away" ? "home" : "away";
+  if (view.phase === "finished") return [];
+  if (view.phase === "awaiting_card" && view.cardWindow) {
+    const role = view.cardWindow.priorityOrder[view.cardWindow.priorityIndex];
+    return [role === "offense" ? view.battingTeam : fielding];
+  }
+  if (view.phase === "awaiting_pitch") {
+    const earlySwing =
+      view.rulesetVersion === "pitch-duel-v4" &&
+      view.activeStrategy?.cardId !== "HNR" &&
+      !view.batterLocked;
+    return earlySwing ? [fielding, view.battingTeam] : [fielding];
+  }
+  return [view.battingTeam];
+}
+
+export function hasLockedDuelChoice(view: ActivityView, team: TeamSide) {
+  if (team === view.battingTeam) {
+    return view.phase === "awaiting_pitch" && Boolean(view.batterLocked);
+  }
+  return view.phase === "awaiting_swing";
+}
+
 export function describeOpponentActivity(
-  view: Pick<GameView, "phase" | "battingTeam" | "cardWindow">,
+  view: ActivityView,
   opponent: TeamSide,
-  actionOwner: TeamSide | null,
   status: OpponentStatus,
 ): OpponentActivity {
+  const opponentPending = getPendingTeams(view).includes(opponent);
   if (status.presence === "absent") {
     return { tone: "idle", title: "상대 팀 참가 대기 중", detail: null };
   }
@@ -33,17 +63,26 @@ export function describeOpponentActivity(
   }
   const awayDetail =
     status.presence === "away" ? "상대가 경기 화면을 벗어나 있습니다." : null;
-  if (actionOwner !== opponent || view.phase === "finished") {
+  if (!opponentPending || view.phase === "finished") {
     return {
       tone: status.presence === "away" ? "away" : "idle",
-      title: "상대 대기 중",
+      title: hasLockedDuelChoice(view, opponent)
+        ? "상대 선택 완료"
+        : "상대 대기 중",
       detail: awayDetail,
     };
   }
   const opponentBats = view.battingTeam === opponent;
   const tone = status.presence === "away" ? "away" : "thinking";
-  if (view.phase === "awaiting_pitch") {
+  if (view.phase === "awaiting_pitch" && !opponentBats) {
     return { tone, title: "상대 투수가 사인을 고르는 중", detail: awayDetail };
+  }
+  if (view.phase === "awaiting_pitch") {
+    return {
+      tone,
+      title: "상대 타자가 노림수를 정하는 중",
+      detail: awayDetail,
+    };
   }
   if (view.phase === "awaiting_swing") {
     return {

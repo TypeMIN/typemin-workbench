@@ -287,11 +287,11 @@ export function getBaseballPlayReceipt(
   const lastCardIndex = events.findLastIndex(
     (event) => event.kind === "card_play",
   );
-  if (commitIndex < 0 && lastCardIndex < 0) return null;
-
   const resultIndex = events.findLastIndex(
     (event) => event.kind === "pitch_result",
   );
+  // v4 has no lock event, so a revealed pitch alone also starts a receipt.
+  if (commitIndex < 0 && lastCardIndex < 0 && resultIndex < 0) return null;
   const hasPendingPitch = commitIndex > resultIndex;
   const hasNewPrePitchCard =
     game.cardWindow?.timing === "before_pitch" &&

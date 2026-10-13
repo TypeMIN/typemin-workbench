@@ -193,7 +193,8 @@ describe("scene audio context", () => {
         (item) => getBeatSounds(item, context, "away").sfx,
       );
     });
-    expect(sounds).toContain("lock");
+    // v4 has no separate lock scene; the pitch scene starts with the flight.
+    expect(sounds).not.toContain("lock");
     expect(sounds).toContain("pitch");
   });
 });

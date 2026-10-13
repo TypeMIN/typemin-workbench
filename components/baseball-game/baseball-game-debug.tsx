@@ -17,7 +17,11 @@ import {
   BroadcastLineScore,
   usePresentation,
 } from "@/components/baseball-game/baseball-broadcast";
-import { BaseballDuelControl } from "@/components/baseball-game/baseball-duel-control";
+import {
+  BaseballDuelControl,
+  pendingDuelChoice,
+  type DuelRole,
+} from "@/components/baseball-game/baseball-duel-control";
 import { useStagedView } from "@/components/baseball-game/use-staged-view";
 import { BaseballCardFace } from "@/components/baseball-game/baseball-card-face";
 import { chooseAiAction } from "@/lib/baseball-game/ai";
@@ -27,6 +31,7 @@ import {
   getActionOwner,
   getGameView,
   getLegalCards,
+  getPendingOwners,
   transition,
 } from "@/lib/baseball-game/engine";
 import {
@@ -131,8 +136,15 @@ export default function BaseballGameDebug({
     : null;
   const modalOpen = Boolean(interludeKind);
   const isAiTurn = Boolean(
-    aiTeam && actionOwner === aiTeam && game.phase !== "finished",
+    aiTeam &&
+    getPendingOwners(game).includes(aiTeam) &&
+    game.phase !== "finished",
   );
+  const humanRole: DuelRole =
+    session.humanTeam === game.battingTeam ? "batter" : "pitcher";
+  const humanChoice = getPendingOwners(game).includes(session.humanTeam)
+    ? pendingDuelChoice(playerView, humanRole)
+    : null;
   const cardViewer =
     session.mode === "solo_ai" ? session.humanTeam : actionOwner;
 
@@ -155,10 +167,13 @@ export default function BaseballGameDebug({
         }
         setError(null);
         setGame(result.state);
+        // A duel pick stays secret and results belong to the scene.
+        const secret =
+          action.type === "SELECT_PITCH" || action.type === "SELECT_SWING";
         showActionFeedback({
           status: "success",
-          title: `${teamNameFor(game, aiTeam)}이 ${gameActionLabel(action, game)}`,
-          detail: result.events.at(-1)?.summary,
+          title: `${teamNameFor(game, aiTeam)}이 ${secret ? "선택을 마쳤습니다" : gameActionLabel(action, game)}`,
+          detail: "결과는 경기장에서 확인하세요.",
         });
       },
       Math.max(AI_TURN_DELAY_MS, currentPresentationDuration + 180),
@@ -323,15 +338,12 @@ export default function BaseballGameDebug({
                   onPresentationChange={setPresentationActive}
                   onPresentedRevision={staged.onPresentedRevision}
                 />
-                {!presentationActive &&
-                staged.settled &&
-                !isAiTurn &&
-                (game.phase === "awaiting_pitch" ||
-                  game.phase === "awaiting_swing") ? (
+                {!presentationActive && staged.settled && humanChoice ? (
                   <div className="bbg-choice-dock">
                     <BaseballDuelControl
                       game={playerView}
                       onAction={dispatchAction}
+                      role={humanRole}
                     />
                   </div>
                 ) : null}
@@ -365,7 +377,7 @@ export default function BaseballGameDebug({
                   {display.score.away} : {display.score.home} 승리
                 </p>
               </div>
-            ) : isAiTurn && aiTeam ? (
+            ) : isAiTurn && aiTeam && !humanChoice ? (
               <AiTurnIndicator game={display} team={aiTeam} />
             ) : staged.settled && game.phase === "awaiting_card" ? (
               <CardDecision

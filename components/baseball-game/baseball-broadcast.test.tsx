@@ -171,7 +171,8 @@ describe("broadcast UI", () => {
       type: "choice",
       actor: "batter",
     });
-    act(() => vi.advanceTimersByTime(1_000));
+    // Shorter than the revealed batter beat (850ms), so it is still showing.
+    act(() => vi.advanceTimersByTime(600));
     expect(result.current.cue).toMatchObject({
       type: "choice",
       actor: "batter",

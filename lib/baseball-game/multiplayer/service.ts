@@ -4,13 +4,16 @@ import { createHash, randomInt } from "node:crypto";
 
 import {
   createGame,
+  getActionActor,
   getActionOwner,
   getGameView,
   getLegalCards,
+  getPendingOwners,
   transition,
 } from "../engine";
 import type { GameConfig, TeamSide } from "../types";
 import { commandToGameAction } from "./command";
+import { canRebaseDuelLock, isDuelLock } from "./duel-lock";
 import {
   getOpponentStatus,
   getSeatPresence,
@@ -41,6 +44,8 @@ import {
   TIMEOUT_EXTENSION_MS,
   buildShotClockView,
   canClaimForfeit,
+  carriedDeadline,
+  continuesDuel,
   chooseTimeoutAction,
   getClockWindow,
   createClockState,
@@ -270,6 +275,10 @@ export async function claimMultiplayerForfeit(
   );
 }
 
+// A duel lock that raced the opponent's lock is replayed on the fresh state;
+// a couple of retries covers both devices submitting in the same instant.
+const MAX_DUEL_REBASE_ATTEMPTS = 3;
+
 export async function submitMultiplayerCommand(
   roomCode: string,
   seatToken: string | null,
@@ -282,94 +291,117 @@ export async function submitMultiplayerCommand(
 ): Promise<MultiplayerRoomSnapshot> {
   const storedRoom = await requireRoom(roomCode, storage);
   const seatContext = await requireSeatContext(storedRoom, seatToken, storage);
-  const room = await settleExpiredDecision(storedRoom, seatContext, storage);
+  let room = await settleExpiredDecision(storedRoom, seatContext, storage);
   const seat = seatContext.seat;
-  if (room.status !== "playing") {
-    throw new MultiplayerServiceError(
-      "ROOM_UNAVAILABLE",
-      room.status === "lobby"
-        ? "상대 팀이 참가할 때까지 기다려 주세요."
-        : "진행 중인 경기가 아닙니다.",
-    );
-  }
-  if (room.revision !== input.expectedRevision) {
-    const duplicateRevision = await storage.getIdempotencyRevision(
-      room.id,
-      input.idempotencyKey,
-    );
-    if (duplicateRevision !== null) {
-      return buildSnapshot(room, seatContext);
+
+  for (let attempt = 0; ; attempt += 1) {
+    if (room.status !== "playing") {
+      throw new MultiplayerServiceError(
+        "ROOM_UNAVAILABLE",
+        room.status === "lobby"
+          ? "상대 팀이 참가할 때까지 기다려 주세요."
+          : "진행 중인 경기가 아닙니다.",
+      );
     }
-    throw new MultiplayerServiceError(
-      "REVISION_CONFLICT",
-      "다른 기기에서 경기가 먼저 진행되었습니다.",
-    );
-  }
-  if (getActionOwner(room.state) !== seat) {
-    throw new MultiplayerServiceError(
-      "NOT_YOUR_TURN",
-      "상대 팀의 결정 차례입니다.",
-    );
-  }
+    if (room.revision !== input.expectedRevision) {
+      const duplicateRevision = await storage.getIdempotencyRevision(
+        room.id,
+        input.idempotencyKey,
+      );
+      if (duplicateRevision !== null) {
+        return buildSnapshot(room, seatContext);
+      }
+      if (!canRebaseDuelLock(room.state, input)) {
+        throw new MultiplayerServiceError(
+          "REVISION_CONFLICT",
+          "다른 기기에서 경기가 먼저 진행되었습니다.",
+        );
+      }
+    }
 
-  const action = commandToGameAction(room.state, input.command);
-  if (!action) {
-    throw new MultiplayerServiceError(
-      "INVALID_ACTION",
-      "현재 단계에서는 이 결정을 내릴 수 없습니다.",
-    );
-  }
-  const result = transition(room.state, action);
-  if (!result.ok) {
-    throw new MultiplayerServiceError("INVALID_ACTION", result.error.message);
-  }
+    const action = commandToGameAction(room.state, input.command);
+    if (!action) {
+      throw new MultiplayerServiceError(
+        "INVALID_ACTION",
+        "현재 단계에서는 이 결정을 내릴 수 없습니다.",
+      );
+    }
+    if (
+      getActionActor(room.state, action) !== seat ||
+      !getPendingOwners(room.state).includes(seat)
+    ) {
+      throw new MultiplayerServiceError(
+        "NOT_YOUR_TURN",
+        "상대 팀의 결정 차례입니다.",
+      );
+    }
+    const result = transition(room.state, action);
+    if (!result.ok) {
+      throw new MultiplayerServiceError("INVALID_ACTION", result.error.message);
+    }
 
-  const clock = nextClockAfterCommit(
-    resolveClockState(room.clock, room.revision),
-    { actor: seat, newRevision: result.state.revision, timedOut: false },
-  );
-  let commit;
-  try {
-    commit = await storage.commitAction({
-      roomId: room.id,
-      expectedRevision: input.expectedRevision,
-      newState: result.state,
-      actorTeam: seat,
-      action,
-      events: result.events,
-      idempotencyKey: input.idempotencyKey,
-      clock,
+    const previousClock = resolveClockState(room.clock, room.revision);
+    const window = getClockWindow(
+      room.state,
+      room.revisionStartedAt,
+      previousClock,
+    );
+    const clock = nextClockAfterCommit(previousClock, {
+      actor: seat,
+      newRevision: result.state.revision,
+      timedOut: false,
+      carryDeadlineAt:
+        window && continuesDuel(room.state, result.state)
+          ? carriedDeadline(window.deadlineAt, Date.now(), false)
+          : null,
     });
-  } catch {
-    throw new MultiplayerServiceError(
-      "STORAGE_ERROR",
-      "경기 진행을 저장하지 못했습니다.",
-    );
-  }
-  if (commit.status === "conflict") {
-    throw new MultiplayerServiceError(
-      "REVISION_CONFLICT",
-      "다른 기기에서 경기가 먼저 진행되었습니다.",
-    );
-  }
-  if (commit.status === "invalid") {
-    throw new MultiplayerServiceError(
-      "INVALID_ACTION",
-      "저장할 수 없는 경기 행동입니다.",
-    );
-  }
+    let commit;
+    try {
+      commit = await storage.commitAction({
+        roomId: room.id,
+        expectedRevision: room.revision,
+        newState: result.state,
+        actorTeam: seat,
+        action,
+        events: result.events,
+        idempotencyKey: input.idempotencyKey,
+        clock,
+      });
+    } catch {
+      throw new MultiplayerServiceError(
+        "STORAGE_ERROR",
+        "경기 진행을 저장하지 못했습니다.",
+      );
+    }
+    if (commit.status === "conflict") {
+      if (attempt + 1 < MAX_DUEL_REBASE_ATTEMPTS && isDuelLock(input.command)) {
+        room = await reloadRoom(room, storage);
+        continue;
+      }
+      throw new MultiplayerServiceError(
+        "REVISION_CONFLICT",
+        "다른 기기에서 경기가 먼저 진행되었습니다.",
+      );
+    }
+    if (commit.status === "invalid") {
+      throw new MultiplayerServiceError(
+        "INVALID_ACTION",
+        "저장할 수 없는 경기 행동입니다.",
+      );
+    }
 
-  return buildSnapshot(
-    {
-      ...room,
-      status: result.state.phase === "finished" ? "finished" : "playing",
-      state: result.state,
-      revision: result.state.revision,
-      revisionStartedAt: new Date().toISOString(),
-      clock,
-    },
-    seatContext,
-  );
+    return buildSnapshot(
+      {
+        ...room,
+        status: result.state.phase === "finished" ? "finished" : "playing",
+        state: result.state,
+        revision: result.state.revision,
+        revisionStartedAt: new Date().toISOString(),
+        clock,
+      },
+      seatContext,
+    );
+  }
 }
 
 export async function sendMultiplayerReaction(
@@ -588,6 +620,9 @@ async function settleExpiredDecision(
         actor: window.owner,
         newRevision: result.state.revision,
         timedOut: true,
+        carryDeadlineAt: continuesDuel(room.state, result.state)
+          ? carriedDeadline(window.deadlineAt, now, true)
+          : null,
       }),
     });
     return await reloadRoom(room, storage);
@@ -677,7 +712,7 @@ function buildSnapshot(
   const clock = resolveClockState(room.clock, room.revision);
   const playing = room.status === "playing" && !clock.forfeitedBy;
   const actionOwner = getActionOwner(room.state);
-  const isYourTurn = playing && actionOwner === seat;
+  const isYourTurn = playing && getPendingOwners(room.state).includes(seat);
   return {
     roomCode: room.roomCode,
     status: room.status,

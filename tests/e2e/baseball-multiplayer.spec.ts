@@ -82,9 +82,11 @@ test("두 기기가 방을 만들고 비공개 손패로 같은 경기를 진행
   await expect(home.locator(".bbg-card-timing")).toHaveCount(4);
   await expect(home.locator(".bbg-card-effect").first()).toBeVisible();
   await expect(home.getByRole("region", { name: "투구 선택" })).toBeVisible();
-  await expect(host.getByText("상대 투수가 사인을 고르는 중")).toBeVisible({
+  // v4: the batter decides at the same time as the pitcher.
+  await expect(host.getByRole("region", { name: "타격 선택" })).toBeVisible({
     timeout: 4_000,
   });
+  await expect(host.getByText("스윙할지 정하세요")).toBeVisible();
 
   const privateViews = await Promise.all([
     host.evaluate(async (code) => {
@@ -118,8 +120,9 @@ test("두 기기가 방을 만들고 비공개 손패로 같은 경기를 진행
     };
     return { keys, results: await Promise.all(keys.map(send)) };
   }, roomCode);
+  // The second lock replays on the fresh state and finds the pitch taken.
   expect(race.results.map((result) => result.status).sort()).toEqual([
-    200, 409,
+    200, 403,
   ]);
   const appliedIndex = race.results.findIndex(
     (result) => result.status === 200,
@@ -154,9 +157,7 @@ test("두 기기가 방을 만들고 비공개 손패로 같은 경기를 진행
     })
     .toBe(1);
   expect(Date.now() - syncStartedAt).toBeLessThan(1_800);
-  await expect(host.getByLabel("현재 승부 진행 기록")).toContainText(
-    "투수선택 완료타자판단 중카드대기판정대기",
-  );
+  await expect(host.getByText(/상대는 이미 골랐습니다/)).toBeVisible();
 
   const lockedViews = await Promise.all([
     host.evaluate(
@@ -256,10 +257,10 @@ test("상대 기기의 응원과 접속 상태가 실시간으로 보인다", as
   await home.getByRole("button", { name: "홈팀으로 참가" }).click();
   await expect(home.getByRole("region", { name: "투구 선택" })).toBeVisible();
 
-  await expect(host.getByText("상대 투수가 사인을 고르는 중")).toBeVisible();
+  await expect(host.getByText("스윙할지 정하세요")).toBeVisible();
   await expect(host.getByText(/접속 중/)).toBeVisible();
   await expect(
-    host.getByRole("timer", { name: /상대 결정 남은 시간/ }),
+    host.getByRole("timer", { name: /내 결정 남은 시간/ }),
   ).toBeVisible();
 
   await home.getByRole("button", { name: "한 번 더 와봐" }).click();

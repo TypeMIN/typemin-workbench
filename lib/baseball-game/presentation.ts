@@ -560,6 +560,15 @@ function createPresentationBeat(
 }
 
 function presentationCueTiming(cue: PresentationCue) {
+  // Revealed duel picks only confirm what both sides chose; cards and the
+  // concealed v3 lock keep the longer read.
+  if (
+    cue.type === "choice" &&
+    !cue.concealed &&
+    (cue.actor === "pitcher" || cue.actor === "batter")
+  ) {
+    return { durationMs: 400, holdMs: 450 };
+  }
   if (cue.type === "choice") return { durationMs: 500, holdMs: 750 };
   if (cue.type === "pitch") return { durationMs: 700, holdMs: 150 };
   if (cue.type === "call") return { durationMs: 400, holdMs: 950 };

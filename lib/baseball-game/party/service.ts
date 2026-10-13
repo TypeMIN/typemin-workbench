@@ -4,12 +4,15 @@ import { randomInt } from "node:crypto";
 
 import {
   createGame,
+  getActionActor,
   getActionOwner,
   getGameView,
   getLegalCards,
+  getPendingOwners,
   transition,
 } from "../engine";
 import { commandToGameAction } from "../multiplayer/command";
+import { canRebaseDuelLock, isDuelLock } from "../multiplayer/duel-lock";
 import { newRoomCode, normalizeRoomCode } from "../multiplayer/security";
 import type { GameConfig, TeamSide } from "../types";
 import { newPartyToken, partyTokenHash } from "./security";
@@ -158,12 +161,13 @@ export async function getPartyPlayerSnapshot(
   const player = await requirePlayer(room, playerToken, storage);
   const players = activePlayers(await storage.listPlayers(room.id));
   const publicSnapshot = buildPublicSnapshot(room, players, false);
-  const activePlayerId = activePlayerForOwner(room, players);
   const actionOwner = getActionOwner(room.state);
   return {
     ...publicSnapshot,
     me: toPublicPlayer(player),
-    canAct: room.status === "playing" && activePlayerId === player.id,
+    canAct:
+      room.status === "playing" &&
+      pendingPlayerIds(room, players).includes(player.id),
     legalCards:
       actionOwner === player.team && room.state.phase === "awaiting_card"
         ? getLegalCards(room.state)
@@ -224,79 +228,96 @@ export async function submitPartyHostCommand(
   return getPartyPublicSnapshot(room.roomCode, hostToken, storage);
 }
 
+// Both duel players can submit against the same revision; the later one is
+// replayed on the fresh state instead of bouncing back with a conflict.
+const MAX_DUEL_REBASE_ATTEMPTS = 3;
+
 export async function submitPartyAction(
   roomCode: string,
   playerToken: string | null,
   input: PartyActionInput,
   storage: PartyStorage = getPartyStorage(),
 ) {
-  const room = await requireRoom(roomCode, storage);
+  let room = await requireRoom(roomCode, storage);
   const player = await requirePlayer(room, playerToken, storage);
   const duplicate = await storage.getIdempotency(room.id, input.idempotencyKey);
   if (duplicate) {
     return getPartyPlayerSnapshot(room.roomCode, playerToken, storage);
   }
-  if (room.status !== "playing") {
-    throw new PartyServiceError(
-      "ROOM_UNAVAILABLE",
-      room.status === "paused"
-        ? "방장이 경기를 일시정지했습니다."
-        : "진행 중인 경기가 아닙니다.",
+  for (let attempt = 0; ; attempt += 1) {
+    if (room.status !== "playing") {
+      throw new PartyServiceError(
+        "ROOM_UNAVAILABLE",
+        room.status === "paused"
+          ? "방장이 경기를 일시정지했습니다."
+          : "진행 중인 경기가 아닙니다.",
+      );
+    }
+    if (
+      room.roomRevision !== input.expectedRoomRevision ||
+      (room.revision !== input.expectedRevision &&
+        !canRebaseDuelLock(room.state, input))
+    ) {
+      throw revisionConflict();
+    }
+    const players = activePlayers(await storage.listPlayers(room.id));
+    const action = commandToGameAction(room.state, input.command);
+    if (!action) {
+      throw new PartyServiceError(
+        "INVALID_ACTION",
+        "현재 단계에서 실행할 수 없는 행동입니다.",
+      );
+    }
+    const actorTeam = getActionActor(room.state, action);
+    if (
+      actorTeam !== player.team ||
+      !pendingPlayerIds(room, players).includes(player.id)
+    ) {
+      throw new PartyServiceError(
+        "NOT_ACTIVE_PLAYER",
+        "현재 활성 선수만 행동할 수 있습니다.",
+      );
+    }
+    const result = transition(room.state, action);
+    if (!result.ok)
+      throw new PartyServiceError("INVALID_ACTION", result.error.message);
+    const nextPartyState = rotatePartyStateAfterTransition(
+      room,
+      result.state,
+      result.events,
     );
+    let commit;
+    try {
+      commit = await storage.commitAction({
+        roomId: room.id,
+        expectedRevision: room.revision,
+        expectedRoomRevision: room.roomRevision,
+        newState: result.state,
+        newPartyState: nextPartyState,
+        actorTeam: player.team,
+        actorPlayerId: player.id,
+        action,
+        events: result.events,
+        idempotencyKey: input.idempotencyKey,
+      });
+    } catch {
+      throw storageError("경기 행동을 저장하지 못했습니다.");
+    }
+    if (commit.status === "conflict") {
+      if (attempt + 1 < MAX_DUEL_REBASE_ATTEMPTS && isDuelLock(input.command)) {
+        room = await requireRoom(roomCode, storage);
+        continue;
+      }
+      throw revisionConflict();
+    }
+    if (commit.status === "invalid") {
+      throw new PartyServiceError(
+        "INVALID_ACTION",
+        "저장할 수 없는 경기 행동입니다.",
+      );
+    }
+    return getPartyPlayerSnapshot(room.roomCode, playerToken, storage);
   }
-  if (
-    room.revision !== input.expectedRevision ||
-    room.roomRevision !== input.expectedRoomRevision
-  ) {
-    throw revisionConflict();
-  }
-  const players = activePlayers(await storage.listPlayers(room.id));
-  if (activePlayerForOwner(room, players) !== player.id) {
-    throw new PartyServiceError(
-      "NOT_ACTIVE_PLAYER",
-      "현재 활성 선수만 행동할 수 있습니다.",
-    );
-  }
-  const action = commandToGameAction(room.state, input.command);
-  if (!action) {
-    throw new PartyServiceError(
-      "INVALID_ACTION",
-      "현재 단계에서 실행할 수 없는 행동입니다.",
-    );
-  }
-  const result = transition(room.state, action);
-  if (!result.ok)
-    throw new PartyServiceError("INVALID_ACTION", result.error.message);
-  const nextPartyState = rotatePartyStateAfterTransition(
-    room,
-    result.state,
-    result.events,
-  );
-  let commit;
-  try {
-    commit = await storage.commitAction({
-      roomId: room.id,
-      expectedRevision: input.expectedRevision,
-      expectedRoomRevision: input.expectedRoomRevision,
-      newState: result.state,
-      newPartyState: nextPartyState,
-      actorTeam: player.team,
-      actorPlayerId: player.id,
-      action,
-      events: result.events,
-      idempotencyKey: input.idempotencyKey,
-    });
-  } catch {
-    throw storageError("경기 행동을 저장하지 못했습니다.");
-  }
-  if (commit.status === "conflict") throw revisionConflict();
-  if (commit.status === "invalid") {
-    throw new PartyServiceError(
-      "INVALID_ACTION",
-      "저장할 수 없는 경기 행동입니다.",
-    );
-  }
-  return getPartyPlayerSnapshot(room.roomCode, playerToken, storage);
 }
 
 function applyHostCommand(
@@ -511,23 +532,29 @@ function buildPublicSnapshot(
   };
 }
 
-function activePlayerForOwner(
+function activePlayerForTeam(
   room: PartyRoomRecord,
   players: PartyStoredPlayer[],
+  team: TeamSide,
 ) {
-  const owner = getActionOwner(room.state);
-  if (!owner) return null;
   const id =
-    owner === room.state.battingTeam
+    team === room.state.battingTeam
       ? activeId(
-          room.partyState.lineups[owner],
-          room.partyState.battingIndex[owner],
+          room.partyState.lineups[team],
+          room.partyState.battingIndex[team],
         )
       : activeId(
-          room.partyState.lineups[owner],
-          room.partyState.defenseIndex[owner],
+          room.partyState.lineups[team],
+          room.partyState.defenseIndex[team],
         );
   return players.some((player) => player.id === id) ? id : null;
+}
+
+/** Players who still owe a decision; a v4 duel has the batter and pitcher. */
+function pendingPlayerIds(room: PartyRoomRecord, players: PartyStoredPlayer[]) {
+  return getPendingOwners(room.state)
+    .map((team) => activePlayerForTeam(room, players, team))
+    .filter((id): id is string => id !== null);
 }
 
 function activeId(lineup: string[], index: number) {

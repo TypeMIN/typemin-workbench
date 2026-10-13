@@ -20,6 +20,7 @@ import {
 import {
   DECISION_LIMIT_MS,
   FORFEIT_AFTER_CONSECUTIVE_TIMEOUTS,
+  MIN_DECISION_AFTER_LOCK_MS,
   PRESENTATION_SYNC_BUFFER_MS,
   RECONNECT_GRACE_MS,
   TIMEOUT_EXTENSION_MS,
@@ -253,7 +254,8 @@ describe("baseball multiplayer service", () => {
     expect(home.view.cards.defense.hand).toHaveLength(4);
     expect(away.view).not.toHaveProperty("rng");
     expect(home.view).not.toHaveProperty("rng");
-    expect(away.isYourTurn).toBe(false);
+    // v4: the batter may lock a decision while the pitcher is choosing.
+    expect(away.isYourTurn).toBe(true);
     expect(home.isYourTurn).toBe(true);
   });
 
@@ -328,7 +330,7 @@ describe("baseball multiplayer service", () => {
         storage,
       ),
     ).rejects.toMatchObject({
-      code: "REVISION_CONFLICT",
+      code: "NOT_YOUR_TURN",
     });
   });
 
@@ -427,7 +429,7 @@ describe("baseball multiplayer service", () => {
         },
         storage,
       ),
-    ).rejects.toMatchObject({ code: "REVISION_CONFLICT" });
+    ).rejects.toMatchObject({ code: "NOT_YOUR_TURN" });
     expect(storage.commits).toHaveLength(1);
   });
 
@@ -570,5 +572,112 @@ describe("baseball multiplayer service", () => {
       { name: "홈", wins: 1 },
       { name: "원정", wins: 0 },
     ]);
+  });
+
+  it("accepts both duel locks sent against the same revision", async () => {
+    const storage = new TestStorage();
+    markOnline(storage, "home");
+    markOnline(storage, "away");
+    const [swing, pitch] = await Promise.all([
+      submitMultiplayerCommand(
+        "ABC234",
+        AWAY_TOKEN,
+        {
+          command: { type: "SELECT_SWING", decision: "swing" },
+          expectedRevision: 0,
+          idempotencyKey: randomUUID(),
+        },
+        storage,
+      ),
+      submitMultiplayerCommand(
+        "ABC234",
+        HOME_TOKEN,
+        {
+          command: { type: "SELECT_PITCH", target: "strike" },
+          expectedRevision: 0,
+          idempotencyKey: randomUUID(),
+        },
+        storage,
+      ),
+    ]);
+    expect(Math.max(swing.view.revision, pitch.view.revision)).toBe(2);
+    expect(storage.commits).toHaveLength(2);
+    expect(
+      storage.room.state.eventLog.some(
+        (event) => event.kind === "pitch_result",
+      ),
+    ).toBe(true);
+  });
+
+  it("refuses a stale lock once the pitch has already been played", async () => {
+    const storage = new TestStorage();
+    markOnline(storage, "home");
+    await submitMultiplayerCommand(
+      "ABC234",
+      AWAY_TOKEN,
+      {
+        command: { type: "SELECT_SWING", decision: "take" },
+        expectedRevision: 0,
+        idempotencyKey: randomUUID(),
+      },
+      storage,
+    );
+    await submitMultiplayerCommand(
+      "ABC234",
+      HOME_TOKEN,
+      {
+        command: { type: "SELECT_PITCH", target: "ball" },
+        expectedRevision: 1,
+        idempotencyKey: randomUUID(),
+      },
+      storage,
+    );
+    await expect(
+      submitMultiplayerCommand(
+        "ABC234",
+        AWAY_TOKEN,
+        {
+          command: { type: "SELECT_SWING", decision: "swing" },
+          expectedRevision: 0,
+          idempotencyKey: randomUUID(),
+        },
+        storage,
+      ),
+    ).rejects.toMatchObject({ code: "REVISION_CONFLICT" });
+  });
+
+  it("keeps the shared deadline when one side locks first", async () => {
+    at(START + 20_000);
+    const storage = new TestStorage();
+    markOnline(storage, "away");
+    const locked = await submitMultiplayerCommand(
+      "ABC234",
+      HOME_TOKEN,
+      {
+        command: { type: "SELECT_PITCH", target: "strike" },
+        expectedRevision: 0,
+        idempotencyKey: randomUUID(),
+      },
+      storage,
+    );
+    expect(locked.view.phase).toBe("awaiting_swing");
+    expect(locked.clock.deadlineAt).toBe(FIRST_PITCH_DEADLINE);
+
+    at(FIRST_PITCH_DEADLINE - 1_000);
+    const late = new TestStorage();
+    markOnline(late, "away");
+    const lastSecond = await submitMultiplayerCommand(
+      "ABC234",
+      HOME_TOKEN,
+      {
+        command: { type: "SELECT_PITCH", target: "strike" },
+        expectedRevision: 0,
+        idempotencyKey: randomUUID(),
+      },
+      late,
+    );
+    expect(lastSecond.clock.deadlineAt).toBe(
+      FIRST_PITCH_DEADLINE - 1_000 + MIN_DECISION_AFTER_LOCK_MS,
+    );
   });
 });

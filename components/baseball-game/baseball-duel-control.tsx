@@ -9,19 +9,54 @@ import type {
 } from "@/lib/baseball-game/types";
 
 type DuelGame = GameState | GameView;
+export type DuelRole = "pitcher" | "batter";
+
+export function isBatterLocked(game: DuelGame) {
+  return "batterLocked" in game
+    ? game.batterLocked
+    : Boolean((game as GameState).earlySwing);
+}
+
+/** Which choice this role still owes, or null once it has locked one. */
+export function pendingDuelChoice(
+  game: DuelGame,
+  role: DuelRole,
+): "pitch" | "swing" | null {
+  if (role === "pitcher") {
+    return game.phase === "awaiting_pitch" ? "pitch" : null;
+  }
+  if (game.phase === "awaiting_swing") return "swing";
+  const earlyOpen =
+    game.phase === "awaiting_pitch" &&
+    game.rulesetVersion === "pitch-duel-v4" &&
+    game.activeStrategy?.cardId !== "HNR" &&
+    !isBatterLocked(game);
+  return earlyOpen ? "swing" : null;
+}
 
 export function BaseballDuelControl({
   busy = false,
   canAct = true,
   game,
   onAction,
+  role,
 }: {
   busy?: boolean;
   canAct?: boolean;
   game: DuelGame;
   onAction: (action: GameAction) => void;
+  /** Without a role the control follows the sequential v3 phase order. */
+  role?: DuelRole;
 }) {
-  if (game.phase === "awaiting_pitch") {
+  const choice = role
+    ? pendingDuelChoice(game, role)
+    : game.phase === "awaiting_pitch"
+      ? "pitch"
+      : game.phase === "awaiting_swing"
+        ? "swing"
+        : null;
+
+  if (choice === "pitch") {
     return (
       <section className="bbg-duel bbg-duel--simple" aria-label="투구 선택">
         <div className="bbg-duel-heading">
@@ -45,7 +80,7 @@ export function BaseballDuelControl({
     );
   }
 
-  if (game.phase === "awaiting_swing") {
+  if (choice === "swing") {
     return (
       <section className="bbg-duel bbg-duel--simple" aria-label="타격 선택">
         <div className="bbg-duel-heading">

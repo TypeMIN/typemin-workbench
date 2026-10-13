@@ -383,23 +383,16 @@ const SHORTCUTS: Record<string, GameAction> = {
   p: { type: "PASS_CARD_WINDOW" },
 };
 
-const SHORTCUT_PHASE: Record<GameAction["type"], GameView["phase"] | null> = {
-  SELECT_PITCH: "awaiting_pitch",
-  SELECT_SWING: "awaiting_swing",
-  PASS_CARD_WINDOW: "awaiting_card",
-  PLAY_CARD: "awaiting_card",
-  PITCH_RESULT: null,
-  BATTING_RESULT: null,
-  HIT_RESULT: null,
-};
-
 export function useDecisionShortcuts({
   enabled,
   phase,
+  duelChoice,
   onAction,
 }: {
   enabled: boolean;
   phase: GameView["phase"];
+  /** The duel choice this seat still owes, from its pitcher or batter role. */
+  duelChoice: "pitch" | "swing" | null;
   onAction: (action: GameAction) => void;
 }) {
   const onActionRef = useRef(onAction);
@@ -418,18 +411,25 @@ export function useDecisionShortcuts({
         return;
       }
       const action = SHORTCUTS[event.key.toLowerCase()];
-      if (!action || SHORTCUT_PHASE[action.type] !== phase) return;
+      const allowed =
+        (action?.type === "SELECT_PITCH" && duelChoice === "pitch") ||
+        (action?.type === "SELECT_SWING" && duelChoice === "swing") ||
+        (action?.type === "PASS_CARD_WINDOW" && phase === "awaiting_card");
+      if (!action || !allowed) return;
       event.preventDefault();
       onActionRef.current(action);
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [enabled, phase]);
+  }, [duelChoice, enabled, phase]);
 }
 
-export function shortcutHint(phase: GameView["phase"]) {
-  if (phase === "awaiting_pitch") return "S 스트라이크 · B 볼";
-  if (phase === "awaiting_swing") return "W 스윙 · T 지켜보기";
+export function shortcutHint(
+  phase: GameView["phase"],
+  duelChoice: "pitch" | "swing" | null,
+) {
+  if (duelChoice === "pitch") return "S 스트라이크 · B 볼";
+  if (duelChoice === "swing") return "W 스윙 · T 지켜보기";
   if (phase === "awaiting_card") return "P 카드 없이 진행";
   return null;
 }
