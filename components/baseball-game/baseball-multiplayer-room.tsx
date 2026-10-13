@@ -4,6 +4,7 @@ import {
   ArrowLeft,
   Check,
   Copy,
+  Eye,
   Film,
   Flag,
   Repeat,
@@ -498,10 +499,12 @@ function RoomShell({
   );
 }
 
-function RoomBar({
+export function RoomBar({
+  label = "Multiplayer",
   roomCode,
   soundscape,
 }: {
+  label?: string;
   roomCode: string;
   soundscape?: BaseballSoundscape;
 }) {
@@ -511,7 +514,7 @@ function RoomBar({
         <span aria-hidden="true" className="bbg-room-brand-mark" />
         <span>
           <strong>야구 게임</strong>
-          <small>Multiplayer</small>
+          <small>{label}</small>
         </span>
       </Link>
       <div className="bbg-room-bar-tools">
@@ -555,6 +558,13 @@ function RoomJoin({
         <Users aria-hidden="true" size={16} />
         {joining ? "좌석 확인 중" : "홈팀으로 참가"}
       </button>
+      <Link
+        className="bbg-room-secondary"
+        href={`/baseball-game/rooms/${roomCode}/watch`}
+      >
+        <Eye aria-hidden="true" size={15} />
+        참가하지 않고 관전하기
+      </Link>
       <Link className="bbg-room-back" href="/baseball-game">
         <ArrowLeft aria-hidden="true" size={15} /> 돌아가기
       </Link>
@@ -602,6 +612,7 @@ function MultiplayerBoard({
   submitting: boolean;
 }) {
   const [presentationActive, setPresentationActive] = useState(false);
+  const [watchCopied, setWatchCopied] = useState(false);
   const liveSnapshot = props.snapshot;
   const liveGame = liveSnapshot.view;
   const staged = useStagedView(liveGame);
@@ -814,6 +825,24 @@ function MultiplayerBoard({
                 }}
               />
             ) : null}
+            {snapshot.status === "playing" ? (
+              <button
+                className="bbg-room-secondary bbg-room-watch-link"
+                onClick={() => {
+                  void navigator.clipboard
+                    ?.writeText(watchUrl(snapshot.roomCode))
+                    .then(() => setWatchCopied(true));
+                }}
+                type="button"
+              >
+                {watchCopied ? (
+                  <Check aria-hidden="true" size={15} />
+                ) : (
+                  <Eye aria-hidden="true" size={15} />
+                )}
+                {watchCopied ? "관전 링크 복사됨" : "관전 링크 복사"}
+              </button>
+            ) : null}
 
             {snapshot.status === "lobby" ? (
               <div className="bbg-room-panel bbg-room-waiting">
@@ -916,7 +945,13 @@ function MultiplayerBoard({
   );
 }
 
-function Scorebug({ game, seat }: { game: GameView; seat: TeamSide }) {
+export function Scorebug({
+  game,
+  seat,
+}: {
+  game: GameView;
+  seat: TeamSide | null;
+}) {
   return (
     <div
       className="bbg-scorebug"
@@ -1465,6 +1500,10 @@ function stageSnapshot(
     isYourTurn: false,
     legalCards: [],
   };
+}
+
+function watchUrl(roomCode: string) {
+  return `${roomUrl(roomCode)}/watch`;
 }
 
 function roomUrl(roomCode: string) {

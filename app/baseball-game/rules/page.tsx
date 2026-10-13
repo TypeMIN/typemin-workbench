@@ -188,7 +188,8 @@ export default function BaseballRulesPage() {
             <dt>멀티플레이</dt>
             <dd>
               두 기기가 한 방에 들어가 각자 손패를 숨긴 채 겨룹니다. 링크나 QR로
-              초대합니다.
+              초대합니다. 다른 사람은 관전 링크로 손패 없이 경기를 볼 수
+              있습니다.
             </dd>
           </div>
           <div>
