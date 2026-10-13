@@ -25,10 +25,8 @@ import { BaseballSoundControls } from "@/components/baseball-game/audio/baseball
 import { useBaseballSoundscape } from "@/components/baseball-game/audio/use-baseball-soundscape";
 import { BaseballStadium } from "@/components/baseball-game/baseball-game-debug";
 import { useStagedView } from "@/components/baseball-game/use-staged-view";
-import {
-  BaseballPlayReceipt,
-  BroadcastLineScore,
-} from "@/components/baseball-game/baseball-broadcast";
+import { BroadcastLineScore } from "@/components/baseball-game/baseball-broadcast";
+import { getPendingTeams } from "@/lib/baseball-game/multiplayer/activity";
 import { hasResolutionOutcome } from "@/lib/baseball-game/presentation";
 import type {
   PartyHostCommand,
@@ -517,19 +515,22 @@ function PartyLive({
   const face = game.eventLog.findLast(
     (event) => event.kind === "die_roll",
   )?.face;
+  // Lineup cursors move when a plate appearance ends, so they wait for the
+  // scene like everything else on the shared screen.
+  const [heldMeta, setHeldMeta] = useState(snapshot);
+  if (staged.settled && heldMeta !== snapshot) setHeldMeta(snapshot);
+  const meta = staged.settled ? snapshot : heldMeta;
   return (
-    <div className="bbg-party-live">
-      <TeamRail
-        label="원정"
-        players={snapshot.players.away}
-        activeIds={[snapshot.activeBatterId, snapshot.activeDefenderId]}
-      />
+    <div className="bbg-party-live bbg-tv-live">
+      <TvTeamRail game={game} meta={meta} team="away" />
       <section
-        className="bbg-party-live-field"
+        className="bbg-party-live-field bbg-tv-stage"
         aria-label="파티플레이 공용 경기장"
       >
-        <PartyScoreboard game={game} />
-        <BaseballSoundControls soundscape={soundscape} />
+        <TvScorebug game={game} />
+        <div className="bbg-tv-sound">
+          <BaseballSoundControls soundscape={soundscape} />
+        </div>
         <BaseballStadium
           face={face}
           game={liveGame}
@@ -538,24 +539,21 @@ function PartyLive({
           onPresentedRevision={staged.onPresentedRevision}
           replayLatestOnMount={false}
         />
-        <div className="bbg-party-live-result">
-          <span>{concealingOutcome ? "•" : (face ?? "▶")}</span>
-          <div>
-            <small>{concealingOutcome ? "NOW PLAYING" : "방금 판정"}</small>
-            <strong>
-              {concealingOutcome
-                ? "플레이 진행 중"
-                : (latest?.summary ?? "경기 시작")}
-            </strong>
-            {concealingOutcome ? null : <BaseballPlayReceipt game={game} />}
-          </div>
+        <TvDeciders game={game} meta={meta} hidden={presentationActive} />
+        <div className="bbg-tv-lower-third" aria-live="polite">
+          <span>{concealingOutcome ? "Live" : latest ? "Play" : "Next"}</span>
+          <strong>
+            {concealingOutcome
+              ? "플레이 진행 중"
+              : (latest?.summary ?? "경기 시작")}
+          </strong>
         </div>
       </section>
-      <TeamRail
-        label="홈"
-        players={snapshot.players.home}
-        activeIds={[snapshot.activeBatterId, snapshot.activeDefenderId]}
-      />
+      <TvTeamRail game={game} meta={meta} team="home">
+        <div className="bbg-tv-box">
+          <BroadcastLineScore game={game} />
+        </div>
+      </TvTeamRail>
       {snapshot.isHost ? (
         <details className="bbg-party-host-panel">
           <summary>
@@ -630,68 +628,184 @@ function PartyLive({
   );
 }
 
-function TeamRail({
-  activeIds,
-  label,
-  players,
-}: {
-  activeIds: Array<string | null>;
-  label: string;
-  players: PartyPlayer[];
-}) {
+function playerName(meta: PartyPublicSnapshot, id: string | null) {
+  if (!id) return null;
   return (
-    <aside className="bbg-party-team-rail" aria-label={`${label}팀 로스터`}>
+    [...meta.players.away, ...meta.players.home].find(
+      (player) => player.id === id,
+    )?.nickname ?? null
+  );
+}
+
+function TvTeamRail({
+  children,
+  game,
+  meta,
+  team,
+}: {
+  children?: React.ReactNode;
+  game: GameView;
+  meta: PartyPublicSnapshot;
+  team: TeamSide;
+}) {
+  const batting = game.battingTeam === team;
+  const lineup = meta.lineups[team];
+  const players = new Map(
+    meta.players[team].map((player) => [player.id, player]),
+  );
+  const current = lineup.length ? meta.battingIndex[team] % lineup.length : 0;
+  const order = lineup.length
+    ? [...lineup.slice(current), ...lineup.slice(0, current)]
+    : meta.players[team].map((player) => player.id);
+  return (
+    <aside
+      className="bbg-tv-rail"
+      data-batting={batting}
+      data-team={team}
+      aria-label={`${teamName(game, team)} 라인업`}
+    >
       <header>
-        {label}
-        <b>{players.length}</b>
+        <small>{team === "away" ? "원정" : "홈"}</small>
+        <strong>{teamName(game, team)}</strong>
+        <span>{batting ? "공격" : "수비"}</span>
       </header>
       <ol>
-        {players.map((player) => (
-          <li
-            data-active={activeIds.includes(player.id)}
-            data-connected={player.connected}
-            key={player.id}
-          >
-            <span>{player.nickname.slice(0, 1)}</span>
-            <strong>{player.nickname}</strong>
-            {activeIds.includes(player.id) ? <em>NOW</em> : null}
-          </li>
-        ))}
+        {order.map((id, index) => {
+          const player = players.get(id);
+          if (!player) return null;
+          const fielding = !batting && id === meta.activeDefenderId;
+          const tag = batting
+            ? index === 0
+              ? "타석"
+              : index === 1
+                ? "대기"
+                : null
+            : fielding
+              ? "투수"
+              : null;
+          return (
+            <li
+              data-connected={player.connected}
+              data-now={tag === "타석" || tag === "투수"}
+              key={id}
+            >
+              <span aria-hidden="true">{player.nickname.slice(0, 1)}</span>
+              <strong>{player.nickname}</strong>
+              {tag ? <em>{tag}</em> : null}
+            </li>
+          );
+        })}
       </ol>
+      {children}
     </aside>
   );
 }
 
-function PartyScoreboard({ game }: { game: GameView }) {
+function TvScorebug({ game }: { game: GameView }) {
   return (
-    <section
-      className="bbg-party-v2-scoreboard"
+    <div
+      className="bbg-tv-scorebug"
+      role="group"
       aria-label={`공용 경기 점수판 ${inningLabel(game)}`}
     >
-      <div className="bbg-party-line-score">
-        <BroadcastLineScore game={game} />
+      <div className="bbg-tv-scorebug-teams">
+        {(["away", "home"] as const).map((team) => (
+          <div
+            data-batting={game.battingTeam === team}
+            data-team={team}
+            key={team}
+          >
+            <span>{teamName(game, team)}</span>
+            <strong>{game.score[team]}</strong>
+          </div>
+        ))}
       </div>
-      <strong className="bbg-party-v2-inning">{inningLabel(game)}</strong>
-      <div className="bbg-party-v2-diamond" aria-label="주자 현황">
+      <div className="bbg-tv-scorebug-inning">
+        <i aria-hidden="true" data-half={game.half} />
+        <strong>{game.inning}</strong>
+      </div>
+      <div className="bbg-tv-scorebug-bases" role="img" aria-label="주자 현황">
         <i data-base="second" data-on={game.bases.second} />
         <i data-base="third" data-on={game.bases.third} />
         <i data-base="first" data-on={game.bases.first} />
       </div>
-      <div className="bbg-party-v2-counts">
-        {[
-          ["B", game.balls, 3],
-          ["S", game.strikes, 2],
-          ["O", game.outs, 2],
-        ].map(([label, active, total]) => (
-          <p data-tone={label} key={label}>
+      <div className="bbg-tv-scorebug-count">
+        {(
+          [
+            ["B", game.balls, 3, "ball"],
+            ["S", game.strikes, 2, "strike"],
+            ["O", game.outs, 2, "out"],
+          ] as const
+        ).map(([label, active, total, tone]) => (
+          <div data-tone={tone} key={label}>
             <b>{label}</b>
-            {Array.from({ length: Number(total) }, (_, index) => (
-              <i data-on={index < Number(active)} key={index} />
+            {Array.from({ length: total }, (_, index) => (
+              <i data-on={index < active} key={index} />
             ))}
-          </p>
+          </div>
         ))}
       </div>
-    </section>
+    </div>
+  );
+}
+
+/** Who still owes a decision right now, readable from across the room. */
+function TvDeciders({
+  game,
+  hidden,
+  meta,
+}: {
+  game: GameView;
+  hidden: boolean;
+  meta: PartyPublicSnapshot;
+}) {
+  if (hidden || game.phase === "finished") return null;
+  const fielding: TeamSide = game.battingTeam === "away" ? "home" : "away";
+  const pending = getPendingTeams(game);
+  const duel =
+    game.phase === "awaiting_pitch" || game.phase === "awaiting_swing";
+  const rows: Array<{
+    key: string;
+    role: string;
+    name: string | null;
+    state: string;
+  }> = duel
+    ? [
+        {
+          key: "pitcher",
+          role: "투수",
+          name: playerName(meta, meta.activeDefenderId),
+          state: pending.includes(fielding) ? "선택 중" : "선택 완료",
+        },
+        {
+          key: "batter",
+          role: "타자",
+          name: playerName(meta, meta.activeBatterId),
+          state: pending.includes(game.battingTeam) ? "선택 중" : "선택 완료",
+        },
+      ]
+    : pending.map((team) => ({
+        key: team,
+        role: team === game.battingTeam ? "공격 카드" : "수비 카드",
+        name: playerName(
+          meta,
+          team === game.battingTeam
+            ? meta.activeBatterId
+            : meta.activeDefenderId,
+        ),
+        state: "검토 중",
+      }));
+  if (!rows.length) return null;
+  return (
+    <div className="bbg-tv-deciders" aria-live="polite">
+      {rows.map((row) => (
+        <div data-done={row.state === "선택 완료"} key={row.key}>
+          <small>{row.role}</small>
+          <strong>{row.name ?? "선수"}</strong>
+          <span>{row.state}</span>
+        </div>
+      ))}
+    </div>
   );
 }
 

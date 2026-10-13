@@ -538,6 +538,11 @@ function buildPublicSnapshot(
       : null,
     view: getGameView(room.state, "public"),
     isHost,
+    lineups: {
+      away: [...room.partyState.lineups.away],
+      home: [...room.partyState.lineups.home],
+    },
+    battingIndex: { ...room.partyState.battingIndex },
     presentationReadyAt: getPresentationReadyAt(
       room.state,
       room.revisionStartedAt,

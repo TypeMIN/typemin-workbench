@@ -71,6 +71,9 @@ export type PartyPublicSnapshot = {
   activeDefenderId: string | null;
   view: GameView;
   isHost: boolean;
+  /** Public batting order, so screens can show who is on deck. */
+  lineups: Record<TeamSide, string[]>;
+  battingIndex: Record<TeamSide, number>;
   /** Epoch ms when the shared screen finishes this revision's scenes. */
   presentationReadyAt: number;
   serverNow: number;

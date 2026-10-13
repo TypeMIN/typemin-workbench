@@ -45,6 +45,8 @@ function snapshot(canAct: boolean): PartyPlayerSnapshot {
     activeDefenderId: "home1",
     view: getGameView(state, "home"),
     isHost: false,
+    lineups: { away: [], home: [] },
+    battingIndex: { away: 0, home: 0 },
     presentationReadyAt: 0,
     serverNow: Date.now(),
     me,
