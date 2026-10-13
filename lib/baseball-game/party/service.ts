@@ -12,11 +12,19 @@ import {
   transition,
 } from "../engine";
 import { commandToGameAction } from "../multiplayer/command";
+import { chooseTimeoutAction } from "../multiplayer/shot-clock";
+import { timeoutIdempotencyKey } from "../multiplayer/service";
 import { getPresentationReadyAt } from "../presentation-gate";
 import { notifyRoomChanged, roomTopic } from "../realtime";
 import { canRebaseDuelLock, isDuelLock } from "../multiplayer/duel-lock";
 import { newRoomCode, normalizeRoomCode } from "../multiplayer/security";
 import type { GameConfig, TeamSide } from "../types";
+import {
+  buildPartyShotClockView,
+  getPartyClockWindow,
+  nextPartyClock,
+  restartPartyClock,
+} from "./clock";
 import { newPartyToken, partyTokenHash } from "./security";
 import { getPartyStorage, type PartyStorage } from "./storage";
 import {
@@ -150,7 +158,10 @@ export async function getPartyPublicSnapshot(
   hostToken: string | null,
   storage: PartyStorage = getPartyStorage(),
 ): Promise<PartyPublicSnapshot> {
-  const room = await requireRoom(roomCode, storage);
+  const room = await settleExpiredPartyDecision(
+    await requireRoom(roomCode, storage),
+    storage,
+  );
   const players = activePlayers(await storage.listPlayers(room.id));
   return buildPublicSnapshot(
     room,
@@ -164,8 +175,9 @@ export async function getPartyPlayerSnapshot(
   playerToken: string | null,
   storage: PartyStorage = getPartyStorage(),
 ): Promise<PartyPlayerSnapshot> {
-  const room = await requireRoom(roomCode, storage);
-  const player = await requirePlayer(room, playerToken, storage);
+  const storedRoom = await requireRoom(roomCode, storage);
+  const player = await requirePlayer(storedRoom, playerToken, storage);
+  const room = await settleExpiredPartyDecision(storedRoom, storage);
   const players = activePlayers(await storage.listPlayers(room.id));
   const publicSnapshot = buildPublicSnapshot(room, players, false);
   const actionOwner = getActionOwner(room.state);
@@ -209,7 +221,7 @@ export async function submitPartyHostCommand(
   if (room.roomRevision !== input.expectedRoomRevision)
     throw revisionConflict();
   const players = activePlayers(await storage.listPlayers(room.id));
-  const next = applyHostCommand(room, players, input.command);
+  const next = applyHostCommand(room, players, input.command, Date.now());
   let commit;
   try {
     commit = await storage.commitHostMutation({
@@ -249,12 +261,16 @@ export async function submitPartyAction(
   input: PartyActionInput,
   storage: PartyStorage = getPartyStorage(),
 ) {
-  let room = await requireRoom(roomCode, storage);
-  const player = await requirePlayer(room, playerToken, storage);
-  const duplicate = await storage.getIdempotency(room.id, input.idempotencyKey);
+  const storedRoom = await requireRoom(roomCode, storage);
+  const player = await requirePlayer(storedRoom, playerToken, storage);
+  const duplicate = await storage.getIdempotency(
+    storedRoom.id,
+    input.idempotencyKey,
+  );
   if (duplicate) {
-    return getPartyPlayerSnapshot(room.roomCode, playerToken, storage);
+    return getPartyPlayerSnapshot(storedRoom.roomCode, playerToken, storage);
   }
+  let room = await settleExpiredPartyDecision(storedRoom, storage);
   for (let attempt = 0; ; attempt += 1) {
     if (room.status !== "playing") {
       throw new PartyServiceError(
@@ -299,11 +315,13 @@ export async function submitPartyAction(
     const result = transition(room.state, action);
     if (!result.ok)
       throw new PartyServiceError("INVALID_ACTION", result.error.message);
-    const nextPartyState = rotatePartyStateAfterTransition(
-      room,
-      result.state,
-      result.events,
-    );
+    const nextPartyState = {
+      ...rotatePartyStateAfterTransition(room, result.state, result.events),
+      clock: nextPartyClock(room, result.state, {
+        now: Date.now(),
+        timedOutTeam: null,
+      }),
+    };
     let commit;
     try {
       commit = await storage.commitAction({
@@ -342,10 +360,80 @@ export async function submitPartyAction(
   }
 }
 
+// A v4 duel can expire twice in a row: the pitch is filled first, then the
+// swing that the carried deadline has already run out on.
+const MAX_TIMEOUT_STEPS = 2;
+
+/**
+ * Expired decisions are filled lazily by whichever screen polls first, like
+ * multiplayer rooms. Party play never forfeits: the clock only keeps a
+ * distracted player from stalling the room. The idempotency key comes from
+ * the revision, so concurrent pollers commit at most one automatic action.
+ */
+async function settleExpiredPartyDecision(
+  room: PartyRoomRecord,
+  storage: PartyStorage,
+): Promise<PartyRoomRecord> {
+  let current = room;
+  for (let step = 0; step < MAX_TIMEOUT_STEPS; step += 1) {
+    const now = Date.now();
+    const window = getPartyClockWindow(current);
+    if (!window || now < window.deadlineAt) return current;
+    const action = chooseTimeoutAction(current.state, (size) =>
+      randomInt(0, size),
+    );
+    if (!action) return current;
+    const result = transition(current.state, action);
+    if (!result.ok) return current;
+    const team = getActionActor(current.state, action);
+    if (!team) return current;
+    try {
+      const players = activePlayers(await storage.listPlayers(current.id));
+      const actorId =
+        activePlayerForTeam(current, players, team) ??
+        players.find((player) => player.team === team)?.id;
+      if (!actorId) return current;
+      const commit = await storage.commitAction({
+        roomId: current.id,
+        expectedRevision: current.revision,
+        expectedRoomRevision: current.roomRevision,
+        newState: result.state,
+        newPartyState: {
+          ...rotatePartyStateAfterTransition(
+            current,
+            result.state,
+            result.events,
+          ),
+          clock: nextPartyClock(current, result.state, {
+            now,
+            timedOutTeam: team,
+          }),
+        },
+        actorTeam: team,
+        actorPlayerId: actorId,
+        action,
+        events: result.events,
+        idempotencyKey: timeoutIdempotencyKey(current.id, current.revision),
+      });
+      if (commit.status === "applied") {
+        await notifyRoomChanged(current.id, {
+          revision: commit.revision,
+          roomRevision: commit.roomRevision,
+        });
+      }
+      current = (await storage.getRoom(current.roomCode)) ?? current;
+    } catch {
+      return current;
+    }
+  }
+  return current;
+}
+
 function applyHostCommand(
   room: PartyRoomRecord,
   players: PartyStoredPlayer[],
   command: PartyHostCommand,
+  now: number,
 ) {
   let status = room.status;
   let state = structuredClone(room.state);
@@ -402,6 +490,7 @@ function applyHostCommand(
     }
     const lineupSeed = randomInt(0, 0x1_0000_0000);
     partyState = createLineups(players, lineupSeed);
+    partyState.clock = restartPartyClock({ ...room, partyState }, now);
     status = "playing";
     payload = { lineupSeed };
   } else if (command.type === "PAUSE_GAME") {
@@ -417,6 +506,7 @@ function applyHostCommand(
     ) {
       throw invalidCommand("양 팀에 선수가 있어야 재개할 수 있습니다.");
     }
+    partyState.clock = restartPartyClock(room, now);
     status = "playing";
   } else if (command.type === "SKIP_ACTIVE_PLAYER") {
     if (room.status !== "playing" && room.status !== "paused") {
@@ -438,6 +528,7 @@ function applyHostCommand(
         partyState.defenseIndex[owner],
       );
     }
+    partyState.clock = restartPartyClock(room, now);
   } else if (command.type === "END_GAME") {
     if (room.status === "finished" || room.status === "expired") {
       throw invalidCommand("이미 종료된 경기입니다.");
@@ -521,6 +612,7 @@ function buildPublicSnapshot(
   players: PartyStoredPlayer[],
   isHost: boolean,
 ): PartyPublicSnapshot {
+  const now = Date.now();
   const hasActivePlayers =
     room.status === "playing" || room.status === "paused";
   const publicPlayers = {
@@ -560,8 +652,9 @@ function buildPublicSnapshot(
       room.state,
       room.revisionStartedAt,
     ),
-    serverNow: Date.now(),
+    serverNow: now,
     realtimeTopic: roomTopic(room.id),
+    shotClock: buildPartyShotClockView(room, now),
   };
 }
 

@@ -28,6 +28,7 @@ import {
 import { BaseballSoundControls } from "@/components/baseball-game/audio/baseball-sound-controls";
 import { useBaseballSoundscape } from "@/components/baseball-game/audio/use-baseball-soundscape";
 import { BaseballStadium } from "@/components/baseball-game/baseball-game-debug";
+import { PartyShotClock } from "@/components/baseball-game/party-shot-clock";
 import { useStagedView } from "@/components/baseball-game/use-staged-view";
 import { BroadcastLineScore } from "@/components/baseball-game/baseball-broadcast";
 import { getPendingTeams } from "@/lib/baseball-game/multiplayer/activity";
@@ -808,6 +809,7 @@ function TvDeciders({
         state: "검토 중",
       }));
   if (!rows.length) return null;
+  const timedOut = meta.shotClock.lastTimeout?.revision === game.revision;
   return (
     <div className="bbg-tv-deciders" aria-live="polite">
       {rows.map((row) => (
@@ -817,6 +819,16 @@ function TvDeciders({
           <span>{row.state}</span>
         </div>
       ))}
+      {meta.shotClock.deadlineAt !== null ? (
+        <PartyShotClock
+          clock={meta.shotClock}
+          key={meta.shotClock.deadlineAt}
+          label="결정"
+        />
+      ) : null}
+      {timedOut ? (
+        <p className="bbg-tv-timeout">시간 초과로 자동 진행했습니다</p>
+      ) : null}
     </div>
   );
 }

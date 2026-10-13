@@ -591,3 +591,80 @@
 .bbg-tv-box .bbg-line-score .bbg-line-inning {
   display: block !important;
 }
+
+/* Party shot clock (shared screen and player devices). Sized in em so it
+   follows whichever screen hosts it. */
+
+.bbg-party-clock {
+  position: relative;
+  display: grid;
+  width: 3.2em;
+  height: 3.2em;
+  flex: none;
+  place-items: center;
+}
+
+.bbg-party-clock svg {
+  position: absolute;
+  inset: 0;
+  rotate: -90deg;
+}
+
+.bbg-party-clock circle {
+  fill: none;
+  stroke-width: 3;
+}
+
+.bbg-party-clock .is-track {
+  stroke: rgb(255 255 255 / 12%);
+}
+
+.bbg-party-clock .is-fill {
+  stroke: var(--room-text);
+  stroke-dasharray: 1;
+  stroke-dashoffset: calc(1 - var(--clock-progress, 1));
+  stroke-linecap: round;
+  transition: stroke-dashoffset 200ms linear;
+}
+
+.bbg-party-clock strong {
+  font-size: 1.05em;
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+}
+
+.bbg-party-clock[data-paused="true"] .is-fill {
+  stroke: var(--room-dim);
+}
+
+.bbg-party-clock[data-warning="true"] .is-fill {
+  stroke: var(--room-out);
+}
+
+.bbg-party-clock[data-warning="true"] strong {
+  color: #ff8d84;
+  animation: bbg-room-clock-pulse 1s ease-in-out infinite;
+}
+
+.bbg-tv-deciders > .bbg-party-clock {
+  align-self: center;
+  width: 3.6em;
+  min-width: 0;
+  height: 3.6em;
+  padding: 0;
+  border: 0;
+  background: none;
+}
+
+.bbg-party-player-turn-clock {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 16px;
+}
+
+.bbg-tv-timeout,
+.bbg-party-player-timeout {
+  color: var(--room-out);
+  font-weight: 700;
+}

@@ -24,6 +24,7 @@ import {
   BroadcastLineScore,
 } from "./baseball-broadcast";
 import { BaseballDuelControl } from "./baseball-duel-control";
+import { PartyShotClock } from "./party-shot-clock";
 import { useTimeGatedSnapshot } from "./use-time-gated-snapshot";
 import type { CardRole, GameAction, GameView } from "@/lib/baseball-game/types";
 
@@ -267,6 +268,22 @@ function PartyPlayerBoard({
               ? `타자 · ${snapshot.me.nickname}`
               : `수비 · ${snapshot.me.nickname}`}
         </p>
+        {snapshot.canAct && snapshot.shotClock.deadlineAt !== null ? (
+          <div className="bbg-party-player-turn-clock">
+            <PartyShotClock
+              clock={snapshot.shotClock}
+              key={snapshot.shotClock.deadlineAt}
+              label="내 결정"
+            />
+            <span>시간이 지나면 자동으로 진행됩니다</span>
+          </div>
+        ) : null}
+        {snapshot.shotClock.lastTimeout?.revision === game.revision &&
+        snapshot.shotClock.lastTimeout.team === snapshot.me.team ? (
+          <p className="bbg-party-player-timeout" role="status">
+            시간 초과로 자동 진행했습니다
+          </p>
+        ) : null}
         <BaseballPlayReceipt game={game} />
       </section>
       <section className="bbg-party-player-roster" aria-label="내 팀 순서">
