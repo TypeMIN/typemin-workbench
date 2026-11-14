@@ -48,7 +48,10 @@ describe("Workbench home", () => {
     const worldcupLink = screen.getByRole("link", {
       name: "월드컵 예측 내기 열기",
     });
-    expect(worldcupLink).toHaveAttribute("href", "/worldcup-prediction");
+    expect(worldcupLink).toHaveAttribute(
+      "href",
+      "https://make-your-pick.vercel.app/spaces/worldcup-2026",
+    );
     const worldcupCard = within(
       screen.getByRole("link", { name: "월드컵 예측 내기 열기" }),
     );

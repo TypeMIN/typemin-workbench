@@ -77,8 +77,19 @@ test("홈에서 두 앱으로 이동한다", async ({ page }) => {
     ),
   ).toBe(true);
 
-  await page.getByRole("link", { name: "월드컵 예측 내기 열기" }).click();
-  await expect(page).toHaveURL(/\/worldcup-prediction$/);
+  await expect(
+    page.getByRole("link", { name: "월드컵 예측 내기 열기" }),
+  ).toHaveAttribute(
+    "href",
+    "https://make-your-pick.vercel.app/spaces/worldcup-2026",
+  );
+  await page.goto("/worldcup-prediction");
+  await expect(
+    page.getByRole("link", { name: "Make Your Pick에서 기록 보기 ↗" }),
+  ).toHaveAttribute(
+    "href",
+    "https://make-your-pick.vercel.app/spaces/worldcup-2026",
+  );
   await expect(
     page.getByRole("link", { name: "Workbench 홈으로 돌아가기" }),
   ).toBeVisible();
