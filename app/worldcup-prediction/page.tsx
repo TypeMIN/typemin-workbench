@@ -470,14 +470,6 @@ export default function Home() {
               <span>2026 예측 프로젝트 완료</span>
             </div>
             <p>
-              <Link
-                className="button primary"
-                href="https://make-your-pick.vercel.app/spaces/worldcup-2026"
-              >
-                Make Your Pick에서 기록 보기 ↗
-              </Link>
-            </p>
-            <p>
               기존 참가자 5명, 예측 40건, 완료된 32경기의 기록을 그대로
               공개합니다. 참가, 예측 수정, 관리자 기능과 경기 동기화는
               종료되었습니다.

@@ -78,7 +78,7 @@ export function WorkbenchProjectCatalog() {
           <Link
             aria-label={`${app.name} 열기`}
             className={`workbench-card workbench-card--${app.accent}`}
-            href={"externalHref" in app ? app.externalHref : app.href}
+            href={app.href}
             key={app.href}
           >
             <span aria-hidden="true" className="workbench-card-emoji">

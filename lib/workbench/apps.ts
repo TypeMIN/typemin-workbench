@@ -20,7 +20,6 @@ export const WORKBENCH_APPS = [
     emoji: "⚽",
     keywords: ["예측 결과", "점수판"],
     href: "/worldcup-prediction",
-    externalHref: "https://make-your-pick.vercel.app/spaces/worldcup-2026",
     status: "archived",
     accent: "worldcup",
   },
